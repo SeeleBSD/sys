@@ -1,0 +1,5 @@
+**/obj
+**/tags
+**/CVS
+**/.vscode
+**/.DS_Store
