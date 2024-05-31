@@ -329,7 +329,7 @@ impl<T: JobImpl> Scheduler<T> {
                 &Self::OPS,
                 hw_submission,
                 hang_limit,
-                bindings::msecs_to_jiffies(timeout_ms.try_into()?).try_into()?,
+                msecs_to_jiffies(timeout_ms.try_into()?).try_into()?,
                 core::ptr::null_mut(),
                 core::ptr::null_mut(),
                 name.as_char_ptr(),

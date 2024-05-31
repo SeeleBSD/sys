@@ -32,6 +32,9 @@ pub mod soc;
 pub mod device;
 pub mod static_assert;
 pub mod drm;
+pub mod dma_fence;
+pub mod tools;
+pub(crate) mod private;
 
 #[doc(hidden)]
 pub use bindings;

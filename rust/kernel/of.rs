@@ -199,36 +199,36 @@ prop_int_type!(u64);
 
 #[macro_export]
 macro_rules! compatible {
-    ($node:tt, $table:tt) => {
+    ($node:tt, $table:tt) => ({
         {
-            let ret: i32 = 0;
-            for (name, _) in table {
-                ret |= $node.is_compatible($crate::c_str!(name));
+            let mut ret: i32 = 0;
+            for (name, _) in $table {
+                ret |= $node.is_compatible(name);
             }
             ret
         }
-    }
+    });
 }
 
 #[macro_export]
 macro_rules! compatible_info {
-    ($node:tt, $table:tt) => {
+    ($node:tt, $table:tt) => ({
         {
-            let ret = None;
-            for (name, val) in table {
-                if $node.is_compatible($crate::c_str!(name)) != 0 {
-                    ret = val.1;
+            let mut ret = None;
+            for (name, val) in $table {
+                if $node.is_compatible(name) != 0 {
+                    ret = val;
                     break;
                 }
             }
             ret
         }
-    }
+    });
 }
 
 #[macro_export]
 macro_rules! id_table {
-    ($name:ident, $data_ty:ty, [$($t:tt)*]) => {
-        const $name: [(&'static str, Option<$data_ty>;$crate::count_items!($($t)*))] = [$($t)*];
-    }
+    ($name:ident, $data_ty:ty, [ $($t:tt)* ]) => {
+        const $name: [(&'static $crate::str::CStr, Option<$data_ty>);$crate::count_items!($($t)*)] = [$($t)*];
+    };
 }

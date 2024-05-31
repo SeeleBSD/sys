@@ -142,14 +142,14 @@ pub trait BaseObject: IntoGEMObject {
 
     /// Sets the exportable flag, which controls whether the object can be exported via PRIME.
     fn set_exportable(&mut self, exportable: bool) {
-        self.mut_gem_obj().exportable = exportable;
+        //self.mut_gem_obj().exportable = exportable;
     }
 
     /// Creates a new reference to the object.
     fn reference(&self) -> ObjectRef<Self> {
         // SAFETY: Having a reference to an Object implies holding a GEM reference
         unsafe {
-            bindings::drm_gem_object_get(self.gem_obj() as *const _ as *mut _);
+            bindings::BINDING_drm_gem_object_get(self.gem_obj() as *const _ as *mut _);
         }
         ObjectRef {
             ptr: self as *const _,
@@ -199,7 +199,7 @@ pub trait BaseObject: IntoGEMObject {
             bindings::drm_gem_create_mmap_offset(self.gem_obj() as *const _ as *mut _)
         })?;
         Ok(unsafe {
-            bindings::drm_vma_node_offset_addr(&self.gem_obj().vma_node as *const _ as *mut _)
+            bindings::BINDING_drm_vma_node_offset_addr(&self.gem_obj().vma_node as *const _ as *mut _)
         })
     }
 }
@@ -328,7 +328,7 @@ impl<T: IntoGEMObject> Drop for ObjectRef<T> {
         // SAFETY: Having an ObjectRef implies holding a GEM reference.
         // The free callback will take care of deallocation.
         unsafe {
-            bindings::drm_gem_object_put((*self.ptr).gem_obj() as *const _ as *mut _);
+            bindings::BINDING_drm_gem_object_put((*self.ptr).gem_obj() as *const _ as *mut _);
         }
     }
 }
@@ -365,7 +365,7 @@ impl<T: IntoGEMObject> Drop for UniqueObjectRef<T> {
         // SAFETY: Having a UniqueObjectRef implies holding a GEM
         // reference. The free callback will take care of deallocation.
         unsafe {
-            bindings::drm_gem_object_put((*self.ptr).gem_obj() as *const _ as *mut _);
+            bindings::BINDING_drm_gem_object_put((*self.ptr).gem_obj() as *const _ as *mut _);
         }
     }
 }
@@ -388,18 +388,18 @@ impl<T: IntoGEMObject> DerefMut for UniqueObjectRef<T> {
 
 pub(super) fn create_fops() -> bindings::file_operations {
     bindings::file_operations {
-        owner: core::ptr::null_mut(),
-        open: Some(bindings::drm_open),
-        release: Some(bindings::drm_release),
-        unlocked_ioctl: Some(bindings::drm_ioctl),
-        #[cfg(CONFIG_COMPAT)]
-        compat_ioctl: Some(bindings::drm_compat_ioctl),
-        #[cfg(not(CONFIG_COMPAT))]
-        compat_ioctl: None,
-        poll: Some(bindings::drm_poll),
-        read: Some(bindings::drm_read),
-        llseek: Some(bindings::noop_llseek),
-        mmap: Some(bindings::drm_gem_mmap),
+        //owner: core::ptr::null_mut(),
+        //open: Some(bindings::drm_open),
+        //release: Some(bindings::drm_release),
+        //unlocked_ioctl: Some(bindings::drm_ioctl),
+        //#[cfg(CONFIG_COMPAT)]
+        //compat_ioctl: Some(bindings::drm_compat_ioctl),
+        //#[cfg(not(CONFIG_COMPAT))]
+        //compat_ioctl: None,
+        //poll: Some(bindings::drm_poll),
+        //read: Some(bindings::drm_read),
+        //llseek: Some(bindings::noop_llseek),
+        //mmap: Some(bindings::drm_gem_mmap),
         ..Default::default()
     }
 }

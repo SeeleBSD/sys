@@ -13,7 +13,6 @@ use crate::{
     private::Sealed,
     str::CStr,
     types::{ARef, ForeignOwnable},
-    ThisModule,
 };
 use core::{
     marker::{PhantomData, PhantomPinned},
@@ -23,22 +22,22 @@ use core::{
 use macros::vtable;
 
 /// Driver use the GEM memory manager. This should be set for all modern drivers.
-pub const FEAT_GEM: u32 = bindings::DRIVER_GEM;
+pub const FEAT_GEM: u32 = bindings::drm_driver_feature_DRIVER_GEM;
 /// Driver supports mode setting interfaces (KMS).
-pub const FEAT_MODESET: u32 = bindings::DRIVER_MODESET;
+pub const FEAT_MODESET: u32 = bindings::drm_driver_feature_DRIVER_MODESET;
 /// Driver supports dedicated render nodes.
-pub const FEAT_RENDER: u32 = bindings::DRIVER_RENDER;
+pub const FEAT_RENDER: u32 = bindings::drm_driver_feature_DRIVER_RENDER;
 /// Driver supports the full atomic modesetting userspace API.
 ///
 /// Drivers which only use atomic internally, but do not support the full userspace API (e.g. not
 /// all properties converted to atomic, or multi-plane updates are not guaranteed to be tear-free)
 /// should not set this flag.
-pub const FEAT_ATOMIC: u32 = bindings::DRIVER_ATOMIC;
+pub const FEAT_ATOMIC: u32 = bindings::drm_driver_feature_DRIVER_ATOMIC;
 /// Driver supports DRM sync objects for explicit synchronization of command submission.
-pub const FEAT_SYNCOBJ: u32 = bindings::DRIVER_SYNCOBJ;
+pub const FEAT_SYNCOBJ: u32 = bindings::drm_driver_feature_DRIVER_SYNCOBJ;
 /// Driver supports the timeline flavor of DRM sync objects for explicit synchronization of command
 /// submission.
-pub const FEAT_SYNCOBJ_TIMELINE: u32 = bindings::DRIVER_SYNCOBJ_TIMELINE;
+pub const FEAT_SYNCOBJ_TIMELINE: u32 = bindings::drm_driver_feature_DRIVER_SYNCOBJ_TIMELINE;
 
 /// Information data for a DRM Driver.
 pub struct DriverInfo {
@@ -264,7 +263,6 @@ impl<T: Driver> Registration<T> {
         self: Pin<&mut Self>,
         data: T::Data,
         flags: usize,
-        module: &'static ThisModule,
     ) -> Result {
         if self.registered {
             // Already registered.
@@ -278,7 +276,7 @@ impl<T: Driver> Registration<T> {
         // mutable reference.
         unsafe { this.drm.raw_mut() }.dev_private = data_pointer as *mut _;
 
-        this.fops.owner = module.0;
+        //this.fops.owner = module.0;
         this.vtable.fops = &this.fops;
 
         // SAFETY: The device is now initialized and ready to be registered.

@@ -89,6 +89,13 @@ dma_fence_free(struct dma_fence *fence)
 	free(fence, M_DRM, 0);
 }
 
+void
+BINDING_dma_fence_free(struct dma_fence *fence)
+{
+	dma_fence_free(fence);
+	return;
+}
+
 /*
  * is a later than b
  * if a and b are the same, should return false to avoid unwanted work
@@ -127,6 +134,13 @@ static inline void
 dma_fence_set_error(struct dma_fence *fence, int error)
 {
 	fence->error = error;
+}
+
+void
+BINDING_dma_fence_set_error(struct dma_fence *fence, int error)
+{
+	dma_fence_set_error(fence, error);
+	return;
 }
 
 static inline bool

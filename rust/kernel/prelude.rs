@@ -11,8 +11,16 @@ pub use super::build_assert;
 
 pub use super::{info, err, warn};
 
+pub use super::{init, pin_init, try_init, try_pin_init};
+
+pub use super::static_assert;
+
 pub use super::error::{code::*, Error, Result};
 
 pub use super::current;
 
+pub use super::init::{InPlaceInit, Init, PinInit};
+
 pub use super::str::{BStr, CStr};
+
+pub use super::tools::msecs_to_jiffies;

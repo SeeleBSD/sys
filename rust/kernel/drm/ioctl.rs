@@ -5,10 +5,11 @@
 //!
 //! C header: [`include/linux/drm/drm_ioctl.h`](../../../../include/linux/drm/drm_ioctl.h)
 
-use crate::ioctl;
+//use crate::ioctl;
 
 const BASE: u32 = bindings::DRM_IOCTL_BASE as u32;
 
+/*
 /// Construct a DRM ioctl number with no argument.
 #[inline(always)]
 pub const fn IO(nr: u32) -> u32 {
@@ -32,20 +33,21 @@ pub const fn IOW<T>(nr: u32) -> u32 {
 pub const fn IOWR<T>(nr: u32) -> u32 {
     ioctl::_IOWR::<T>(BASE, nr)
 }
+*/
 
 /// Descriptor type for DRM ioctls. Use the `declare_drm_ioctls!{}` macro to construct them.
 pub type DrmIoctlDescriptor = bindings::drm_ioctl_desc;
 
 /// This is for ioctl which are used for rendering, and require that the file descriptor is either
 /// for a render node, or if it’s a legacy/primary node, then it must be authenticated.
-pub const AUTH: u32 = bindings::DRM_AUTH;
+pub const AUTH: u32 = bindings::drm_ioctl_flags_DRM_AUTH;
 
 /// This must be set for any ioctl which can change the modeset or display state. Userspace must
 /// call the ioctl through a primary node, while it is the active master.
 ///
 /// Note that read-only modeset ioctl can also be called by unauthenticated clients, or when a
 /// master is not the currently active one.
-pub const MASTER: u32 = bindings::DRM_MASTER;
+pub const MASTER: u32 = bindings::drm_ioctl_flags_DRM_MASTER;
 
 /// Anything that could potentially wreak a master file descriptor needs to have this flag set.
 ///
@@ -53,20 +55,20 @@ pub const MASTER: u32 = bindings::DRM_MASTER;
 /// a non-behaving master (display compositor) into compliance.
 ///
 /// This is equivalent to callers with the SYSADMIN capability.
-pub const ROOT_ONLY: u32 = bindings::DRM_ROOT_ONLY;
+pub const ROOT_ONLY: u32 = bindings::drm_ioctl_flags_DRM_ROOT_ONLY;
 
 /// Whether drm_ioctl_desc.func should be called with the DRM BKL held or not. Enforced as the
 /// default for all modern drivers, hence there should never be a need to set this flag.
 ///
 /// Do not use anywhere else than for the VBLANK_WAIT IOCTL, which is the only legacy IOCTL which
 /// needs this.
-pub const UNLOCKED: u32 = bindings::DRM_UNLOCKED;
+pub const UNLOCKED: u32 = bindings::drm_ioctl_flags_DRM_UNLOCKED;
 
 /// This is used for all ioctl needed for rendering only, for drivers which support render nodes.
 /// This should be all new render drivers, and hence it should be always set for any ioctl with
 /// `AUTH` set. Note though that read-only query ioctl might have this set, but have not set
 /// DRM_AUTH because they do not require authentication.
-pub const RENDER_ALLOW: u32 = bindings::DRM_RENDER_ALLOW;
+pub const RENDER_ALLOW: u32 = bindings::drm_ioctl_flags_DRM_RENDER_ALLOW;
 
 /// Internal structures used by the [`declare_drm_ioctls!{}`] macro. Do not use directly.
 #[doc(hidden)]
@@ -76,6 +78,7 @@ pub mod internal {
     pub use bindings::drm_ioctl_desc;
 }
 
+/*
 /// Declare the DRM ioctls for a driver.
 ///
 /// Each entry in the list should have the form:
@@ -101,7 +104,7 @@ pub mod internal {
 /// }
 /// ```
 ///
-/*#[macro_export]
+#[macro_export]
 macro_rules! declare_drm_ioctls {
     ( $(($cmd:ident, $struct:ident, $flags:expr, $func:expr)),* $(,)? ) => {
         const IOCTLS: &'static [$crate::drm::ioctl::DrmIoctlDescriptor] = {

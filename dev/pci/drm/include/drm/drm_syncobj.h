@@ -82,6 +82,13 @@ drm_syncobj_get(struct drm_syncobj *obj)
 	kref_get(&obj->refcount);
 }
 
+void
+BINDING_drm_syncobj_get(struct drm_syncobj *obj)
+{
+	drm_syncobj_get(obj);
+	return;
+}
+
 /**
  * drm_syncobj_put - release a reference to a sync object.
  * @obj: sync object.
@@ -90,6 +97,13 @@ static inline void
 drm_syncobj_put(struct drm_syncobj *obj)
 {
 	kref_put(&obj->refcount, drm_syncobj_free);
+}
+
+void
+BINDING_drm_syncobj_put(struct drm_syncobj *obj)
+{
+	drm_syncobj_put(obj);
+	return;
 }
 
 /**
@@ -113,6 +127,12 @@ drm_syncobj_fence_get(struct drm_syncobj *syncobj)
 	rcu_read_unlock();
 
 	return fence;
+}
+
+struct dma_fence *
+BINDING_drm_syncobj_fence_get(struct drm_syncobj *syncobj)
+{
+	return drm_syncobj_fence_get(syncobj);
 }
 
 struct drm_syncobj *drm_syncobj_find(struct drm_file *file_private,

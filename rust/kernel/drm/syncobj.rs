@@ -29,7 +29,7 @@ impl SyncObj {
 
     /// Returns the DMA fence associated with this sync object, if any.
     pub fn fence_get(&self) -> Option<Fence> {
-        let fence = unsafe { bindings::drm_syncobj_fence_get(self.ptr) };
+        let fence = unsafe { bindings::BINDING_drm_syncobj_fence_get(self.ptr) };
         if fence.is_null() {
             None
         } else {
@@ -60,14 +60,14 @@ impl SyncObj {
 impl Drop for SyncObj {
     fn drop(&mut self) {
         // SAFETY: We own a reference to this syncobj.
-        unsafe { bindings::drm_syncobj_put(self.ptr) };
+        unsafe { bindings::BINDING_drm_syncobj_put(self.ptr) };
     }
 }
 
 impl Clone for SyncObj {
     fn clone(&self) -> Self {
         // SAFETY: `ptr` is valid per the type invariant and we own a reference to it.
-        unsafe { bindings::drm_syncobj_get(self.ptr) };
+        unsafe { bindings::BINDING_drm_syncobj_get(self.ptr) };
         SyncObj { ptr: self.ptr }
     }
 }
