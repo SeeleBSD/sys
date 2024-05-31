@@ -44,11 +44,7 @@ dma_fence_chain_alloc(void)
 	    M_WAITOK | M_CANFAIL);
 }
 
-struct dma_fence_chain *
-BINDING_dma_fence_chain_alloc(void)
-{
-	return dma_fence_chain_alloc();
-}
+struct dma_fence_chain *BINDING_dma_fence_chain_alloc(void);
 
 static inline void
 dma_fence_chain_free(struct dma_fence_chain *dfc)
@@ -56,12 +52,7 @@ dma_fence_chain_free(struct dma_fence_chain *dfc)
 	free(dfc, M_DRM, sizeof(struct dma_fence_chain));
 }
 
-void
-BINDING_dma_fence_chain_free(struct dma_fence_chain *dfc)
-{
-	dma_fence_chain_free(dfc);
-	return;
-}
+void BINDING_dma_fence_chain_free(struct dma_fence_chain *dfc);
 
 static inline struct dma_fence *
 dma_fence_chain_contained(struct dma_fence *f)

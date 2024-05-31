@@ -1815,3 +1815,16 @@ int drm_gem_evict(struct drm_gem_object *obj)
 	return 0;
 }
 EXPORT_SYMBOL(drm_gem_evict);
+
+void BINDING_drm_gem_object_get(struct drm_gem_object *obj)
+{
+	drm_gem_object_get(obj);
+	return;
+}
+
+void
+BINDING_drm_gem_object_put(struct drm_gem_object *obj)
+{
+	drm_gem_object_put(obj);
+	return;
+}

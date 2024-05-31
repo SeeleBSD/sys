@@ -82,13 +82,6 @@ drm_syncobj_get(struct drm_syncobj *obj)
 	kref_get(&obj->refcount);
 }
 
-void
-BINDING_drm_syncobj_get(struct drm_syncobj *obj)
-{
-	drm_syncobj_get(obj);
-	return;
-}
-
 /**
  * drm_syncobj_put - release a reference to a sync object.
  * @obj: sync object.
@@ -97,13 +90,6 @@ static inline void
 drm_syncobj_put(struct drm_syncobj *obj)
 {
 	kref_put(&obj->refcount, drm_syncobj_free);
-}
-
-void
-BINDING_drm_syncobj_put(struct drm_syncobj *obj)
-{
-	drm_syncobj_put(obj);
-	return;
 }
 
 /**
@@ -129,12 +115,6 @@ drm_syncobj_fence_get(struct drm_syncobj *syncobj)
 	return fence;
 }
 
-struct dma_fence *
-BINDING_drm_syncobj_fence_get(struct drm_syncobj *syncobj)
-{
-	return drm_syncobj_fence_get(syncobj);
-}
-
 struct drm_syncobj *drm_syncobj_find(struct drm_file *file_private,
 				     u32 handle);
 void drm_syncobj_add_point(struct drm_syncobj *syncobj,
@@ -152,5 +132,9 @@ int drm_syncobj_create(struct drm_syncobj **out_syncobj, uint32_t flags,
 int drm_syncobj_get_handle(struct drm_file *file_private,
 			   struct drm_syncobj *syncobj, u32 *handle);
 int drm_syncobj_get_fd(struct drm_syncobj *syncobj, int *p_fd);
+
+void BINDING_drm_syncobj_get(struct drm_syncobj *obj);
+void BINDING_drm_syncobj_put(struct drm_syncobj *obj);
+struct dma_fence *BINDING_drm_syncobj_fence_get(struct drm_syncobj *syncobj);
 
 #endif

@@ -1734,3 +1734,23 @@ int drm_syncobj_query_ioctl(struct drm_device *dev, void *data,
 
 	return ret;
 }
+
+void
+BINDING_drm_syncobj_get(struct drm_syncobj *obj)
+{
+	drm_syncobj_get(obj);
+	return;
+}
+
+void
+BINDING_drm_syncobj_put(struct drm_syncobj *obj)
+{
+	drm_syncobj_put(obj);
+	return;
+}
+
+struct dma_fence *
+BINDING_drm_syncobj_fence_get(struct drm_syncobj *syncobj)
+{
+	return drm_syncobj_fence_get(syncobj);
+}

@@ -3946,3 +3946,30 @@ BINDING_init_wait_entry(wait_queue_entry_t *wqe, int flags)
 	init_wait_entry(wqe, flags);
 	return;
 }
+
+struct dma_fence_chain *
+BINDING_dma_fence_chain_alloc(void)
+{
+	return dma_fence_chain_alloc();
+}
+
+void
+BINDING_dma_fence_chain_free(struct dma_fence_chain *dfc)
+{
+	dma_fence_chain_free(dfc);
+	return;
+}
+
+void
+BINDING_dma_fence_free(struct dma_fence *fence)
+{
+	dma_fence_free(fence);
+	return;
+}
+
+void
+BINDING_dma_fence_set_error(struct dma_fence *fence, int error)
+{
+	dma_fence_set_error(fence, error);
+	return;
+}

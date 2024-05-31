@@ -205,10 +205,7 @@ static inline __u64 drm_vma_node_offset_addr(struct drm_vma_offset_node *node)
 	return ((__u64)node->vm_node.start) << PAGE_SHIFT;
 }
 
-__u64 BINDING_drm_vma_node_offset_addr(struct drm_vma_offset_node *node)
-{
-	return drm_vma_node_offset_addr(node);
-}
+__u64 BINDING_drm_vma_node_offset_addr(struct drm_vma_offset_node *node);
 
 /**
  * drm_vma_node_unmap() - Unmap offset node

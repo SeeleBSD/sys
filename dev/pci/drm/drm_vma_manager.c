@@ -419,3 +419,8 @@ bool drm_vma_node_is_allowed(struct drm_vma_offset_node *node,
 	return iter;
 }
 EXPORT_SYMBOL(drm_vma_node_is_allowed);
+
+__u64 BINDING_drm_vma_node_offset_addr(struct drm_vma_offset_node *node)
+{
+	return drm_vma_node_offset_addr(node);
+}
