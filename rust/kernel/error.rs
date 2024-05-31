@@ -154,7 +154,9 @@ impl Error {
     /// It is a bug to pass an out-of-range `errno`. `EINVAL` would
     /// be returned in such a case.
     pub(crate) fn from_errno(errno: core::ffi::c_int) -> Error {
-        if /*errno < -(bindings::MAX_ERRNO as i32) ||*/ errno >= 0 {
+        if
+        /*errno < -(bindings::MAX_ERRNO as i32) ||*/
+        errno >= 0 {
             // TODO: Make it a `WARN_ONCE` once available.
             crate::println!(
                 "attempted to create `Error` with out of range `errno`: {}",

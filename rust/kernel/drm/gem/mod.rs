@@ -199,7 +199,9 @@ pub trait BaseObject: IntoGEMObject {
             bindings::drm_gem_create_mmap_offset(self.gem_obj() as *const _ as *mut _)
         })?;
         Ok(unsafe {
-            bindings::BINDING_drm_vma_node_offset_addr(&self.gem_obj().vma_node as *const _ as *mut _)
+            bindings::BINDING_drm_vma_node_offset_addr(
+                &self.gem_obj().vma_node as *const _ as *mut _,
+            )
         })
     }
 }

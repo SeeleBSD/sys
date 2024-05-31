@@ -6,21 +6,17 @@ use crate::c_str;
 unsafe impl GlobalAlloc for KernelAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         unsafe {
-        bindings::malloc(
-            layout.size(),
-            bindings::M_DRM as i32,
-            bindings::M_WAITOK as i32,
-        ) as *mut u8
+            bindings::malloc(
+                layout.size(),
+                bindings::M_DRM as i32,
+                bindings::M_WAITOK as i32,
+            ) as *mut u8
         }
     }
 
     unsafe fn dealloc(&self, ptr: *mut u8, _layout: Layout) {
         unsafe {
-        bindings::free(
-            ptr as *mut core::ffi::c_void,
-            bindings::M_DRM as i32,
-            0
-        );
+            bindings::free(ptr as *mut core::ffi::c_void, bindings::M_DRM as i32, 0);
         }
     }
 }

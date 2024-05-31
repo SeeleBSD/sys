@@ -5,31 +5,29 @@ use core::time::Duration;
 
 pub mod clock;
 
-pub trait Clock: Sized {
-
-}
+pub trait Clock: Sized {}
 
 pub trait Now: Clock {
     fn now() -> Instance<Self>;
 }
 
-pub trait Monotonic {
+pub trait Monotonic {}
 
-}
-
-pub trait WallTime {
-
-}
+pub trait WallTime {}
 
 #[derive(Debug)]
 pub struct Instance<T: Clock> {
     nanosecs: u64,
-    _type: PhantomData<T>
+    _type: PhantomData<T>,
 }
 
-impl<T: Clock> Copy for Instance<T> {
-
+impl<T: Clock> Clone for Instance<T> {
+    fn clone(&self) -> Self {
+        *self
+    }
 }
+
+impl<T: Clock> Copy for Instance<T> {}
 
 impl<T: Clock> Instance<T> {
     fn new(nanosecs: u64) -> Self {

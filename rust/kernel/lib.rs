@@ -18,23 +18,24 @@ extern crate alloc;
 extern crate macros;
 
 pub mod allocator;
-pub mod init;
-pub mod prelude;
-pub mod io;
-pub mod error;
-pub mod str;
-pub mod types;
-pub mod sync;
 pub mod build_assert;
-pub mod proc;
-pub mod of;
-pub mod soc;
 pub mod device;
-pub mod static_assert;
-pub mod drm;
 pub mod dma_fence;
-pub mod tools;
+pub mod drm;
+pub mod error;
+pub mod init;
+pub mod io;
+pub mod of;
+pub mod prelude;
 pub(crate) mod private;
+pub mod proc;
+pub mod soc;
+pub mod static_assert;
+pub mod str;
+pub mod sync;
+pub mod time;
+pub mod tools;
+pub mod types;
 
 #[doc(hidden)]
 pub use bindings;
@@ -55,12 +56,12 @@ pub extern "C" fn __udivti3() -> ! {
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo<'_>) -> ! {
     print!("{}\n", info);
-	unreachable!()
+    unreachable!()
 }
 
 #[no_mangle]
 pub extern "C" fn _rust_kernel_main() {
-	info!("hello");
+    info!("hello");
 }
 
 /// Print kernel debug messages without a trailing newline

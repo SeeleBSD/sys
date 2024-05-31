@@ -9,7 +9,7 @@ pub use macros::{module, pin_data, pinned_drop, vtable, Zeroable};
 
 pub use super::build_assert;
 
-pub use super::{info, err, warn};
+pub use super::{err, info, warn};
 
 pub use super::{init, pin_init, try_init, try_pin_init};
 

@@ -1355,4 +1355,3 @@ macro_rules! impl_tuple_zeroable {
 }
 
 impl_tuple_zeroable!(A, B, C, D, E, F, G, H, I, J);
-
