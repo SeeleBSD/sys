@@ -507,6 +507,8 @@ static inline void drm_gem_object_get(struct drm_gem_object *obj)
 	kref_get(&obj->refcount);
 }
 
+void BINDING_drm_gem_object_get(struct drm_gem_object *obj);
+
 __attribute__((nonnull))
 static inline void
 __drm_gem_object_put(struct drm_gem_object *obj)
@@ -526,6 +528,8 @@ drm_gem_object_put(struct drm_gem_object *obj)
 	if (obj)
 		__drm_gem_object_put(obj);
 }
+
+void BINDING_drm_gem_object_put(struct drm_gem_object *obj);
 
 int drm_gem_handle_create(struct drm_file *file_priv,
 			  struct drm_gem_object *obj,
