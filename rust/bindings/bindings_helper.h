@@ -14,6 +14,7 @@
 #include <sys/device.h>
 #include <sys/mutex.h>
 #include <sys/rwlock.h>
+#include <sys/time.h>
 #include <drm/bronya/bronyadrm.h>
 #include <drm/drm_device.h>
 #include <drm/drm_drv.h>
