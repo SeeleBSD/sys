@@ -7,6 +7,8 @@ extern crate kernel;
 
 pub(crate) mod debug;
 pub(crate) mod float;
+pub(crate) mod slotalloc;
+pub(crate) mod util;
 
 use kernel::{of, prelude::*};
 

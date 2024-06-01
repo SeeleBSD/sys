@@ -34,11 +34,14 @@ pub mod static_assert;
 pub mod drm;
 pub mod dma_fence;
 pub mod tools;
+pub mod user_ptr;
 pub(crate) mod private;
 
 #[doc(hidden)]
 pub use bindings;
 pub use build_error::build_error;
+pub use macros;
+pub use uapi;
 
 const __LOG_PREFIX: &'static str = "rust_kernel";
 

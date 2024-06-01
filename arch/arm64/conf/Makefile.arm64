@@ -132,7 +132,6 @@ LINKFLAGS+=	-S
 bindgen_target_flags = \
 	--opaque-type kunit_try_catch \
 	--experimental --wrap-static-fns-* \
-#@grep -v '^#\|^$$' $S/rust/bindgen_parameters
 bindings/bindings_generated.rs: $S/rust/bindgen_parameters
 	@mkdir -p bindings
 	$(BINDGEN) $S/rust/bindings/bindings_helper.h $(bindgen_target_flags) \
@@ -158,6 +157,18 @@ bindings/bindings_helpers_generated.rs:
 .undef bindgen_target_flags
 .undef bindgen_target_cflags
 
+bindgen_target_flags = \
+	--opaque-type kunit_try_catch \
+	--experimental --wrap-static-fns-* \
+uapi/uapi_generated.rs: $S/rust/bindgen_parameters
+	@mkdir -p uapi
+	$(BINDGEN) $S/rust/uapi/uapi_helper.h $(bindgen_target_flags) \
+		--use-core --with-derive-default --ctypes-prefix core::ffi --no-layout-tests \
+		--no-debug '.*' \
+		-o $@ -- $(bindgen_c_flags) -DMODULE \
+		$(bindgen_target_cflags) $(bindgen_target_extra)
+.undef bindgen_target_flags
+
 core.o:
 	$(rust_common_cmd) --cfg no_fp_fmt_parse --emit=obj=$@ --emit=metadata=libcore.rmeta --crate-name core $(RUST_LIB_SRC)/core/src/lib.rs
 
@@ -176,8 +187,12 @@ bindings.o: compiler_builtins.o \
     bindings/bindings_helpers_generated.rs
 	O=${.OBJDIR} $(rust_common_cmd) --extern core --extern alloc --extern compiler_builtins --emit=obj=$@ --emit=metadata=libbindings.rmeta --crate-name bindings $S/rust/bindings/lib.rs
 
+uapi.o: compiler_builtins.o \
+    uapi/uapi_generated.rs
+	O=${.OBJDIR} $(rust_common_cmd) --extern core --extern alloc --extern compiler_builtins --emit=obj=$@ --emit=metadata=libuapi.rmeta --crate-name uapi $S/rust/uapi/lib.rs
+
 kernel.o: alloc.o bindings.o libmacros.so build_error.o
-	$(rust_common_cmd) --extern build_error --extern core --extern alloc --extern compiler_builtins --extern bindings --extern macros --emit=obj=$@ --emit=metadata=libkernel.rmeta --crate-name kernel $S/rust/kernel/lib.rs
+	$(rust_common_cmd) --extern build_error --extern core --extern alloc --extern compiler_builtins --extern bindings --extern uapi --extern macros --emit=obj=$@ --emit=metadata=libkernel.rmeta --crate-name kernel $S/rust/kernel/lib.rs
 
 libmacros.so: core.o
 	$(RUSTC) $(rust_common_flags) --extern core --extern alloc --extern compiler_builtins --emit=link=$@ --extern proc_macro \
