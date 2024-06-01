@@ -926,15 +926,18 @@ void DCP_FW_NAME(iomfb_poweroff)(struct apple_dcp *dcp)
 
 	iomfb_abort_swaps_dcp(dcp, false, &abort_req,
 				aborted_swaps_dcp_poff, poff_cookie);
-	/*ret = wait_for_completion_timeout(&poff_cookie->done,
-					  msecs_to_jiffies(1000));
+	mtx_enter(&poff_cookie->done.lock);
+	ret = msleep(&poff_cookie->done, &poff_cookie->done.lock, 0, "wfct", msecs_to_jiffies(1000));
+	mtx_leave(&poff_cookie->done.lock);
+	//ret = wait_for_completion_timeout(&poff_cookie->done,
+	//				  msecs_to_jiffies(1000));
 
 	if (ret == 0)
 		dev_warn(dcp->dev, "setPowerState(0) timeout %u ms\n", 1000);
 	else if (ret > 0)
 		dev_dbg(dcp->dev,
 			"setPowerState(0) finished with %d ms to spare",
-			jiffies_to_msecs(ret));*/
+			jiffies_to_msecs(ret));
 
 	kref_put(&poff_cookie->refcount, release_wait_cookie);
 
