@@ -71,5 +71,5 @@ macro_rules! container_of {
 
 #[inline]
 pub fn msecs_to_jiffies(x: i32) -> u64 {
-    ((x as u64) * unsafe { bindings::hz as u64 })/1000
+    ((x as u64) * unsafe { bindings::hz as u64 }) / 1000
 }

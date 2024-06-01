@@ -21,18 +21,15 @@ impl Iterator for NodeIter {
                 if self.curr.is_null() {
                     None
                 } else {
-                    unsafe {
-                        Node::from_raw(self.curr)
-                    }
+                    unsafe { Node::from_raw(self.curr) }
                 }
             } else {
-            self.curr = unsafe {
-                bindings::fdt_next_node(self.curr as *mut core::ffi::c_void) as *mut bindings::device_node
-            };
-            self.is_halt = self.curr.is_null();
-            unsafe {
-                Node::from_raw(self.curr)
-            }
+                self.curr = unsafe {
+                    bindings::fdt_next_node(self.curr as *mut core::ffi::c_void)
+                        as *mut bindings::device_node
+                };
+                self.is_halt = self.curr.is_null();
+                unsafe { Node::from_raw(self.curr) }
             }
         }
     }
@@ -53,7 +50,8 @@ impl Node {
     }
 
     pub fn from_handle(handle: i32) -> Option<Node> {
-        let node = (unsafe { bindings::fdt_get().header.addr() } + (handle as usize)) as *mut bindings::device_node;
+        let node = (unsafe { bindings::fdt_get().header.addr() } + (handle as usize))
+            as *mut bindings::device_node;
         if node.is_null() {
             None
         } else {
@@ -62,9 +60,7 @@ impl Node {
     }
 
     pub fn node(&self) -> &bindings::device_node {
-        unsafe {
-            &*self.raw_node
-        }
+        unsafe { &*self.raw_node }
     }
 
     pub fn handle(&self) -> i32 {
@@ -72,16 +68,14 @@ impl Node {
     }
 
     pub fn full_name(&self) -> &CStr {
-        unsafe {
-            CStr::from_char_ptr(self.node().full_name)
-        }
+        unsafe { CStr::from_char_ptr(self.node().full_name) }
     }
 
     pub fn child(&self) -> NodeIter {
         NodeIter {
             curr: self.raw_node,
             is_halt: false,
-            is_first: true
+            is_first: true,
         }
     }
 
@@ -91,7 +85,7 @@ impl Node {
             None
         } else {
             Some(Self {
-                raw_node: par as *mut bindings::device_node
+                raw_node: par as *mut bindings::device_node,
             })
         }
     }
@@ -105,8 +99,15 @@ impl Node {
     pub fn find_property(&self, name: &CStr) -> Option<Property> {
         unsafe {
             let len = bindings::OF_getproplen(self.handle(), name.as_char_ptr() as *mut i8);
-            let mut buf = vec![0u8;len as usize];
-            if len == bindings::OF_getprop(self.handle(), name.as_char_ptr() as *mut i8, buf.as_mut_ptr() as *mut core::ffi::c_void, len as i32) {
+            let mut buf = vec![0u8; len as usize];
+            if len
+                == bindings::OF_getprop(
+                    self.handle(),
+                    name.as_char_ptr() as *mut i8,
+                    buf.as_mut_ptr() as *mut core::ffi::c_void,
+                    len as i32,
+                )
+            {
                 Some(Property::from_vec(buf))
             } else {
                 None
@@ -115,13 +116,18 @@ impl Node {
     }
 
     pub fn get_property<T: TryFrom<Property>>(&self, name: &CStr) -> Result<T>
-    where crate::error::Error: From<<T as TryFrom<Property>>::Error> {
+    where
+        crate::error::Error: From<<T as TryFrom<Property>>::Error>,
+    {
         Ok(self.find_property(name).ok_or(ENOENT)?.try_into()?)
     }
 
-    pub fn get_opt_property<T: TryFrom<Property>>(&self, name: &CStr) -> Result<Option<T>> 
-    where crate::error::Error: From<<T as TryFrom<Property>>::Error> {
-        self.find_property(name).map_or(Ok(None), |prop| Ok(Some(prop.try_into()?)))
+    pub fn get_opt_property<T: TryFrom<Property>>(&self, name: &CStr) -> Result<Option<T>>
+    where
+        crate::error::Error: From<<T as TryFrom<Property>>::Error>,
+    {
+        self.find_property(name)
+            .map_or(Ok(None), |prop| Ok(Some(prop.try_into()?)))
     }
 }
 
@@ -131,9 +137,7 @@ pub struct Property {
 
 impl Property {
     fn from_vec(data: Vec<u8>) -> Self {
-        Self {
-            value: data
-        }
+        Self { value: data }
     }
 
     pub fn len(&self) -> usize {
@@ -147,7 +151,7 @@ impl Property {
 
 pub trait PropertyUnit: Sized {
     const UNIT_SIZE: usize;
-    
+
     fn from_bytes(data: &[u8]) -> Result<Self>;
 }
 
@@ -159,7 +163,7 @@ impl<T: PropertyUnit> TryFrom<Property> for Vec<T> {
             let mut ret = vec![];
             let val = prop.value();
             for i in (0..prop.len()).step_by(T::UNIT_SIZE) {
-                ret.push(T::from_bytes(&val[i..i+T::UNIT_SIZE])?);
+                ret.push(T::from_bytes(&val[i..i + T::UNIT_SIZE])?);
             }
             Ok(ret)
         } else {
@@ -174,7 +178,9 @@ macro_rules! prop_int_type {
             type Error = Error;
 
             fn try_from(prop: Property) -> core::result::Result<$type, Self::Error> {
-                Ok(<$type>::from_be_bytes(prop.value().try_into().or(Err(EINVAL))?))
+                Ok(<$type>::from_be_bytes(
+                    prop.value().try_into().or(Err(EINVAL))?,
+                ))
             }
         }
 
@@ -185,7 +191,7 @@ macro_rules! prop_int_type {
                 Ok(<$type>::from_be_bytes(data.try_into().or(Err(EINVAL))?))
             }
         }
-    }
+    };
 }
 
 prop_int_type!(i8);
@@ -199,7 +205,7 @@ prop_int_type!(u64);
 
 #[macro_export]
 macro_rules! compatible {
-    ($node:tt, $table:tt) => ({
+    ($node:tt, $table:tt) => {{
         {
             let mut ret: i32 = 0;
             for (name, _) in $table {
@@ -207,12 +213,12 @@ macro_rules! compatible {
             }
             ret
         }
-    });
+    }};
 }
 
 #[macro_export]
 macro_rules! compatible_info {
-    ($node:tt, $table:tt) => ({
+    ($node:tt, $table:tt) => {{
         {
             let mut ret = None;
             for (name, val) in $table {
@@ -223,7 +229,7 @@ macro_rules! compatible_info {
             }
             ret
         }
-    });
+    }};
 }
 
 #[macro_export]

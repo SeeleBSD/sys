@@ -472,10 +472,7 @@ impl FenceContexts {
         // After this, all fields are initialized.
         unsafe {
             addr_of_mut!((*p).inner).write(inner);
-            bindings::__mtx_init(
-                addr_of_mut!((*p).lock) as *mut _,
-                bindings::IPL_VM as i32
-            );
+            bindings::__mtx_init(addr_of_mut!((*p).lock) as *mut _, bindings::IPL_VM as i32);
             bindings::dma_fence_init(
                 addr_of_mut!((*p).fence),
                 &FenceObject::<T>::VTABLE,

@@ -259,11 +259,7 @@ impl<T: Driver> Registration<T> {
     ///
     /// Users are encouraged to use the [`drm_device_register!()`] macro because it automatically
     /// picks up the current module.
-    pub fn register(
-        self: Pin<&mut Self>,
-        data: T::Data,
-        flags: usize,
-    ) -> Result {
+    pub fn register(self: Pin<&mut Self>, data: T::Data, flags: usize) -> Result {
         if self.registered {
             // Already registered.
             return Err(EINVAL);

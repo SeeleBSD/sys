@@ -816,7 +816,7 @@ void DCP_FW_NAME(iomfb_poweron)(struct apple_dcp *dcp)
 		dcp_set_display_device(dcp, false, &handle,
 				       dcp_on_set_parameter, cookie);
 	}
-	ret = wait_for_completion_timeout(&cookie->done, msecs_to_jiffies(1500));
+	ret = wait_for_completion_timeout(&cookie->done, msecs_to_jiffies(500));
 
 	if (ret == 0)
 		dev_warn(dcp->dev, "wait for power timed out\n");
@@ -927,10 +927,10 @@ void DCP_FW_NAME(iomfb_poweroff)(struct apple_dcp *dcp)
 	iomfb_abort_swaps_dcp(dcp, false, &abort_req,
 				aborted_swaps_dcp_poff, poff_cookie);
 	ret = wait_for_completion_timeout(&poff_cookie->done,
-					  msecs_to_jiffies(3000));
+					  msecs_to_jiffies(1000));
 
 	if (ret == 0)
-		dev_warn(dcp->dev, "setPowerState(0) timeout %u ms\n", 3000);
+		dev_warn(dcp->dev, "setPowerState(0) timeout %u ms\n", 1000);
 	else if (ret > 0)
 		dev_dbg(dcp->dev,
 			"setPowerState(0) finished with %d ms to spare",

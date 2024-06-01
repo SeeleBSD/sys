@@ -110,9 +110,7 @@ impl CondVar {
         unsafe { bindings::BINDING_init_wait_entry(wait.get(), 0) };
 
         // SAFETY: Both `wait` and `wait_list` point to valid memory.
-        unsafe {
-            bindings::prepare_to_wait(self.wait_list.get(), wait.get(), wait_state as _)
-        };
+        unsafe { bindings::prepare_to_wait(self.wait_list.get(), wait.get(), wait_state as _) };
 
         // SAFETY: No arguments, switches to another thread.
         guard.do_unlocked(|| unsafe { bindings::schedule() });
@@ -146,11 +144,7 @@ impl CondVar {
     /// Calls the kernel function to notify the appropriate number of threads with the given flags.
     fn notify(&self, count: i32, flags: u32) {
         // SAFETY: `wait_list` points to valid memory.
-        unsafe {
-            bindings::BINDING_wake_up(
-                self.wait_list.get(),
-            )
-        };
+        unsafe { bindings::BINDING_wake_up(self.wait_list.get()) };
     }
 
     /// Wakes a single waiter up, if any.

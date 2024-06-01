@@ -174,7 +174,7 @@ core.o:
 
 compiler_builtins.o: core.o
 	$(rust_common_cmd) --emit=obj=$@ --emit=metadata=libcompiler_builtins.rmeta --crate-name compiler_builtins $S/rust/compiler_builtins.rs
-	objcopy -w -W '__*' $@
+#	objcopy -w -W '__*' $@
 
 build_error.o: compiler_builtins.o
 	$(rust_common_cmd) --emit=obj=$@ --emit=metadata=libbuild_error.rmeta --crate-name build_error $S/rust/build_error.rs
