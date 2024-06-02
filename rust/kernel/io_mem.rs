@@ -164,10 +164,10 @@ impl<const SIZE: usize> IoMem<SIZE> {
         // Try to map the resource.
         // SAFETY: Just mapping the memory range.
         let mut bsh: bindings::bus_space_handle_t = 0;
-        if bindings::bus_space_map(bst, res.offset as bindings::bus_addr_t, res.size as bindings::bus_size_t, bindings::BUS_SPACE_MAP_LINEAR, &bsh) != 0 {
+        if bindings::BINDINGS_bus_space_map(bst, res.offset as bindings::bus_addr_t, res.size as bindings::bus_size_t, bindings::BUS_SPACE_MAP_LINEAR, &bsh) != 0 {
             return Err(ENOMEM);
         }
-        let addr = bindings::bus_space_vaddr(bst, bsh);
+        let addr = bindings::BINDINGS_bus_space_vaddr(bst, bsh);
 
         if addr.is_null() {
             Err(ENOMEM)
@@ -264,6 +264,6 @@ impl<const SIZE: usize> Drop for IoMem<SIZE> {
     fn drop(&mut self) {
         // SAFETY: By the type invariant, `self.ptr` is a value returned by a previous successful
         // call to `ioremap`.
-        unsafe { bindings::bus_space_unmap(self.bst, self.bsh, self.res.size as bindings::bus_space_size_t) };
+        unsafe { bindings::BINDINGS_bus_space_unmap(self.bst, self.bsh, self.res.size as bindings::bus_space_size_t) };
     }
 }
