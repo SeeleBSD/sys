@@ -33,6 +33,9 @@ pub mod sync;
 pub mod time;
 pub mod tools;
 pub mod types;
+pub mod io_buffer;
+pub mod io_mem;
+pub mod user_ptr;
 
 #[doc(hidden)]
 pub use bindings;

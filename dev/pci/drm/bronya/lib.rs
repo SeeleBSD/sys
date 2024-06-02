@@ -68,6 +68,7 @@ pub extern "C" fn bronyadrm_attach(
     let faa = aux as *mut bindings::fdt_attach_args;
     unsafe {
         (*sc).sc_node = (*faa).fa_node;
+        (*sc).sc_iot = (*faa).fa_iot;
     }
 
     print!("\n");

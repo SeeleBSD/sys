@@ -27,6 +27,8 @@ struct bronyadrm_softc {
 	struct wsscreen_list	sc_wsl;
 	struct wsscreen_descr	*sc_scrlist[1];
 
+	bus_space_tag_t	sc_iot;
+
 	void			(*sc_switchcb)(void *, int, int);
 	void			*sc_switchcbarg;
 	void			*sc_switchcookie;

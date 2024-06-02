@@ -15,6 +15,7 @@
 #include <sys/mutex.h>
 #include <sys/rwlock.h>
 #include <sys/time.h>
+#include <machine/bus.h>
 #include <drm/bronya/bronyadrm.h>
 #include <drm/drm_device.h>
 #include <drm/drm_drv.h>
@@ -32,6 +33,7 @@
 #include <linux/dma-resv.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
+#include <linux/ioport.h>
 #include <linux/iosys-map.h>
 #include <linux/ktime.h>
 #include <linux/lockdep.h>
@@ -98,3 +100,5 @@ const gfp_t BINDINGS_GFP_KERNEL_ACCOUNT = GFP_KERNEL_ACCOUNT;
 const gfp_t BINDINGS_XA_FLAGS_LOCK_IRQ = XA_FLAGS_LOCK_IRQ;
 const gfp_t BINDINGS_XA_FLAGS_ALLOC = XA_FLAGS_ALLOC;
 const gfp_t BINDINGS_XA_FLAGS_ALLOC1 = XA_FLAGS_ALLOC1;
+
+const u_long BINDINGS_IORESOURCE_MEM = IORESOURCE_MEM;
