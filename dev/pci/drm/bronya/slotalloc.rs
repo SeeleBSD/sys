@@ -135,16 +135,16 @@ impl<T: SlotItem> SlotAllocator<T> {
         lock_key1: LockClassKey,
         lock_key2: LockClassKey,
     ) -> Result<SlotAllocator<T>> {
-        let mut slots = Vec::try_with_capacity(num_slots as usize)?;
+        let mut slots = Vec::with_capacity(num_slots as usize);
 
         for i in 0..num_slots {
             slots
-                .try_push(constructor(&mut data, i).map(|item| Entry {
+                .push(constructor(&mut data, i).map(|item| Entry {
                     item,
                     get_time: 0,
                     drop_time: 0,
-                }))
-                .expect("try_push() failed after reservation");
+                }));
+
         }
 
         let inner = SlotAllocatorInner {
@@ -225,7 +225,7 @@ impl<T: SlotItem> SlotAllocator<T> {
 
             if oldest_time == u64::MAX {
                 if first {
-                    pr_warn!(
+                    warn!(
                         "{}: out of slots, blocking\n",
                         core::any::type_name::<Self>()
                     );
@@ -271,7 +271,7 @@ impl<T: SlotItem> Drop for Guard<T> {
     fn drop(&mut self) {
         let mut inner = self.alloc.inner.lock();
         if inner.slots[self.token.slot as usize].is_some() {
-            pr_crit!(
+            err!(
                 "{}: tried to return an item into a full slot ({})\n",
                 core::any::type_name::<Self>(),
                 self.token.slot

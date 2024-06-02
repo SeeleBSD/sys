@@ -14,15 +14,16 @@ extern crate self as kernel;
 
 #[macro_use]
 extern crate alloc;
-#[macro_use]
-extern crate macros;
-
 pub mod allocator;
 pub mod build_assert;
 pub mod device;
 pub mod dma_fence;
-pub mod tools;
-pub mod user_ptr;
+pub mod drm;
+pub mod error;
+pub mod init;
+pub mod io;
+pub mod of;
+pub mod prelude;
 pub(crate) mod private;
 pub mod proc;
 pub mod soc;

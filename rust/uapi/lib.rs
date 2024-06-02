@@ -23,4 +23,4 @@
     unsafe_op_in_unsafe_fn
 )]
 
-include!(concat!(env!("O"), "/rust/uapi/uapi_generated.rs"));
+include!(concat!(env!("O"), "/uapi/uapi_generated.rs"));

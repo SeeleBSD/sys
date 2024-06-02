@@ -131,7 +131,7 @@ LINKFLAGS+=	-S
 
 bindgen_target_flags = \
 	--opaque-type kunit_try_catch \
-	--experimental --wrap-static-fns-* \
+	--experimental --wrap-static-fns-*
 bindings/bindings_generated.rs: $S/rust/bindgen_parameters
 	@mkdir -p bindings
 	$(BINDGEN) $S/rust/bindings/bindings_helper.h $(bindgen_target_flags) \
@@ -159,7 +159,7 @@ bindings/bindings_helpers_generated.rs:
 
 bindgen_target_flags = \
 	--opaque-type kunit_try_catch \
-	--experimental --wrap-static-fns-* \
+	--experimental --wrap-static-fns-*
 uapi/uapi_generated.rs: $S/rust/bindgen_parameters
 	@mkdir -p uapi
 	$(BINDGEN) $S/rust/uapi/uapi_helper.h $(bindgen_target_flags) \
@@ -191,7 +191,7 @@ uapi.o: compiler_builtins.o \
     uapi/uapi_generated.rs
 	O=${.OBJDIR} $(rust_common_cmd) --extern core --extern alloc --extern compiler_builtins --emit=obj=$@ --emit=metadata=libuapi.rmeta --crate-name uapi $S/rust/uapi/lib.rs
 
-kernel.o: alloc.o bindings.o libmacros.so build_error.o
+kernel.o: alloc.o bindings.o libmacros.so build_error.o uapi.o
 	$(rust_common_cmd) --extern build_error --extern core --extern alloc --extern compiler_builtins --extern bindings --extern uapi --extern macros --emit=obj=$@ --emit=metadata=libkernel.rmeta --crate-name kernel $S/rust/kernel/lib.rs
 
 libmacros.so: core.o
