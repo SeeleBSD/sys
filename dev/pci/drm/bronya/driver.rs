@@ -22,14 +22,10 @@ pub struct BronyaDriver;
 pub type BronyaDevice = drm::device::Device<BronyaDriver>;
 pub type BronyaDevRef = ARef<BronyaDevice>;
 
-/// DRM Driver implementation for `AsahiDriver`.
 #[vtable]
-impl drv::Driver for AsahiDriver {
-    /// Our `DeviceData` type, reference-counted
+impl drv::Driver for BronyaDriver {
     type Data = Arc<DeviceData>;
-    /// Our `File` type.
     type File = file::File;
-    /// Our `Object` type.
     type Object = gem::Object;
 
     const INFO: drv::DriverInfo = INFO;
@@ -37,22 +33,23 @@ impl drv::Driver for AsahiDriver {
         drv::FEAT_GEM | drv::FEAT_RENDER | drv::FEAT_SYNCOBJ | drv::FEAT_SYNCOBJ_TIMELINE;
 
     kernel::declare_drm_ioctls! {
-        (ASAHI_GET_PARAMS,      drm_bronya_get_params,
+        (BRONYA_GET_PARAMS,      drm_bronya_get_params,
                           ioctl::RENDER_ALLOW, file::File::get_params),
-        (ASAHI_VM_CREATE,       drm_bronya_vm_create,
+        (BRONYA_VM_CREATE,       drm_bronya_vm_create,
             ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::vm_create),
-        (ASAHI_VM_DESTROY,      drm_bronya_vm_destroy,
+        (BRONYA_VM_DESTROY,      drm_bronya_vm_destroy,
             ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::vm_destroy),
-        (ASAHI_GEM_CREATE,      drm_bronya_gem_create,
+        (BRONYA_GEM_CREATE,      drm_bronya_gem_create,
             ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::gem_create),
-        (ASAHI_GEM_MMAP_OFFSET, drm_bronya_gem_mmap_offset,
+        (BRONYA_GEM_MMAP_OFFSET, drm_bronya_gem_mmap_offset,
             ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::gem_mmap_offset),
-        (ASAHI_GEM_BIND,        drm_bronya_gem_bind,
+        (BRONYA_GEM_BIND,        drm_bronya_gem_bind,
             ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::gem_bind),
-        (ASAHI_QUEUE_CREATE,    drm_bronya_queue_create,
+        (BRONYA_QUEUE_CREATE,    drm_bronya_queue_create,
             ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::queue_create),
-        (ASAHI_QUEUE_DESTROY,   drm_bronya_queue_destroy,
+        (BRONYA_QUEUE_DESTROY,   drm_bronya_queue_destroy,
             ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::queue_destroy),
-        (ASAHI_SUBMIT,          drm_bronya_submit,
+        (BRONYA_SUBMIT,          drm_bronya_submit,
             ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::submit),
     }
+}
