@@ -85,7 +85,7 @@ macro_rules! define_read {
             // SAFETY: The type invariants guarantee that `ptr` is a valid pointer. The check above
             // guarantees that the code won't build if `offset` makes the read go out of bounds
             // (including the type size).
-            unsafe { bindings::bus_space_$name(self.bst, self.bsh, offset) }
+            unsafe { (*(bst as *const bindings::bus_space))._space_$name(self.bst, self.bsh, offset) }
         }
 
         /// Reads IO data from the given offset.
@@ -99,7 +99,7 @@ macro_rules! define_read {
             // SAFETY: The type invariants guarantee that `ptr` is a valid pointer. The check above
             // returns an error if `offset` would make the read go out of bounds (including the
             // type size).
-            Ok(unsafe { bindings::bus_space_$name(self.bst, self.bsh, offset) })
+            Ok(unsafe { (*(bst as *const bindings::bus_space))._space_$name(self.bst, self.bsh, offset) })
         }
     };
 }
@@ -116,7 +116,7 @@ macro_rules! define_write {
             // SAFETY: The type invariants guarantee that `ptr` is a valid pointer. The check above
             // guarantees that the code won't link if `offset` makes the write go out of bounds
             // (including the type size).
-            unsafe { bindings::bus_space_$name(self.bst, self.bsh, offset, value) }
+            unsafe { (*(bst as *const bindings::bus_space))._space_$name(self.bst, self.bsh, offset, value) }
         }
 
         /// Writes IO data to the given offset.
@@ -130,7 +130,7 @@ macro_rules! define_write {
             // SAFETY: The type invariants guarantee that `ptr` is a valid pointer. The check above
             // returns an error if `offset` would make the write go out of bounds (including the
             // type size).
-            unsafe { bindings::bus_space_$name(self.bst, self.bsh, offset, value) };
+            unsafe { (*(bst as *const bindings::bus_space))._space_$name(self.bst, self.bsh, offset, value) };
             Ok(())
         }
     };
@@ -164,10 +164,10 @@ impl<const SIZE: usize> IoMem<SIZE> {
         // Try to map the resource.
         // SAFETY: Just mapping the memory range.
         let mut bsh: bindings::bus_space_handle_t = 0;
-        if bindings::BINDINGS_bus_space_map(bst, res.offset as bindings::bus_addr_t, res.size as bindings::bus_size_t, bindings::BUS_SPACE_MAP_LINEAR, &bsh) != 0 {
+        if (*(bst as *const bindings::bus_space))._space_map(bst, res.offset as bindings::bus_addr_t, res.size as bindings::bus_size_t, bindings::BUS_SPACE_MAP_LINEAR, &mut bsh) != 0 {
             return Err(ENOMEM);
         }
-        let addr = bindings::BINDINGS_bus_space_vaddr(bst, bsh);
+        let addr = (*(bst as *const bindings::bus_space))._space_vaddr(bst, bsh);
 
         if addr.is_null() {
             Err(ENOMEM)
@@ -241,11 +241,11 @@ impl<const SIZE: usize> IoMem<SIZE> {
         Ok(())
     }
 
-    define_read!(readb, try_read_1, u8);
-    define_read!(readw, try_read_2, u16);
-    define_read!(readl, try_read_4, u32);
+    define_read!(read_1, try_read_1, u8);
+    define_read!(read_2, try_read_2, u16);
+    define_read!(read_4, try_read_4, u32);
     define_read!(
-        readq,
+        read_8,
         try_read_8,
         u64
     );
@@ -264,6 +264,6 @@ impl<const SIZE: usize> Drop for IoMem<SIZE> {
     fn drop(&mut self) {
         // SAFETY: By the type invariant, `self.ptr` is a value returned by a previous successful
         // call to `ioremap`.
-        unsafe { bindings::BINDINGS_bus_space_unmap(self.bst, self.bsh, self.res.size as bindings::bus_space_size_t) };
+        unsafe { (*(self.bst as *const bindings::bus_space))._space_unmap(self.bst, self.bsh, self.res.size as bindings::bus_size_t) };
     }
 }
