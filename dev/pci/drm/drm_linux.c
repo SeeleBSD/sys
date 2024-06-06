@@ -3973,3 +3973,50 @@ BINDING_dma_fence_set_error(struct dma_fence *fence, int error)
 	dma_fence_set_error(fence, error);
 	return;
 }
+
+void
+BINDINGS_xa_lock(struct xarray *xa) {
+	xa_lock(xa);
+	return;
+}
+
+void
+BINDINGS_xa_unlock(struct xarray *xa) {
+	xa_unlock(xa);
+	return;
+}
+
+int
+BINDINGS_xa_err(const void *e) {
+	return xa_err(e);
+}
+
+int
+BINDINGS_xa_alloc(struct xarray *xa, u32 *id, void *entry, int limit, gfp_t gfp)
+{
+	return xa_alloc(xa, id, entry, limit, gfp);
+}
+
+void *
+BINDINGS_xa_load(struct xarray *xa, unsigned long index)
+{
+	return xa_load(xa, index);
+}
+
+void *
+BINDINGS_xa_store(struct xarray *xa, unsigned long index, void *entry, gfp_t gfp)
+{
+	return xa_store(xa, index, entry, gfp);
+}
+
+void *
+BINDINGS_xa_erase(struct xarray *xa, unsigned long index)
+{
+	return xa_erase(xa, index);
+}
+
+bool
+BINDINGS_xa_empty(const struct xarray *xa)
+{
+	return xa_empty(xa);
+}

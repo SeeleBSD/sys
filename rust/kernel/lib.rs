@@ -37,6 +37,7 @@ pub mod types;
 pub mod io_buffer;
 pub mod io_mem;
 pub mod user_ptr;
+pub mod xarray;
 
 #[doc(hidden)]
 pub use bindings;

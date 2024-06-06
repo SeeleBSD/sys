@@ -47,9 +47,13 @@ void *xa_get_next(struct xarray *, unsigned long *);
 		mtx_enter(&(_xa)->xa_lock);		\
 	} while (0)
 
+void BINDINGS_xa_lock(struct xarray *);
+
 #define xa_unlock(_xa) do {				\
 		mtx_leave(&(_xa)->xa_lock);		\
 	} while (0)
+
+void BINDINGS_xa_unlock(struct xarray *);
 
 #define xa_lock_irq(_xa) do {				\
 		mtx_enter(&(_xa)->xa_lock);		\
@@ -105,6 +109,8 @@ xa_err(const void *e)
 	return 0;
 }
 
+int BINDINGS_xa_err(const void *);
+
 static inline bool
 xa_is_err(const void *e)
 {
@@ -121,6 +127,8 @@ xa_alloc(struct xarray *xa, u32 *id, void *entry, int limit, gfp_t gfp)
 	return r;
 }
 
+int BINDINGS_xa_alloc(struct xarray *, u32 *, void *, int, gfp_t);
+
 static inline void *
 xa_load(struct xarray *xa, unsigned long index)
 {
@@ -129,6 +137,7 @@ xa_load(struct xarray *xa, unsigned long index)
 	return r;
 }
 
+void *BINDINGS_xa_load(struct xarray *, unsigned long);
 
 static inline void *
 xa_store(struct xarray *xa, unsigned long index, void *entry, gfp_t gfp)
@@ -140,6 +149,8 @@ xa_store(struct xarray *xa, unsigned long index, void *entry, gfp_t gfp)
 	return r;
 }
 
+void *BINDINGS_xa_store(struct xarray *, unsigned long, void *, gfp_t);
+
 static inline void *
 xa_erase(struct xarray *xa, unsigned long index)
 {
@@ -149,6 +160,8 @@ xa_erase(struct xarray *xa, unsigned long index)
 	mtx_leave(&xa->xa_lock);
 	return r;
 }
+
+void *BINDINGS_xa_erase(struct xarray *, unsigned long);
 
 static inline void *
 xa_store_irq(struct xarray *xa, unsigned long index, void *entry, gfp_t gfp)
@@ -175,6 +188,8 @@ xa_empty(const struct xarray *xa)
 {
 	return SPLAY_EMPTY(&xa->xa_tree);
 }
+
+bool BINDINGS_xa_empty(const struct xarray *);
 
 static inline void
 xa_init(struct xarray *xa)
