@@ -259,11 +259,7 @@ extern struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s1_init_fns;
 extern struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s2_init_fns;
 extern struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s1_init_fns;
 extern struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s2_init_fns;
-extern struct io_pgtable_init_fns io_pgtable_arm_v7s_init_fns;
 extern struct io_pgtable_init_fns io_pgtable_arm_mali_lpae_init_fns;
-extern struct io_pgtable_init_fns io_pgtable_amd_iommu_v1_init_fns;
-extern struct io_pgtable_init_fns io_pgtable_amd_iommu_v2_init_fns;
-extern struct io_pgtable_init_fns io_pgtable_apple_dart_init_fns;
 extern struct io_pgtable_init_fns io_pgtable_apple_uat_init_fns;
 
 #endif /* __IO_PGTABLE_H */

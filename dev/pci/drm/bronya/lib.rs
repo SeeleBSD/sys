@@ -69,6 +69,7 @@ pub extern "C" fn bronyadrm_attach(
     unsafe {
         (*sc).sc_node = (*faa).fa_node;
         (*sc).sc_iot = (*faa).fa_iot;
+        (*sc).sc_dmat = (*faa).fa_dmat;
     }
 
     print!("\n");

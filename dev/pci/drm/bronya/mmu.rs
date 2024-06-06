@@ -176,7 +176,7 @@ const PAGETABLES_SIZE: usize = UAT_PGSZ;
 
 /// Inner data for a Vm instance. This is reference-counted by the outer Vm object.
 struct VmInner {
-    dev: driver::AsahiDevRef,
+    dev: driver::BronyaDevRef,
     is_kernel: bool,
     min_va: usize,
     max_va: usize,

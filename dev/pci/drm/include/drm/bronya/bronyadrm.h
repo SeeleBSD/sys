@@ -3,6 +3,7 @@
 #include <sys/device.h>
 
 #include <machine/fdt.h>
+#include <machine/bus.h>
 
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/fdt.h>
@@ -28,6 +29,7 @@ struct bronyadrm_softc {
 	struct wsscreen_descr	*sc_scrlist[1];
 
 	bus_space_tag_t	sc_iot;
+	bus_dma_tag_t	sc_dmat;
 
 	void			(*sc_switchcb)(void *, int, int);
 	void			*sc_switchcbarg;
