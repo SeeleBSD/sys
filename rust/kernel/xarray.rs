@@ -204,7 +204,7 @@ impl<T: ForeignOwnable> XArray<T> {
                 self.xa.get(),
                 &mut id,
                 new as *mut _,
-                bindings::xa_limit { min, max },
+                max as i32,
                 bindings::GFP_KERNEL,
             )
         };
