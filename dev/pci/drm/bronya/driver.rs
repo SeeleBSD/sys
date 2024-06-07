@@ -2,6 +2,8 @@
 
 use kernel::{types::ARef, drm::drv, drm::ioctl, device};
 
+use crate::{gpu, gem, file, regs};
+
 const INFO: drv::DriverInfo = drv::DriverInfo {
     major: 0,
     minor: 0,

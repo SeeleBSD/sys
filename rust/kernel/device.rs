@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: ISC
 
-use crate::{bindings, of};
+use crate::{bindings, of, of::Node};
 
 pub unsafe trait RawDevice {
     fn raw_device(&self) -> *mut bindings::device;
@@ -17,7 +17,7 @@ impl Device {
 
     pub fn of_node(&self) -> Option<Node> {
         let rnode = unsafe { (*self.ptr).dv_cfdata as *mut bindings::device_node };
-        Node::from_raw(rnode)
+        unsafe { Node::from_raw(rnode) }
     }
 }
 

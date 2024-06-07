@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: ISC
 
 #![no_std]
+#![recursion_limit = "2048"]
+#![feature(impl_trait_in_assoc_type)]
 
 #[macro_use]
 extern crate kernel;
+
+#[macro_use]
+extern crate alloc;
 
 pub(crate) mod debug;
 pub(crate) mod float;
@@ -29,6 +34,8 @@ pub(crate) mod alloc;
 pub(crate) mod queue;
 
 use kernel::{of, prelude::*};
+
+use crate::hw::HwConfig;
 
 const __LOG_PREFIX: &'static str = "bronyadrm";
 static mut INFO: Option<&'static HwConfig> = None;
