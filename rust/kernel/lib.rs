@@ -36,6 +36,7 @@ pub mod tools;
 pub mod types;
 pub mod io_buffer;
 pub mod io_mem;
+pub mod io_pgtable;
 pub mod user_ptr;
 pub mod xarray;
 
@@ -90,9 +91,21 @@ macro_rules! print {
 }
 
 #[macro_export]
+macro_rules! dbg {
+	($fmt:expr)              => ($crate::println!("{}:dbg: {}", crate::__LOG_PREFIX, alloc::format!($fmt)));
+	($fmt:expr, $($arg:tt)+) => ($crate::println!("{}:dbg: {}", crate::__LOG_PREFIX, alloc::format!($fmt, $($arg)*)));
+}
+
+#[macro_export]
 macro_rules! info {
 	($fmt:expr)              => ($crate::println!("{}:info: {}", crate::__LOG_PREFIX, alloc::format!($fmt)));
 	($fmt:expr, $($arg:tt)+) => ($crate::println!("{}:info: {}", crate::__LOG_PREFIX, alloc::format!($fmt, $($arg)*)));
+}
+
+#[macro_export]
+macro_rules! notice {
+	($fmt:expr)              => ($crate::println!("{}:notice: {}", crate::__LOG_PREFIX, alloc::format!($fmt)));
+	($fmt:expr, $($arg:tt)+) => ($crate::println!("{}:notice: {}", crate::__LOG_PREFIX, alloc::format!($fmt, $($arg)*)));
 }
 
 #[macro_export]
@@ -105,6 +118,12 @@ macro_rules! warn {
 macro_rules! err {
 	($fmt:expr)              => ($crate::println!("{}:err: {}", crate::__LOG_PREFIX, alloc::format!($fmt)));
 	($fmt:expr, $($arg:tt)+) => ($crate::println!("{}:err: {}", crate::__LOG_PREFIX, alloc::format!($fmt, $($arg)*)));
+}
+
+#[macro_export]
+macro_rules! crit {
+	($fmt:expr)              => ($crate::println!("{}:crit: {}", crate::__LOG_PREFIX, alloc::format!($fmt)));
+	($fmt:expr, $($arg:tt)+) => ($crate::println!("{}:crit: {}", crate::__LOG_PREFIX, alloc::format!($fmt, $($arg)*)));
 }
 
 /// Print kernel debug messages with a trailing newline

@@ -98,7 +98,7 @@ pub(crate) mod feat {
 
         /// Hardware requires Z/S compression to be mandatorily enabled.
         pub(crate) const MANDATORY_ZS_COMPRESSION: u64 =
-            uapi::drm_asahi_feat_incompat_DRM_ASAHI_FEAT_MANDATORY_ZS_COMPRESSION as u64;
+            uapi::drm_bronya_feat_incompat_DRM_BRONYA_FEAT_MANDATORY_ZS_COMPRESSION as u64;
     }
 }
 

@@ -9,35 +9,39 @@ pub(crate) mod debug;
 pub(crate) mod float;
 pub(crate) mod slotalloc;
 pub(crate) mod util;
+pub(crate) mod workqueue;
+pub(crate) mod fw;
+pub(crate) mod hw;
+pub(crate) mod driver;
+pub(crate) mod regs;
+pub(crate) mod object;
+pub(crate) mod mmu;
+pub(crate) mod microseq;
+pub(crate) mod mem;
+pub(crate) mod initdata;
+pub(crate) mod gpu;
+pub(crate) mod gem;
+pub(crate) mod file;
+pub(crate) mod event;
+pub(crate) mod channel;
+pub(crate) mod buffer;
+pub(crate) mod alloc;
+pub(crate) mod queue;
 
 use kernel::{of, prelude::*};
 
 const __LOG_PREFIX: &'static str = "bronyadrm";
-//static mut INFO: Option<&'static HwConfig> = None;
-static mut INFO: Option<()> = None;
+static mut INFO: Option<&'static HwConfig> = None;
 
-/*
 id_table! { BRONYA_ID_TABLE, &'static hw::HwConfig, [
-    ("apple,agx-t8103", Some(&hw::t8103::HWCONFIG)),
-    ("apple,agx-t8112", Some(&hw::t8112::HWCONFIG)),
-    ("apple,agx-t6000", Some(&hw::t600x::HWCONFIG_T6000)),
-    ("apple,agx-t6001", Some(&hw::t600x::HWCONFIG_T6001)),
-    ("apple,agx-t6002", Some(&hw::t600x::HWCONFIG_T6002)),
-    ("apple,agx-t6020", Some(&hw::t602x::HWCONFIG_T6020)),
-    ("apple,agx-t6021", Some(&hw::t602x::HWCONFIG_T6021)),
-    ("apple,agx-t6022", Some(&hw::t602x::HWCONFIG_T6022))
-] }
-*/
-
-id_table! { BRONYA_ID_TABLE, (), [
-    (c_str!("apple,agx-t8103"), Some(())),
-    (c_str!("apple,agx-t8112"), Some(())),
-    (c_str!("apple,agx-t6000"), Some(())),
-    (c_str!("apple,agx-t6001"), Some(())),
-    (c_str!("apple,agx-t6002"), Some(())),
-    (c_str!("apple,agx-t6020"), Some(())),
-    (c_str!("apple,agx-t6021"), Some(())),
-    (c_str!("apple,agx-t6022"), Some(()))
+    (c_str!("apple,agx-t8103"), Some(&hw::t8103::HWCONFIG)),
+    (c_str!("apple,agx-t8112"), Some(&hw::t8112::HWCONFIG)),
+    (c_str!("apple,agx-t6000"), Some(&hw::t600x::HWCONFIG_T6000)),
+    (c_str!("apple,agx-t6001"), Some(&hw::t600x::HWCONFIG_T6001)),
+    (c_str!("apple,agx-t6002"), Some(&hw::t600x::HWCONFIG_T6002)),
+    (c_str!("apple,agx-t6020"), Some(&hw::t602x::HWCONFIG_T6020)),
+    (c_str!("apple,agx-t6021"), Some(&hw::t602x::HWCONFIG_T6021)),
+    (c_str!("apple,agx-t6022"), Some(&hw::t602x::HWCONFIG_T6022))
 ] }
 
 #[no_mangle]

@@ -211,7 +211,7 @@ impl EventManager {
                 owner.mark_error(EventValue(wait_value), error);
             }
             None => {
-                pr_err!("Received error for empty slot {}\n", slot);
+                err!("Received error for empty slot {}\n", slot);
             }
         }
     }
@@ -223,7 +223,7 @@ impl EventManager {
         self.alloc.with_inner(|inner| {
             for wq in inner.owners.iter().filter_map(|o| o.as_ref()).cloned() {
                 if owners.try_push(wq).is_err() {
-                    pr_err!("Failed to signal failure to WorkQueue\n");
+                    err!("Failed to signal failure to WorkQueue\n");
                 }
             }
         });

@@ -53,18 +53,18 @@ pub(crate) enum WorkError {
     Unknown,
 }
 
-impl From<WorkError> for uapi::drm_asahi_result_info {
+impl From<WorkError> for uapi::drm_bronya_result_info {
     fn from(err: WorkError) -> Self {
         match err {
             WorkError::Fault(info) => Self {
-                status: uapi::drm_asahi_status_DRM_ASAHI_STATUS_FAULT,
+                status: uapi::drm_bronya_status_DRM_BRONYA_STATUS_FAULT,
                 fault_type: match info.reason {
-                    FaultReason::Unmapped => uapi::drm_asahi_fault_DRM_ASAHI_FAULT_UNMAPPED,
-                    FaultReason::AfFault => uapi::drm_asahi_fault_DRM_ASAHI_FAULT_AF_FAULT,
-                    FaultReason::WriteOnly => uapi::drm_asahi_fault_DRM_ASAHI_FAULT_WRITE_ONLY,
-                    FaultReason::ReadOnly => uapi::drm_asahi_fault_DRM_ASAHI_FAULT_READ_ONLY,
-                    FaultReason::NoAccess => uapi::drm_asahi_fault_DRM_ASAHI_FAULT_NO_ACCESS,
-                    FaultReason::Unknown(_) => uapi::drm_asahi_fault_DRM_ASAHI_FAULT_UNKNOWN,
+                    FaultReason::Unmapped => uapi::drm_bronya_fault_DRM_BRONYA_FAULT_UNMAPPED,
+                    FaultReason::AfFault => uapi::drm_bronya_fault_DRM_BRONYA_FAULT_AF_FAULT,
+                    FaultReason::WriteOnly => uapi::drm_bronya_fault_DRM_BRONYA_FAULT_WRITE_ONLY,
+                    FaultReason::ReadOnly => uapi::drm_bronya_fault_DRM_BRONYA_FAULT_READ_ONLY,
+                    FaultReason::NoAccess => uapi::drm_bronya_fault_DRM_BRONYA_FAULT_NO_ACCESS,
+                    FaultReason::Unknown(_) => uapi::drm_bronya_fault_DRM_BRONYA_FAULT_UNKNOWN,
                 },
                 unit: info.unit_code.into(),
                 sideband: info.sideband.into(),
@@ -76,10 +76,10 @@ impl From<WorkError> for uapi::drm_asahi_result_info {
             },
             a => Self {
                 status: match a {
-                    WorkError::Timeout => uapi::drm_asahi_status_DRM_ASAHI_STATUS_TIMEOUT,
-                    WorkError::Killed => uapi::drm_asahi_status_DRM_ASAHI_STATUS_KILLED,
-                    WorkError::NoDevice => uapi::drm_asahi_status_DRM_ASAHI_STATUS_NO_DEVICE,
-                    _ => uapi::drm_asahi_status_DRM_ASAHI_STATUS_UNKNOWN_ERROR,
+                    WorkError::Timeout => uapi::drm_bronya_status_DRM_BRONYA_STATUS_TIMEOUT,
+                    WorkError::Killed => uapi::drm_bronya_status_DRM_BRONYA_STATUS_KILLED,
+                    WorkError::NoDevice => uapi::drm_bronya_status_DRM_BRONYA_STATUS_NO_DEVICE,
+                    _ => uapi::drm_bronya_status_DRM_BRONYA_STATUS_UNKNOWN_ERROR,
                 },
                 ..Default::default()
             },
@@ -102,7 +102,7 @@ impl From<WorkError> for kernel::error::Error {
 
 /// A GPU context tracking structure, which must be explicitly invalidated when dropped.
 pub(crate) struct GpuContext {
-    dev: driver::AsahiDevRef,
+    dev: driver::BronyaDevRef,
     data: Option<Box<GpuObject<fw::workqueue::GpuContextData>>>,
 }
 no_debug!(GpuContext);
@@ -110,7 +110,7 @@ no_debug!(GpuContext);
 impl GpuContext {
     /// Allocate a new GPU context.
     pub(crate) fn new(
-        dev: &driver::AsahiDevice,
+        dev: &driver::BronyaDevice,
         alloc: &mut gpu::KernelAllocators,
         buffer: Option<Arc<dyn core::any::Any + Send + Sync>>,
     ) -> Result<GpuContext> {
@@ -203,7 +203,7 @@ impl<O: OpaqueGpuObject, C: FnOnce(&mut O, Option<WorkError>) + Send + Sync> Gen
 /// Inner data for managing a single work queue.
 #[versions(AGX)]
 struct WorkQueueInner {
-    dev: driver::AsahiDevRef,
+    dev: driver::BronyaDevRef,
     event_manager: Arc<event::EventManager>,
     info: GpuObject<QueueInfo::ver>,
     new: bool,
@@ -323,12 +323,12 @@ impl Job::ver {
 
     pub(crate) fn commit(&mut self) -> Result {
         if self.committed {
-            pr_err!("WorkQueue: Tried to commit committed Job\n");
+            err!("WorkQueue: Tried to commit committed Job\n");
             return Err(EINVAL);
         }
 
         if self.pending.is_empty() {
-            pr_err!("WorkQueue: Job::commit() with no commands\n");
+            err!("WorkQueue: Job::commit() with no commands\n");
             return Err(EINVAL);
         }
 
@@ -337,7 +337,7 @@ impl Job::ver {
         let ev = inner.event.as_mut().expect("WorkQueue: Job lost its event");
 
         if ev.1 != self.start_value {
-            pr_err!(
+            err!(
                 "WorkQueue: Job::commit() out of order (event slot {} {:?} != {:?}\n",
                 ev.0.slot(),
                 ev.1,
@@ -361,31 +361,31 @@ impl Job::ver {
         } else if let Some(work) = inner.pending.first() {
             Some(work.get_fence())
         } else {
-            pr_err!("WorkQueue: Cannot submit, but queue is empty?\n");
+            err!("WorkQueue: Cannot submit, but queue is empty?\n");
             None
         }
     }
 
     pub(crate) fn submit(&mut self) -> Result<JobSubmission::ver<'_>> {
         if !self.committed {
-            pr_err!("WorkQueue: Tried to submit uncommitted Job\n");
+            err!("WorkQueue: Tried to submit uncommitted Job\n");
             return Err(EINVAL);
         }
 
         if self.submitted {
-            pr_err!("WorkQueue: Tried to submit Job twice\n");
+            err!("WorkQueue: Tried to submit Job twice\n");
             return Err(EINVAL);
         }
 
         if self.pending.is_empty() {
-            pr_err!("WorkQueue: Job::submit() with no commands\n");
+            err!("WorkQueue: Job::submit() with no commands\n");
             return Err(EINVAL);
         }
 
         let mut inner = self.wq.inner.lock();
 
         if inner.submit_seq != self.event_info.cmd_seq {
-            pr_err!(
+            err!(
                 "WorkQueue: Job::submit() out of order (submit_seq {} != {})\n",
                 inner.submit_seq,
                 self.event_info.cmd_seq
@@ -394,7 +394,7 @@ impl Job::ver {
         }
 
         if inner.commit_seq < (self.event_info.cmd_seq + self.pending.len() as u64) {
-            pr_err!(
+            err!(
                 "WorkQueue: Job::submit() out of order (commit_seq {} != {})\n",
                 inner.commit_seq,
                 (self.event_info.cmd_seq + self.pending.len() as u64)
@@ -406,7 +406,7 @@ impl Job::ver {
         let command_count = self.pending.len();
 
         if inner.free_space() <= command_count {
-            pr_err!("WorkQueue: Job does not fit in ring buffer\n");
+            err!("WorkQueue: Job does not fit in ring buffer\n");
             return Err(EBUSY);
         }
 
@@ -568,7 +568,7 @@ impl WorkQueue::ver {
     /// Create a new WorkQueue of a given type and priority.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
-        dev: &driver::AsahiDevice,
+        dev: &driver::BronyaDevice,
         alloc: &mut gpu::KernelAllocators,
         event_manager: Arc<event::EventManager>,
         gpu_context: Arc<GpuContext>,
@@ -776,7 +776,7 @@ impl WorkQueue for WorkQueue::ver {
         let mut completed = Vec::new();
 
         if completed.try_reserve(completed_commands).is_err() {
-            pr_crit!(
+            crit!(
                 "WorkQueue({:?}): Failed to allocate space for {} completed commands\n",
                 inner.pipe_type,
                 completed_commands
@@ -836,7 +836,7 @@ impl WorkQueue for WorkQueue::ver {
         let mut inner = self.inner.lock();
 
         if inner.event.is_none() {
-            pr_err!("WorkQueue: signal_fault() called but no event?\n");
+            err!("WorkQueue: signal_fault() called but no event?\n");
             return;
         }
 
@@ -865,7 +865,7 @@ impl WorkQueue for WorkQueue::ver {
         let mut inner = self.inner.lock();
 
         if inner.event.is_none() {
-            pr_err!("WorkQueue: fail_all() called but no event?\n");
+            err!("WorkQueue: fail_all() called but no event?\n");
             return;
         }
 

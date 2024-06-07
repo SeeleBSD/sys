@@ -9,7 +9,7 @@
 //! implementation.
 
 use crate::debug::*;
-use crate::driver::{AsahiDevRef, AsahiDevice};
+use crate::driver::{BronyaDevRef, BronyaDevice};
 use crate::fw::channels::*;
 use crate::fw::initdata::{raw, ChannelRing};
 use crate::fw::types::*;
@@ -139,7 +139,7 @@ where
             let next_wptr = (self.wptr + 1) % self.count;
             let mut rptr = T::rptr(raw);
             if next_wptr == rptr {
-                pr_err!(
+                err!(
                     "TX ring buffer is full! Waiting... ({}, {})\n",
                     next_wptr,
                     rptr
@@ -191,7 +191,7 @@ where
 /// Device Control channel for global device management commands.
 #[versions(AGX)]
 pub(crate) struct DeviceControlChannel {
-    dev: AsahiDevRef,
+    dev: BronyaDevRef,
     ch: TxChannel<ChannelState, DeviceControlMsg::ver>,
 }
 
@@ -201,7 +201,7 @@ impl DeviceControlChannel::ver {
 
     /// Allocate a new Device Control channel.
     pub(crate) fn new(
-        dev: &AsahiDevice,
+        dev: &BronyaDevice,
         alloc: &mut gpu::KernelAllocators,
     ) -> Result<DeviceControlChannel::ver> {
         Ok(DeviceControlChannel::ver {
@@ -230,7 +230,7 @@ impl DeviceControlChannel::ver {
 /// Pipe channel to submit WorkQueue execution requests.
 #[versions(AGX)]
 pub(crate) struct PipeChannel {
-    dev: AsahiDevRef,
+    dev: BronyaDevRef,
     ch: TxChannel<ChannelState, PipeMsg::ver>,
 }
 
@@ -238,7 +238,7 @@ pub(crate) struct PipeChannel {
 impl PipeChannel::ver {
     /// Allocate a new Pipe submission channel.
     pub(crate) fn new(
-        dev: &AsahiDevice,
+        dev: &BronyaDevice,
         alloc: &mut gpu::KernelAllocators,
     ) -> Result<PipeChannel::ver> {
         Ok(PipeChannel::ver {
@@ -261,7 +261,7 @@ impl PipeChannel::ver {
 
 /// Firmware Control channel, used for secure cache flush requests.
 pub(crate) struct FwCtlChannel {
-    dev: AsahiDevRef,
+    dev: BronyaDevRef,
     ch: TxChannel<FwCtlChannelState, FwCtlMsg>,
 }
 
@@ -270,7 +270,7 @@ impl FwCtlChannel {
 
     /// Allocate a new Firmware Control channel.
     pub(crate) fn new(
-        dev: &AsahiDevice,
+        dev: &BronyaDevice,
         alloc: &mut gpu::KernelAllocators,
     ) -> Result<FwCtlChannel> {
         Ok(FwCtlChannel {
@@ -300,7 +300,7 @@ impl FwCtlChannel {
 /// other events.
 #[versions(AGX)]
 pub(crate) struct EventChannel {
-    dev: AsahiDevRef,
+    dev: BronyaDevRef,
     ch: RxChannel<ChannelState, RawEventMsg>,
     ev_mgr: Arc<event::EventManager>,
     buf_mgr: buffer::BufferManager::ver,
@@ -311,7 +311,7 @@ pub(crate) struct EventChannel {
 impl EventChannel::ver {
     /// Allocate a new Event channel.
     pub(crate) fn new(
-        dev: &AsahiDevice,
+        dev: &BronyaDevice,
         alloc: &mut gpu::KernelAllocators,
         ev_mgr: Arc<event::EventManager>,
         buf_mgr: buffer::BufferManager::ver,
@@ -348,7 +348,7 @@ impl EventChannel::ver {
                         EventMsg::Fault => match self.gpu.as_ref() {
                             Some(gpu) => gpu.handle_fault(),
                             None => {
-                                dev_crit!(self.dev, "EventChannel: No GPU manager available!\n")
+                                crit!("EventChannel: No GPU manager available!\n")
                             }
                         },
                         EventMsg::Timeout {
@@ -358,7 +358,7 @@ impl EventChannel::ver {
                         } => match self.gpu.as_ref() {
                             Some(gpu) => gpu.handle_timeout(counter, event_slot),
                             None => {
-                                dev_crit!(self.dev, "EventChannel: No GPU manager available!\n")
+                                crit!("EventChannel: No GPU manager available!\n")
                             }
                         },
                         EventMsg::Flag { firing, .. } => {
@@ -381,16 +381,16 @@ impl EventChannel::ver {
                                 gpu.ack_grow(buffer_slot, vm_slot, counter);
                             }
                             None => {
-                                dev_crit!(self.dev, "EventChannel: No GPU manager available!\n")
+                                crit!("EventChannel: No GPU manager available!\n")
                             }
                         },
                         msg => {
-                            dev_crit!(self.dev, "Unknown event message: {:?}\n", msg);
+                            crit!("Unknown event message: {:?}\n", msg);
                         }
                     }
                 }
                 _ => {
-                    dev_warn!(self.dev, "Unknown event message: {:?}\n", unsafe {
+                    warn!("Unknown event message: {:?}\n", unsafe {
                         msg.raw
                     });
                 }
@@ -403,7 +403,7 @@ impl EventChannel::ver {
 /// levels), and it also uses a side buffer to actually hold the log messages, only passing around
 /// pointers in the main buffer.
 pub(crate) struct FwLogChannel {
-    dev: AsahiDevRef,
+    dev: BronyaDevRef,
     ch: RxChannel<FwLogChannelState, RawFwLogMsg>,
     payload_buf: GpuArray<RawFwLogPayloadMsg>,
 }
@@ -414,7 +414,7 @@ impl FwLogChannel {
 
     /// Allocate a new Firmware Log channel.
     pub(crate) fn new(
-        dev: &AsahiDevice,
+        dev: &BronyaDevice,
         alloc: &mut gpu::KernelAllocators,
     ) -> Result<FwLogChannel> {
         Ok(FwLogChannel {
@@ -447,8 +447,7 @@ impl FwLogChannel {
                     continue;
                 }
                 if msg.msg_index.0 as usize >= Self::BUF_SIZE {
-                    dev_warn!(
-                        self.dev,
+                    warn!(
                         "FWLog{} message index out of bounds: {:?}\n",
                         i,
                         msg
@@ -459,7 +458,7 @@ impl FwLogChannel {
                 let index = Self::BUF_SIZE * i + msg.msg_index.0 as usize;
                 let payload = &self.payload_buf.as_slice()[index];
                 if payload.msg_type != 3 {
-                    dev_warn!(self.dev, "Unknown FWLog{} payload: {:?}\n", i, payload);
+                    warn!("Unknown FWLog{} payload: {:?}\n", i, payload);
                     self.ch.get(i);
                     continue;
                 }
@@ -467,8 +466,7 @@ impl FwLogChannel {
                     CStr::from_bytes_with_nul(&(*payload.msg)[..end + 1])
                         .unwrap_or(c_str!("cstr_err"))
                 } else {
-                    dev_warn!(
-                        self.dev,
+                    warn!(
                         "FWLog{} payload not NUL-terminated: {:?}\n",
                         i,
                         payload
@@ -477,12 +475,12 @@ impl FwLogChannel {
                     continue;
                 };
                 match i {
-                    0 => dev_dbg!(self.dev, "FWLog: {}\n", msg),
-                    1 => dev_info!(self.dev, "FWLog: {}\n", msg),
-                    2 => dev_notice!(self.dev, "FWLog: {}\n", msg),
-                    3 => dev_warn!(self.dev, "FWLog: {}\n", msg),
-                    4 => dev_err!(self.dev, "FWLog: {}\n", msg),
-                    5 => dev_crit!(self.dev, "FWLog: {}\n", msg),
+                    0 => dbg!("FWLog: {}\n", msg),
+                    1 => info!("FWLog: {}\n", msg),
+                    2 => notice!("FWLog: {}\n", msg),
+                    3 => warn!("FWLog: {}\n", msg),
+                    4 => err!("FWLog: {}\n", msg),
+                    5 => crit!("FWLog: {}\n", msg),
                     _ => (),
                 };
                 self.ch.get(i);
@@ -492,7 +490,7 @@ impl FwLogChannel {
 }
 
 pub(crate) struct KTraceChannel {
-    dev: AsahiDevRef,
+    dev: BronyaDevRef,
     ch: RxChannel<ChannelState, RawKTraceMsg>,
 }
 
@@ -501,7 +499,7 @@ pub(crate) struct KTraceChannel {
 impl KTraceChannel {
     /// Allocate a new KTrace channel.
     pub(crate) fn new(
-        dev: &AsahiDevice,
+        dev: &BronyaDevice,
         alloc: &mut gpu::KernelAllocators,
     ) -> Result<KTraceChannel> {
         Ok(KTraceChannel {
@@ -527,7 +525,7 @@ impl KTraceChannel {
 /// Not really implemented other than debug logs yet...
 #[versions(AGX)]
 pub(crate) struct StatsChannel {
-    dev: AsahiDevRef,
+    dev: BronyaDevRef,
     ch: RxChannel<ChannelState, RawStatsMsg::ver>,
 }
 
@@ -535,7 +533,7 @@ pub(crate) struct StatsChannel {
 impl StatsChannel::ver {
     /// Allocate a new Statistics channel.
     pub(crate) fn new(
-        dev: &AsahiDevice,
+        dev: &BronyaDevice,
         alloc: &mut gpu::KernelAllocators,
     ) -> Result<StatsChannel::ver> {
         Ok(StatsChannel::ver {

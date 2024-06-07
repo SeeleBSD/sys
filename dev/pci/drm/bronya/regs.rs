@@ -209,8 +209,7 @@ impl Resources {
         let id_unk18 = self.sgx_read32(ID_UNK18);
         let id_clusters = self.sgx_read32(ID_CLUSTERS);
 
-        dev_info!(
-            self.dev,
+        info!(
             "GPU ID registers: {:#x} {:#x} {:#x} {:#x} {:#x} {:#x}\n",
             id_version,
             id_unk08,
@@ -240,7 +239,7 @@ impl Resources {
                 ((id_counts_1 >> 8) & 0xff) * ((id_counts_1 >> 16) & 0xf)
             }
             a => {
-                dev_err!(self.dev, "Unknown GPU generation {}\n", a);
+                err!("Unknown GPU generation {}\n", a);
                 return Err(ENODEV);
             }
         };
@@ -248,13 +247,12 @@ impl Resources {
         let mut core_masks_packed = Vec::new();
         core_masks_packed.try_extend_from_slice(&core_mask_regs)?;
 
-        dev_info!(self.dev, "Core masks: {:#x?}\n", core_masks_packed);
+        info!("Core masks: {:#x?}\n", core_masks_packed);
 
         let num_cores = id_counts_1 & 0xff;
 
         if num_cores > 32 {
-            dev_err!(
-                self.dev,
+            err!(
                 "Too many cores per cluster ({} > 32)\n",
                 num_cores
             );
@@ -262,8 +260,7 @@ impl Resources {
         }
 
         if num_cores * num_clusters > (core_mask_regs.len() * 32) as u32 {
-            dev_err!(
-                self.dev,
+            err!(
                 "Too many total cores ({} x {} > {})\n",
                 num_clusters,
                 num_cores,
@@ -289,7 +286,7 @@ impl Resources {
         }
 
         if core_mask_regs.iter().any(|a| *a != 0) {
-            dev_err!(self.dev, "Leftover core mask: {:#x?}\n", core_mask_regs);
+            err!("Leftover core mask: {:#x?}\n", core_mask_regs);
             return Err(EIO);
         }
 
@@ -301,7 +298,7 @@ impl Resources {
             0x20 => (hw::GpuRevision::C0, hw::GpuRevisionID::C0),
             0x21 => (hw::GpuRevision::C1, hw::GpuRevisionID::C1),
             a => {
-                dev_err!(self.dev, "Unknown GPU revision {}\n", a);
+                err!("Unknown GPU revision {}\n", a);
                 return Err(ENODEV);
             }
         };
@@ -312,7 +309,7 @@ impl Resources {
                 5 => hw::GpuGen::G14,
                 6 => hw::GpuGen::G14, // G14X has a separate ID
                 a => {
-                    dev_err!(self.dev, "Unknown GPU generation {}\n", a);
+                    err!("Unknown GPU generation {}\n", a);
                     return Err(ENODEV);
                 }
             },
@@ -328,7 +325,7 @@ impl Resources {
                     }
                 }
                 a => {
-                    dev_err!(self.dev, "Unknown GPU variant {}\n", a);
+                    err!("Unknown GPU variant {}\n", a);
                     return Err(ENODEV);
                 }
             },

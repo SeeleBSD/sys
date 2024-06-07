@@ -35,6 +35,7 @@
 #include <linux/dma-resv.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
+#include <linux/iommu.h>
 #include <linux/ioport.h>
 #include <linux/iosys-map.h>
 #include <linux/ktime.h>
@@ -104,3 +105,6 @@ const gfp_t BINDINGS_XA_FLAGS_ALLOC = XA_FLAGS_ALLOC;
 const gfp_t BINDINGS_XA_FLAGS_ALLOC1 = XA_FLAGS_ALLOC1;
 
 const u_long BINDINGS_IORESOURCE_MEM = IORESOURCE_MEM;
+
+const uint32_t BINDINGS_IOMMU_READ = IOMMU_READ;
+const uint32_t BINDINGS_IOMMU_WRITE = IOMMU_WRITE;

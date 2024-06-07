@@ -101,7 +101,7 @@ macro_rules! debug {
 #[macro_export]
 macro_rules! mod_pr_debug (
     ($($arg:tt)*) => (
-        $crate::debug! { ::kernel::info! ( $($arg)* ); }
+        $crate::debug! { ::kernel::dbg! ( $($arg)* ); }
     )
 );
 
@@ -109,7 +109,7 @@ macro_rules! mod_pr_debug (
 #[macro_export]
 macro_rules! mod_dev_dbg (
     ($dev:tt, $($arg:tt)*) => (
-        $crate::debug! { ::kernel::info! ( $($arg)* ); }
+        $crate::debug! { ::kernel::dbg! ( $($arg)* ); }
     )
 );
 
@@ -118,7 +118,7 @@ macro_rules! mod_dev_dbg (
 macro_rules! cls_pr_debug (
     ($cls:ident, $($arg:tt)*) => (
         if $crate::debug::debug_enabled($crate::debug::DebugFlags::$cls) {
-            ::kernel::info! ( $($arg)* );
+            ::kernel::dbg! ( $($arg)* );
         }
     )
 );
@@ -128,7 +128,7 @@ macro_rules! cls_pr_debug (
 macro_rules! cls_dev_dbg (
     ($cls:ident, $dev:tt, $($arg:tt)*) => (
         if $crate::debug::debug_enabled($crate::debug::DebugFlags::$cls) {
-            ::kernel::info! ( $($arg)* );
+            ::kernel::dbg! ( $($arg)* );
         }
     )
 );

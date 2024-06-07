@@ -20,7 +20,7 @@ use kernel::drm::gem::BaseObject;
 
 use core::sync::atomic::{AtomicU64, Ordering};
 
-use crate::{debug::*, driver::AsahiDevice, file::DrmFile, mmu, util::*};
+use crate::{debug::*, driver::BronyaDevice, file::DrmFile, mmu, util::*};
 
 const DEBUG_CLASS: DebugFlags = DebugFlags::Gem;
 
@@ -197,7 +197,7 @@ impl ObjectRef {
 }
 
 /// Create a new kernel-owned GEM object.
-pub(crate) fn new_kernel_object(dev: &AsahiDevice, size: usize) -> Result<ObjectRef> {
+pub(crate) fn new_kernel_object(dev: &BronyaDevice, size: usize) -> Result<ObjectRef> {
     let mut gem = shmem::Object::<DriverObject>::new(dev, align(size, mmu::UAT_PGSZ))?;
     gem.kernel = true;
     gem.flags = 0;
@@ -210,7 +210,7 @@ pub(crate) fn new_kernel_object(dev: &AsahiDevice, size: usize) -> Result<Object
 
 /// Create a new user-owned GEM object with the given flags.
 pub(crate) fn new_object(
-    dev: &AsahiDevice,
+    dev: &BronyaDevice,
     size: usize,
     flags: u32,
     vm_id: Option<u64>,
@@ -221,7 +221,7 @@ pub(crate) fn new_object(
     gem.vm_id = vm_id;
 
     gem.set_exportable(vm_id.is_none());
-    gem.set_wc(flags & uapi::ASAHI_GEM_WRITEBACK == 0);
+    gem.set_wc(flags & uapi::BRONYA_GEM_WRITEBACK == 0);
 
     mod_pr_debug!(
         "DriverObject new user object: vm_id={:?} id={}\n",
@@ -240,7 +240,7 @@ impl gem::BaseDriverObject<Object> for DriverObject {
     type Initializer = impl PinInit<Self, Error>;
 
     /// Callback to create the inner data of a GEM object
-    fn new(_dev: &AsahiDevice, _size: usize) -> Self::Initializer {
+    fn new(_dev: &BronyaDevice, _size: usize) -> Self::Initializer {
         let id = GEM_ID.fetch_add(1, Ordering::Relaxed);
         mod_pr_debug!("DriverObject::new id={}\n", id);
         try_pin_init!(DriverObject {
@@ -260,7 +260,7 @@ impl gem::BaseDriverObject<Object> for DriverObject {
 }
 
 impl shmem::DriverObject for DriverObject {
-    type Driver = crate::driver::AsahiDriver;
+    type Driver = crate::driver::BronyaDriver;
 }
 
 impl rtkit::Buffer for ObjectRef {
