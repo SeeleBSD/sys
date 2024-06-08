@@ -32,12 +32,12 @@ impl super::Queue::ver {
     pub(super) fn submit_compute(
         &self,
         job: &mut Job<super::QueueJob::ver>,
-        cmd: &uapi::drm_bronya_command,
+        cmd: &uapi::drm_asahi_command,
         result_writer: Option<super::ResultWriter>,
         id: u64,
         flush_stamps: bool,
     ) -> Result {
-        if cmd.cmd_type != uapi::drm_bronya_cmd_type_DRM_BRONYA_CMD_COMPUTE {
+        if cmd.cmd_type != uapi::drm_asahi_cmd_type_DRM_ASAHI_CMD_COMPUTE {
             return Err(EINVAL);
         }
 
@@ -45,7 +45,7 @@ impl super::Queue::ver {
         let gpu = match dev.gpu.as_any().downcast_ref::<gpu::GpuManager::ver>() {
             Some(gpu) => gpu,
             None => {
-                crit!(self.dev, "GpuManager mismatched with Queue!\n");
+                dev_crit!(self.dev, "GpuManager mismatched with Queue!\n");
                 return Err(EIO);
             }
         };
@@ -58,16 +58,16 @@ impl super::Queue::ver {
         let mut cmdbuf_reader = unsafe {
             UserSlicePtr::new(
                 cmd.cmd_buffer as usize as *mut _,
-                core::mem::size_of::<uapi::drm_bronya_cmd_compute>(),
+                core::mem::size_of::<uapi::drm_asahi_cmd_compute>(),
             )
             .reader()
         };
 
-        let mut cmdbuf: MaybeUninit<uapi::drm_bronya_cmd_compute> = MaybeUninit::uninit();
+        let mut cmdbuf: MaybeUninit<uapi::drm_asahi_cmd_compute> = MaybeUninit::uninit();
         unsafe {
             cmdbuf_reader.read_raw(
                 cmdbuf.as_mut_ptr() as *mut u8,
-                core::mem::size_of::<uapi::drm_bronya_cmd_compute>(),
+                core::mem::size_of::<uapi::drm_asahi_cmd_compute>(),
             )?;
         }
         let cmdbuf = unsafe { cmdbuf.assume_init() };
@@ -343,7 +343,7 @@ impl super::Queue::ver {
                         unk_2: 0,
                         // TODO: make separate flag
                         no_preemption: (cmdbuf.flags
-                        & uapi::BRONYA_COMPUTE_NO_PREEMPTION as u64
+                        & uapi::ASAHI_COMPUTE_NO_PREEMPTION as u64
                         != 0) as u8,
                         stamp: ev_comp.stamp_pointer,
                         fw_stamp: ev_comp.fw_stamp_pointer,
@@ -385,7 +385,7 @@ impl super::Queue::ver {
                 fence.set_error(err.into())
             }
             if let Some(mut rw) = result_writer {
-                let mut result: uapi::drm_bronya_result_compute = Default::default();
+                let mut result: uapi::drm_asahi_result_compute = Default::default();
 
                 cmd.timestamps.with(|raw, _inner| {
                     result.ts_start = raw.start.load(Ordering::Relaxed);
@@ -395,7 +395,7 @@ impl super::Queue::ver {
                 if let Some(err) = error {
                     result.info = err.into();
                 } else {
-                    result.info.status = uapi::drm_bronya_status_DRM_BRONYA_STATUS_COMPLETE;
+                    result.info.status = uapi::drm_asahi_status_DRM_ASAHI_STATUS_COMPLETE;
                 }
 
                 rw.write(result);

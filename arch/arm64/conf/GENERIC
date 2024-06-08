@@ -194,8 +194,8 @@ aplspmi*	at fdt?
 aplpmu*		at aplspmi?
 exuart*		at fdt?
 
-# Bronya
-bronyadrm*	at fdt?
+# Asahi
+asahidrm*	at fdt?
 
 # iMX
 imxccm*		at fdt? early 1

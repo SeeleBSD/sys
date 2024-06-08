@@ -30,11 +30,21 @@ use core::ptr::NonNull;
 
 const DEBUG_CLASS: DebugFlags = DebugFlags::Alloc;
 
+#[cfg(not(CONFIG_DRM_ASAHI_DEBUG_ALLOCATOR))]
 /// The driver-global allocator type
 pub(crate) type DefaultAllocator = HeapAllocator;
 
+#[cfg(not(CONFIG_DRM_ASAHI_DEBUG_ALLOCATOR))]
 /// The driver-global allocation type
 pub(crate) type DefaultAllocation = HeapAllocation;
+
+#[cfg(CONFIG_DRM_ASAHI_DEBUG_ALLOCATOR)]
+/// The driver-global allocator type
+pub(crate) type DefaultAllocator = SimpleAllocator;
+
+#[cfg(CONFIG_DRM_ASAHI_DEBUG_ALLOCATOR)]
+/// The driver-global allocation type
+pub(crate) type DefaultAllocation = SimpleAllocation;
 
 /// Represents a raw allocation (without any type information).
 pub(crate) trait RawAllocation {
@@ -619,7 +629,8 @@ impl Drop for HeapAllocation {
         alloc.with(|a| {
             if let Some(garbage) = a.garbage.as_mut() {
                 if garbage.try_push(node).is_err() {
-                    err!(
+                    dev_err!(
+                        &a.dev,
                         "HeapAllocation[{}]::drop: Failed to keep garbage\n",
                         &*a.name,
                     );
@@ -783,7 +794,8 @@ impl HeapAllocator {
         );
 
         if self.top.saturating_add(size_aligned as u64) >= self.end {
-            err!(
+            dev_err!(
+                &self.dev,
                 "HeapAllocator[{}]::add_block: Exhausted VA space\n",
                 &*self.name,
             );
@@ -796,7 +808,8 @@ impl HeapAllocator {
 
         let gpu_ptr = self.top;
         if let Err(e) = obj.map_at(&self.vm, gpu_ptr, self.prot, self.cpu_maps) {
-            err!(
+            dev_err!(
+                &self.dev,
                 "HeapAllocator[{}]::add_block: Failed to map at {:#x} ({:?})\n",
                 &*self.name,
                 gpu_ptr,
@@ -933,7 +946,8 @@ impl Allocator for HeapAllocator {
         ) {
             Ok(a) => a,
             Err(a) => {
-                err!(
+                dev_err!(
+                    &self.dev,
                     "HeapAllocator[{}]::new: Failed to insert node of size {:#x} / align {:#x}: {:?}\n",
                     &*self.name, size_aligned, align, a
                 );
@@ -948,7 +962,8 @@ impl Allocator for HeapAllocator {
         let end = start + node.size();
         if end > self.top {
             if start > self.top {
-                warn!(
+                dev_warn!(
+                    self.dev,
                     "HeapAllocator[{}]::alloc: top={:#x}, start={:#x}\n",
                     &*self.name,
                     self.top,
@@ -1028,7 +1043,8 @@ impl Allocator for HeapAllocator {
         let mut garbage = Vec::new();
 
         if garbage.try_reserve(count).is_err() {
-            crit!(
+            dev_crit!(
+                self.dev,
                 "HeapAllocator[{}]:collect_garbage: failed to reserve space\n",
                 &*self.name,
             );
@@ -1057,7 +1073,8 @@ impl Drop for HeapAllocatorInner {
         );
         if self.allocated > 0 {
             // This should never happen
-            crit!(
+            dev_crit!(
+                self.dev,
                 "HeapAllocator[{}]: dropping with {} bytes allocated\n",
                 &*self.name,
                 self.allocated

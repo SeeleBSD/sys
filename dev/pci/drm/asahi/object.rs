@@ -302,7 +302,8 @@ impl<T: GpuStruct, U: Allocation<T>> GpuObject<T, U> {
         // SAFETY: `p` is guaranteed to be valid per the Allocation invariant.
         let raw = callback(&inner, unsafe { &mut *p })?;
         if p as *mut T::Raw<'_> != raw as *mut _ {
-            err!(
+            dev_err!(
+                alloc.device(),
                 "Allocation callback returned a mismatched reference ({})\n",
                 core::any::type_name::<T>(),
             );

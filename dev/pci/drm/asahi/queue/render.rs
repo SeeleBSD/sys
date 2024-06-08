@@ -36,7 +36,7 @@ const DEBUG_CLASS: DebugFlags = DebugFlags::Render;
 const TILECTL_DISABLE_CLUSTERING: u32 = 1u32 << 0;
 
 struct RenderResult {
-    result: uapi::drm_bronya_result_render,
+    result: uapi::drm_asahi_result_render,
     vtx_complete: bool,
     frag_complete: bool,
     vtx_error: Option<workqueue::WorkError>,
@@ -60,7 +60,7 @@ impl RenderResult {
         if let Some(err) = error {
             self.result.info = err.into();
         } else {
-            self.result.info.status = uapi::drm_bronya_status_DRM_BRONYA_STATUS_COMPLETE;
+            self.result.info.status = uapi::drm_asahi_status_DRM_ASAHI_STATUS_COMPLETE;
         }
 
         self.writer.write(self.result);
@@ -71,7 +71,7 @@ impl RenderResult {
 impl super::Queue::ver {
     /// Get the appropriate tiling parameters for a given userspace command buffer.
     fn get_tiling_params(
-        cmdbuf: &uapi::drm_bronya_cmd_render,
+        cmdbuf: &uapi::drm_asahi_cmd_render,
         num_clusters: u32,
     ) -> Result<buffer::TileInfo> {
         let width: u32 = cmdbuf.fb_width;
@@ -209,12 +209,12 @@ impl super::Queue::ver {
     pub(super) fn submit_render(
         &self,
         job: &mut Job<super::QueueJob::ver>,
-        cmd: &uapi::drm_bronya_command,
+        cmd: &uapi::drm_asahi_command,
         result_writer: Option<super::ResultWriter>,
         id: u64,
         flush_stamps: bool,
     ) -> Result {
-        if cmd.cmd_type != uapi::drm_bronya_cmd_type_DRM_BRONYA_CMD_RENDER {
+        if cmd.cmd_type != uapi::drm_asahi_cmd_type_DRM_ASAHI_CMD_RENDER {
             cls_pr_debug!(Errors, "Not a render command ({})\n", cmd.cmd_type);
             return Err(EINVAL);
         }
@@ -224,27 +224,27 @@ impl super::Queue::ver {
         let mut cmdbuf_reader = unsafe {
             UserSlicePtr::new(
                 cmd.cmd_buffer as usize as *mut _,
-                core::mem::size_of::<uapi::drm_bronya_cmd_render>(),
+                core::mem::size_of::<uapi::drm_asahi_cmd_render>(),
             )
             .reader()
         };
 
-        let mut cmdbuf: MaybeUninit<uapi::drm_bronya_cmd_render> = MaybeUninit::uninit();
+        let mut cmdbuf: MaybeUninit<uapi::drm_asahi_cmd_render> = MaybeUninit::uninit();
         unsafe {
             cmdbuf_reader.read_raw(
                 cmdbuf.as_mut_ptr() as *mut u8,
-                core::mem::size_of::<uapi::drm_bronya_cmd_render>(),
+                core::mem::size_of::<uapi::drm_asahi_cmd_render>(),
             )?;
         }
         let cmdbuf = unsafe { cmdbuf.assume_init() };
 
         if cmdbuf.flags
-            & !(uapi::BRONYA_RENDER_NO_CLEAR_PIPELINE_TEXTURES
-                | uapi::BRONYA_RENDER_SET_WHEN_RELOADING_Z_OR_S
-                | uapi::BRONYA_RENDER_VERTEX_SPILLS
-                | uapi::BRONYA_RENDER_PROCESS_EMPTY_TILES
-                | uapi::BRONYA_RENDER_NO_VERTEX_CLUSTERING
-                | uapi::BRONYA_RENDER_MSAA_ZS) as u64
+            & !(uapi::ASAHI_RENDER_NO_CLEAR_PIPELINE_TEXTURES
+                | uapi::ASAHI_RENDER_SET_WHEN_RELOADING_Z_OR_S
+                | uapi::ASAHI_RENDER_VERTEX_SPILLS
+                | uapi::ASAHI_RENDER_PROCESS_EMPTY_TILES
+                | uapi::ASAHI_RENDER_NO_VERTEX_CLUSTERING
+                | uapi::ASAHI_RENDER_MSAA_ZS) as u64
             != 0
         {
             cls_pr_debug!(Errors, "Invalid flags ({:#x})\n", cmdbuf.flags);
@@ -265,7 +265,7 @@ impl super::Queue::ver {
             return Err(EINVAL);
         }
 
-        let mut unks: uapi::drm_bronya_cmd_render_unknowns = Default::default();
+        let mut unks: uapi::drm_asahi_cmd_render_unknowns = Default::default();
 
         let mut ext_ptr = cmdbuf.extensions;
         while ext_ptr != 0 {
@@ -277,7 +277,7 @@ impl super::Queue::ver {
             );
 
             match ext_type {
-                uapi::BRONYA_RENDER_EXT_UNKNOWNS => {
+                uapi::ASAHI_RENDER_EXT_UNKNOWNS => {
                     if !debug_enabled(debug::DebugFlags::AllowUnknownOverrides) {
                         cls_pr_debug!(Errors, "Overrides not enabled\n");
                         return Err(EINVAL);
@@ -285,14 +285,14 @@ impl super::Queue::ver {
                     let mut ext_reader = unsafe {
                         UserSlicePtr::new(
                             ext_ptr as usize as *mut _,
-                            core::mem::size_of::<uapi::drm_bronya_cmd_render_unknowns>(),
+                            core::mem::size_of::<uapi::drm_asahi_cmd_render_unknowns>(),
                         )
                         .reader()
                     };
                     unsafe {
                         ext_reader.read_raw(
                             &mut unks as *mut _ as *mut u8,
-                            core::mem::size_of::<uapi::drm_bronya_cmd_render_unknowns>(),
+                            core::mem::size_of::<uapi::drm_asahi_cmd_render_unknowns>(),
                         )?;
                     }
 
@@ -326,7 +326,7 @@ impl super::Queue::ver {
         let mut clustering = nclusters > 1;
 
         if debug_enabled(debug::DebugFlags::DisableClustering)
-            || cmdbuf.flags & uapi::BRONYA_RENDER_NO_VERTEX_CLUSTERING as u64 != 0
+            || cmdbuf.flags & uapi::ASAHI_RENDER_NO_VERTEX_CLUSTERING as u64 != 0
         {
             clustering = false;
         }
@@ -455,7 +455,7 @@ impl super::Queue::ver {
 
         let timestamps = Arc::try_new(kalloc.shared.new_default::<fw::job::RenderTimestamps>()?)?;
 
-        let unk1 = unks.flags & uapi::BRONYA_RENDER_UNK_UNK1 as u64 != 0;
+        let unk1 = unks.flags & uapi::ASAHI_RENDER_UNK_UNK1 as u64 != 0;
 
         let mut tile_config: u64 = 0;
         if !unk1 {
@@ -464,7 +464,7 @@ impl super::Queue::ver {
         if cmdbuf.layers > 1 {
             tile_config |= 1;
         }
-        if cmdbuf.flags & uapi::BRONYA_RENDER_PROCESS_EMPTY_TILES as u64 != 0 {
+        if cmdbuf.flags & uapi::ASAHI_RENDER_PROCESS_EMPTY_TILES as u64 != 0 {
             tile_config |= 0x10000;
         }
 
@@ -500,10 +500,10 @@ impl super::Queue::ver {
                 };
 
                 if tvb_autogrown {
-                    result.result.flags |= uapi::DRM_BRONYA_RESULT_RENDER_TVB_GROW_OVF as u64;
+                    result.result.flags |= uapi::DRM_ASAHI_RESULT_RENDER_TVB_GROW_OVF as u64;
                 }
                 if tvb_grown {
-                    result.result.flags |= uapi::DRM_BRONYA_RESULT_RENDER_TVB_GROW_MIN as u64;
+                    result.result.flags |= uapi::DRM_ASAHI_RESULT_RENDER_TVB_GROW_MIN as u64;
                 }
                 result.result.tvb_size_bytes = buffer.size() as u64;
 
@@ -521,86 +521,86 @@ impl super::Queue::ver {
 
         // Unknowns handling
 
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_TILE_CONFIG as u64 != 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_TILE_CONFIG as u64 != 0 {
             tile_config = unks.tile_config;
         }
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_UTILE_CONFIG as u64 != 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_UTILE_CONFIG as u64 != 0 {
             utile_config = unks.utile_config as u32;
         }
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_AUX_FB_UNK as u64 == 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_AUX_FB_UNK as u64 == 0 {
             unks.aux_fb_unk = 0x100000;
         }
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_G14_UNK as u64 == 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_G14_UNK as u64 == 0 {
             #[ver(G >= G14)]
             unks.g14_unk = 0x4040404;
             #[ver(G < G14)]
             unks.g14_unk = 0;
         }
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_FRG_UNK_140 as u64 == 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_FRG_UNK_140 as u64 == 0 {
             unks.frg_unk_140 = 0x8c60;
         }
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_FRG_UNK_158 as u64 == 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_FRG_UNK_158 as u64 == 0 {
             unks.frg_unk_158 = 0x1c;
         }
         #[ver(G >= G14X)]
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_FRG_TILECFG as u64 != 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_FRG_TILECFG as u64 != 0 {
             frg_tilecfg = unks.frg_tilecfg;
         }
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_LOAD_BGOBJVALS as u64 == 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_LOAD_BGOBJVALS as u64 == 0 {
             unks.load_bgobjvals = cmdbuf.isp_bgobjvals.into();
             #[ver(G < G14)]
             unks.load_bgobjvals |= 0x400;
         }
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_FRG_UNK_38 as u64 == 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_FRG_UNK_38 as u64 == 0 {
             unks.frg_unk_38 = 0;
         }
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_FRG_UNK_3C as u64 == 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_FRG_UNK_3C as u64 == 0 {
             unks.frg_unk_3c = 1;
         }
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_FRG_UNK_40 as u64 == 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_FRG_UNK_40 as u64 == 0 {
             unks.frg_unk_40 = 0;
         }
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_RELOAD_ZLSCTRL as u64 == 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_RELOAD_ZLSCTRL as u64 == 0 {
             unks.reload_zlsctrl = cmdbuf.zls_ctrl;
         }
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_UNK_BUF_10 as u64 == 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_UNK_BUF_10 as u64 == 0 {
             #[ver(G < G14X)]
             unks.unk_buf_10 = 1;
             #[ver(G >= G14X)]
             unks.unk_buf_10 = 0;
         }
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_FRG_UNK_MASK as u64 == 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_FRG_UNK_MASK as u64 == 0 {
             unks.frg_unk_mask = 0xffffffff;
         }
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_IOGPU_UNK54 == 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_IOGPU_UNK54 == 0 {
             unks.iogpu_unk54 = 0x3a0012006b0003;
         }
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_IOGPU_UNK56 == 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_IOGPU_UNK56 == 0 {
             unks.iogpu_unk56 = 1;
         }
         #[ver(G != G14)]
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_TILING_CONTROL != 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_TILING_CONTROL != 0 {
             tiling_control = unks.tiling_control as u32;
         }
         #[ver(G != G14)]
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_TILING_CONTROL_2 == 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_TILING_CONTROL_2 == 0 {
             #[ver(G < G14X)]
             unks.tiling_control_2 = 0;
             #[ver(G >= G14X)]
             unks.tiling_control_2 = 4;
         }
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_VTX_UNK_F0 == 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_VTX_UNK_F0 == 0 {
             unks.vtx_unk_f0 = 0x1c;
             #[ver(G < G14X)]
             unks.vtx_unk_f0 += align(tile_info.meta1_blocks, 4) as u64;
         }
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_VTX_UNK_F8 == 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_VTX_UNK_F8 == 0 {
             unks.vtx_unk_f8 = 0x8c60;
         }
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_VTX_UNK_118 == 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_VTX_UNK_118 == 0 {
             unks.vtx_unk_118 = 0x1c;
         }
-        if unks.flags & uapi::BRONYA_RENDER_UNK_SET_VTX_UNK_MASK == 0 {
+        if unks.flags & uapi::ASAHI_RENDER_UNK_SET_VTX_UNK_MASK == 0 {
             unks.vtx_unk_mask = 0xffffffff;
         }
 
@@ -1023,7 +1023,7 @@ impl super::Queue::ver {
                     tvb_overflow_count: 0,
                     unk_878: 0,
                     encoder_params <- try_init!(fw::job::raw::EncoderParams {
-                        unk_8: (cmdbuf.flags & uapi::BRONYA_RENDER_SET_WHEN_RELOADING_Z_OR_S as u64
+                        unk_8: (cmdbuf.flags & uapi::ASAHI_RENDER_SET_WHEN_RELOADING_Z_OR_S as u64
                             != 0) as u32,
                         sync_grow: 0,
                         unk_10: 0x0, // fixed
@@ -1035,12 +1035,12 @@ impl super::Queue::ver {
                         sampler_max: cmdbuf.fragment_sampler_max,
                     }),
                     process_empty_tiles: (cmdbuf.flags
-                        & uapi::BRONYA_RENDER_PROCESS_EMPTY_TILES as u64
+                        & uapi::ASAHI_RENDER_PROCESS_EMPTY_TILES as u64
                         != 0) as u32,
                     no_clear_pipeline_textures: (cmdbuf.flags
-                        & uapi::BRONYA_RENDER_NO_CLEAR_PIPELINE_TEXTURES as u64
+                        & uapi::ASAHI_RENDER_NO_CLEAR_PIPELINE_TEXTURES as u64
                         != 0) as u32,
-                    msaa_zs: (cmdbuf.flags & uapi::BRONYA_RENDER_MSAA_ZS as u64 != 0) as u32,
+                    msaa_zs: (cmdbuf.flags & uapi::ASAHI_RENDER_MSAA_ZS as u64 != 0) as u32,
                     unk_pointee: 0,
                     #[ver(V >= V13_3)]
                     unk_v13_3: 0,
@@ -1048,7 +1048,7 @@ impl super::Queue::ver {
                         unk_0: 0,
                         unk_2: 0,
                         no_preemption: (cmdbuf.flags
-                        & uapi::BRONYA_RENDER_NO_PREEMPTION as u64
+                        & uapi::ASAHI_RENDER_NO_PREEMPTION as u64
                         != 0) as u8,
                         stamp: ev_frag.stamp_pointer,
                         fw_stamp: ev_frag.fw_stamp_pointer,
@@ -1499,13 +1499,13 @@ impl super::Queue::ver {
                     sync_grow: 0,
                     unk_568: 0,
                     spills: (cmdbuf.flags
-                        & uapi::BRONYA_RENDER_VERTEX_SPILLS as u64
+                        & uapi::ASAHI_RENDER_VERTEX_SPILLS as u64
                         != 0) as u32,
                     meta <- try_init!(fw::job::raw::JobMeta {
                         unk_0: 0,
                         unk_2: 0,
                         no_preemption: (cmdbuf.flags
-                        & uapi::BRONYA_RENDER_NO_PREEMPTION as u64
+                        & uapi::ASAHI_RENDER_NO_PREEMPTION as u64
                         != 0) as u8,
                         stamp: ev_vtx.stamp_pointer,
                         fw_stamp: ev_vtx.fw_stamp_pointer,
@@ -1554,7 +1554,7 @@ impl super::Queue::ver {
                 });
                 res.result.tvb_usage_bytes = cmd.scene.used_bytes() as u64;
                 if cmd.scene.overflowed() {
-                    res.result.flags |= uapi::DRM_BRONYA_RESULT_RENDER_TVB_OVERFLOWED as u64;
+                    res.result.flags |= uapi::DRM_ASAHI_RESULT_RENDER_TVB_OVERFLOWED as u64;
                 }
                 res.vtx_error = error;
                 res.vtx_complete = true;

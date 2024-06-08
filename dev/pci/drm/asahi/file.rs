@@ -8,7 +8,7 @@
 //! information to userspace and accepting submissions.
 
 use crate::debug::*;
-use crate::driver::BronyaDevice;
+use crate::driver::AsahiDevice;
 use crate::{alloc, buffer, driver, gem, mmu, queue};
 use core::mem::MaybeUninit;
 use kernel::dma_fence::RawDmaFence;
@@ -48,14 +48,14 @@ pub(crate) struct SyncItem {
 }
 
 impl SyncItem {
-    fn parse_one(file: &DrmFile, data: uapi::drm_bronya_sync, out: bool) -> Result<SyncItem> {
+    fn parse_one(file: &DrmFile, data: uapi::drm_asahi_sync, out: bool) -> Result<SyncItem> {
         if data.extensions != 0 {
-            cls_pr_debug!(Errors, "drm_bronya_sync extension unexpected\n");
+            cls_pr_debug!(Errors, "drm_asahi_sync extension unexpected\n");
             return Err(EINVAL);
         }
 
         match data.sync_type {
-            uapi::drm_bronya_sync_type_DRM_BRONYA_SYNC_SYNCOBJ => {
+            uapi::drm_asahi_sync_type_DRM_ASAHI_SYNC_SYNCOBJ => {
                 if data.timeline_value != 0 {
                     cls_pr_debug!(Errors, "Non-timeline sync object with a nonzero value\n");
                     return Err(EINVAL);
@@ -76,7 +76,7 @@ impl SyncItem {
                     timeline_value: data.timeline_value,
                 })
             }
-            uapi::drm_bronya_sync_type_DRM_BRONYA_SYNC_TIMELINE_SYNCOBJ => {
+            uapi::drm_asahi_sync_type_DRM_ASAHI_SYNC_TIMELINE_SYNCOBJ => {
                 let syncobj = drm::syncobj::SyncObj::lookup_handle(file, data.handle)?;
                 let fence = if out {
                     None
@@ -116,14 +116,14 @@ impl SyncItem {
     fn parse_array(file: &DrmFile, ptr: u64, count: u32, out: bool) -> Result<Vec<SyncItem>> {
         let mut vec = Vec::try_with_capacity(count as usize)?;
 
-        const STRIDE: usize = core::mem::size_of::<uapi::drm_bronya_sync>();
+        const STRIDE: usize = core::mem::size_of::<uapi::drm_asahi_sync>();
         let size = STRIDE * count as usize;
 
         // SAFETY: We only read this once, so there are no TOCTOU issues.
         let mut reader = unsafe { UserSlicePtr::new(ptr as usize as *mut _, size).reader() };
 
         for _i in 0..count {
-            let mut sync: MaybeUninit<uapi::drm_bronya_sync> = MaybeUninit::uninit();
+            let mut sync: MaybeUninit<uapi::drm_asahi_sync> = MaybeUninit::uninit();
 
             // SAFETY: The size of `sync` is STRIDE
             unsafe { reader.read_raw(sync.as_mut_ptr() as *mut u8, STRIDE)? };
@@ -169,10 +169,10 @@ const VM_DRV_GPUFW_END: u64 = 0x61_ffffffff;
 const VM_UNK_PAGE: u64 = 0x6f_ffff8000;
 
 impl drm::file::DriverFile for File {
-    type Driver = driver::BronyaDriver;
+    type Driver = driver::AsahiDriver;
 
     /// Create a new `File` instance for a fresh client.
-    fn open(device: &BronyaDevice) -> Result<Pin<Box<Self>>> {
+    fn open(device: &AsahiDevice) -> Result<Pin<Box<Self>>> {
         debug::update_debug_flags();
 
         let gpu = &device.data().gpu;
@@ -203,8 +203,8 @@ impl File {
 
     /// IOCTL: get_param: Get a driver parameter value.
     pub(crate) fn get_params(
-        device: &BronyaDevice,
-        data: &mut uapi::drm_bronya_get_params,
+        device: &AsahiDevice,
+        data: &mut uapi::drm_asahi_get_params,
         file: &DrmFile,
     ) -> Result<u32> {
         mod_dev_dbg!(device, "[File {}]: IOCTL: get_params\n", file.inner().id);
@@ -220,8 +220,8 @@ impl File {
             return Err(ENODEV);
         }
 
-        let mut params = uapi::drm_bronya_params_global {
-            unstable_uabi_version: uapi::DRM_BRONYA_UNSTABLE_UABI_VERSION,
+        let mut params = uapi::drm_asahi_params_global {
+            unstable_uabi_version: uapi::DRM_ASAHI_UNSTABLE_UABI_VERSION,
             pad0: 0,
 
             feat_compat: gpu.get_cfg().gpu_feat_compat,
@@ -238,7 +238,7 @@ impl File {
             num_frags_per_cluster: gpu.get_dyncfg().id.num_frags,
             num_gps_per_cluster: gpu.get_dyncfg().id.num_gps,
             num_cores_total_active: gpu.get_dyncfg().id.total_active_cores,
-            core_masks: [0; uapi::DRM_BRONYA_MAX_CLUSTERS as usize],
+            core_masks: [0; uapi::DRM_ASAHI_MAX_CLUSTERS as usize],
 
             vm_page_size: mmu::UAT_PGSZ as u32,
             pad1: 0,
@@ -257,8 +257,8 @@ impl File {
             max_frequency_khz: gpu.get_dyncfg().pwr.max_frequency_khz(),
             max_power_mw: gpu.get_dyncfg().pwr.max_power_mw,
 
-            result_render_size: core::mem::size_of::<uapi::drm_bronya_result_render>() as u32,
-            result_compute_size: core::mem::size_of::<uapi::drm_bronya_result_compute>() as u32,
+            result_render_size: core::mem::size_of::<uapi::drm_asahi_result_render>() as u32,
+            result_compute_size: core::mem::size_of::<uapi::drm_asahi_result_compute>() as u32,
 
             firmware_version: [0; 4],
         };
@@ -271,7 +271,7 @@ impl File {
             params.firmware_version[i] = *gpu.get_dyncfg().firmware_version.get(i).unwrap_or(&0);
         }
 
-        let size = core::mem::size_of::<uapi::drm_bronya_params_global>().min(data.size.try_into()?);
+        let size = core::mem::size_of::<uapi::drm_asahi_params_global>().min(data.size.try_into()?);
 
         // SAFETY: We only write to this userptr once, so there are no TOCTOU issues.
         let mut params_writer =
@@ -285,8 +285,8 @@ impl File {
 
     /// IOCTL: vm_create: Create a new `Vm`.
     pub(crate) fn vm_create(
-        device: &BronyaDevice,
-        data: &mut uapi::drm_bronya_vm_create,
+        device: &AsahiDevice,
+        data: &mut uapi::drm_asahi_vm_create,
         file: &DrmFile,
     ) -> Result<u32> {
         if data.extensions != 0 {
@@ -358,8 +358,8 @@ impl File {
 
     /// IOCTL: vm_destroy: Destroy a `Vm`.
     pub(crate) fn vm_destroy(
-        _device: &BronyaDevice,
-        data: &mut uapi::drm_bronya_vm_destroy,
+        _device: &AsahiDevice,
+        data: &mut uapi::drm_asahi_vm_destroy,
         file: &DrmFile,
     ) -> Result<u32> {
         if data.extensions != 0 {
@@ -376,8 +376,8 @@ impl File {
 
     /// IOCTL: gem_create: Create a new GEM object.
     pub(crate) fn gem_create(
-        device: &BronyaDevice,
-        data: &mut uapi::drm_bronya_gem_create,
+        device: &AsahiDevice,
+        data: &mut uapi::drm_asahi_gem_create,
         file: &DrmFile,
     ) -> Result<u32> {
         mod_dev_dbg!(
@@ -388,14 +388,14 @@ impl File {
         );
 
         if data.extensions != 0
-            || (data.flags & !(uapi::BRONYA_GEM_WRITEBACK | uapi::BRONYA_GEM_VM_PRIVATE)) != 0
-            || (data.flags & uapi::BRONYA_GEM_VM_PRIVATE == 0 && data.vm_id != 0)
+            || (data.flags & !(uapi::ASAHI_GEM_WRITEBACK | uapi::ASAHI_GEM_VM_PRIVATE)) != 0
+            || (data.flags & uapi::ASAHI_GEM_VM_PRIVATE == 0 && data.vm_id != 0)
         {
             cls_pr_debug!(Errors, "gem_create: Invalid arguments\n");
             return Err(EINVAL);
         }
 
-        let vm_id = if data.flags & uapi::BRONYA_GEM_VM_PRIVATE != 0 {
+        let vm_id = if data.flags & uapi::ASAHI_GEM_VM_PRIVATE != 0 {
             Some(
                 file.inner()
                     .vms()
@@ -427,8 +427,8 @@ impl File {
 
     /// IOCTL: gem_mmap_offset: Assign an mmap offset to a GEM object.
     pub(crate) fn gem_mmap_offset(
-        device: &BronyaDevice,
-        data: &mut uapi::drm_bronya_gem_mmap_offset,
+        device: &AsahiDevice,
+        data: &mut uapi::drm_asahi_gem_mmap_offset,
         file: &DrmFile,
     ) -> Result<u32> {
         mod_dev_dbg!(
@@ -450,8 +450,8 @@ impl File {
 
     /// IOCTL: gem_bind: Map or unmap a GEM object into a Vm.
     pub(crate) fn gem_bind(
-        device: &BronyaDevice,
-        data: &mut uapi::drm_bronya_gem_bind,
+        device: &AsahiDevice,
+        data: &mut uapi::drm_asahi_gem_bind,
         file: &DrmFile,
     ) -> Result<u32> {
         mod_dev_dbg!(
@@ -473,9 +473,9 @@ impl File {
         }
 
         match data.op {
-            uapi::drm_bronya_bind_op_BRONYA_BIND_OP_BIND => Self::do_gem_bind(device, data, file),
-            uapi::drm_bronya_bind_op_BRONYA_BIND_OP_UNBIND => Err(ENOTSUPP),
-            uapi::drm_bronya_bind_op_BRONYA_BIND_OP_UNBIND_ALL => {
+            uapi::drm_asahi_bind_op_ASAHI_BIND_OP_BIND => Self::do_gem_bind(device, data, file),
+            uapi::drm_asahi_bind_op_ASAHI_BIND_OP_UNBIND => Err(ENOTSUPP),
+            uapi::drm_asahi_bind_op_ASAHI_BIND_OP_UNBIND_ALL => {
                 Self::do_gem_unbind_all(device, data, file)
             }
             _ => {
@@ -486,12 +486,12 @@ impl File {
     }
 
     pub(crate) fn do_gem_bind(
-        _device: &BronyaDevice,
-        data: &mut uapi::drm_bronya_gem_bind,
+        _device: &AsahiDevice,
+        data: &mut uapi::drm_asahi_gem_bind,
         file: &DrmFile,
     ) -> Result<u32> {
         if data.offset != 0 {
-            err!("gem_bind: Offset not supported yet\n");
+            pr_err!("gem_bind: Offset not supported yet\n");
             return Err(EINVAL); // Not supported yet
         }
 
@@ -505,7 +505,7 @@ impl File {
             return Err(EINVAL); // Must be page aligned
         }
 
-        if (data.flags & !(uapi::BRONYA_BIND_READ | uapi::BRONYA_BIND_WRITE)) != 0 {
+        if (data.flags & !(uapi::ASAHI_BIND_READ | uapi::ASAHI_BIND_WRITE)) != 0 {
             cls_pr_debug!(Errors, "gem_bind: Invalid flags {:#x}\n", data.flags);
             return Err(EINVAL);
         }
@@ -513,7 +513,7 @@ impl File {
         let mut bo = gem::lookup_handle(file, data.handle)?;
 
         if data.range != bo.size().try_into()? {
-            err!("gem_bind: Partial maps not supported yet\n");
+            pr_err!("gem_bind: Partial maps not supported yet\n");
             return Err(EINVAL); // Not supported yet
         }
 
@@ -561,13 +561,13 @@ impl File {
             return Err(EINVAL);
         }
 
-        let prot = if data.flags & uapi::BRONYA_BIND_READ != 0 {
-            if data.flags & uapi::BRONYA_BIND_WRITE != 0 {
+        let prot = if data.flags & uapi::ASAHI_BIND_READ != 0 {
+            if data.flags & uapi::ASAHI_BIND_WRITE != 0 {
                 mmu::PROT_GPU_SHARED_RW
             } else {
                 mmu::PROT_GPU_SHARED_RO
             }
-        } else if data.flags & uapi::BRONYA_BIND_WRITE != 0 {
+        } else if data.flags & uapi::ASAHI_BIND_WRITE != 0 {
             mmu::PROT_GPU_SHARED_WO
         } else {
             cls_pr_debug!(
@@ -575,7 +575,7 @@ impl File {
                 "gem_bind: Must specify read or write (flags: {:#x})\n",
                 data.flags
             );
-            return Err(EINVAL); // Must specify one of BRONYA_BIND_{READ,WRITE}
+            return Err(EINVAL); // Must specify one of ASAHI_BIND_{READ,WRITE}
         };
 
         // Clone it immediately so we aren't holding the XArray lock
@@ -594,8 +594,8 @@ impl File {
     }
 
     pub(crate) fn do_gem_unbind_all(
-        _device: &BronyaDevice,
-        data: &mut uapi::drm_bronya_gem_bind,
+        _device: &AsahiDevice,
+        data: &mut uapi::drm_asahi_gem_bind,
         file: &DrmFile,
     ) -> Result<u32> {
         if data.flags != 0 || data.offset != 0 || data.range != 0 || data.addr != 0 {
@@ -624,8 +624,8 @@ impl File {
 
     /// IOCTL: queue_create: Create a new command submission queue of a given type.
     pub(crate) fn queue_create(
-        device: &BronyaDevice,
-        data: &mut uapi::drm_bronya_queue_create,
+        device: &AsahiDevice,
+        data: &mut uapi::drm_asahi_queue_create,
         file: &DrmFile,
     ) -> Result<u32> {
         let file_id = file.inner().id;
@@ -645,9 +645,9 @@ impl File {
             || data.priority > 3
             || data.queue_caps == 0
             || (data.queue_caps
-                & !(uapi::drm_bronya_queue_cap_DRM_BRONYA_QUEUE_CAP_RENDER
-                    | uapi::drm_bronya_queue_cap_DRM_BRONYA_QUEUE_CAP_BLIT
-                    | uapi::drm_bronya_queue_cap_DRM_BRONYA_QUEUE_CAP_COMPUTE))
+                & !(uapi::drm_asahi_queue_cap_DRM_ASAHI_QUEUE_CAP_RENDER
+                    | uapi::drm_asahi_queue_cap_DRM_ASAHI_QUEUE_CAP_BLIT
+                    | uapi::drm_asahi_queue_cap_DRM_ASAHI_QUEUE_CAP_COMPUTE))
                 != 0
         {
             cls_pr_debug!(Errors, "queue_create: Invalid arguments\n");
@@ -680,8 +680,8 @@ impl File {
 
     /// IOCTL: queue_destroy: Destroy a command submission queue.
     pub(crate) fn queue_destroy(
-        _device: &BronyaDevice,
-        data: &mut uapi::drm_bronya_queue_destroy,
+        _device: &AsahiDevice,
+        data: &mut uapi::drm_asahi_queue_destroy,
         file: &DrmFile,
     ) -> Result<u32> {
         if data.extensions != 0 {
@@ -703,8 +703,8 @@ impl File {
 
     /// IOCTL: submit: Submit GPU work to a command submission queue.
     pub(crate) fn submit(
-        device: &BronyaDevice,
-        data: &mut uapi::drm_bronya_submit,
+        device: &AsahiDevice,
+        data: &mut uapi::drm_asahi_submit,
         file: &DrmFile,
     ) -> Result<u32> {
         debug::update_debug_flags();
@@ -789,7 +789,7 @@ impl File {
         );
         let mut commands = Vec::try_with_capacity(data.command_count as usize)?;
 
-        const STRIDE: usize = core::mem::size_of::<uapi::drm_bronya_command>();
+        const STRIDE: usize = core::mem::size_of::<uapi::drm_asahi_command>();
         let size = STRIDE * data.command_count as usize;
 
         // SAFETY: We only read this once, so there are no TOCTOU issues.
@@ -797,7 +797,7 @@ impl File {
             unsafe { UserSlicePtr::new(data.commands as usize as *mut _, size).reader() };
 
         for _i in 0..data.command_count {
-            let mut cmd: MaybeUninit<uapi::drm_bronya_command> = MaybeUninit::uninit();
+            let mut cmd: MaybeUninit<uapi::drm_asahi_command> = MaybeUninit::uninit();
 
             // SAFETY: The size of `sync` is STRIDE
             unsafe { reader.read_raw(cmd.as_mut_ptr() as *mut u8, STRIDE)? };

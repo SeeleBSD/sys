@@ -4,7 +4,7 @@
 //!
 //! This module contains the definitions used to store per-GPU and per-SoC configuration data.
 
-use crate::driver::BronyaDevice;
+use crate::driver::AsahiDevice;
 use crate::fw::types::*;
 use alloc::vec::Vec;
 use kernel::c_str;
@@ -98,7 +98,7 @@ pub(crate) mod feat {
 
         /// Hardware requires Z/S compression to be mandatorily enabled.
         pub(crate) const MANDATORY_ZS_COMPRESSION: u64 =
-            uapi::drm_bronya_feat_incompat_DRM_BRONYA_FEAT_MANDATORY_ZS_COMPRESSION as u64;
+            uapi::drm_asahi_feat_incompat_DRM_ASAHI_FEAT_MANDATORY_ZS_COMPRESSION as u64;
     }
 }
 
@@ -474,7 +474,7 @@ pub(crate) struct PwrConfig {
 
 impl PwrConfig {
     fn load_opp(
-        dev: &BronyaDevice,
+        dev: &AsahiDevice,
         name: &CStr,
         cfg: &HwConfig,
         is_main: bool,
@@ -500,7 +500,8 @@ impl PwrConfig {
             };
 
             if volt_uv.len() != voltage_count as usize {
-                err!(
+                dev_err!(
+                    dev,
                     "Invalid opp-microvolt length (expected {}, got {})\n",
                     voltage_count,
                     volt_uv.len()
@@ -528,7 +529,7 @@ impl PwrConfig {
     }
 
     /// Load the GPU power configuration from the device tree.
-    pub(crate) fn load(dev: &BronyaDevice, cfg: &HwConfig) -> Result<PwrConfig> {
+    pub(crate) fn load(dev: &AsahiDevice, cfg: &HwConfig) -> Result<PwrConfig> {
         let perf_states = Self::load_opp(dev, c_str!("operating-points-v2"), cfg, true)?;
         let node = dev.of_node().ok_or(EIO)?;
 
@@ -536,14 +537,14 @@ impl PwrConfig {
             ($prop:expr, $default:expr) => {{
                 node.get_opt_property(c_str!($prop))
                     .map_err(|e| {
-                        err!("Error reading property {}: {:?}\n", $prop, e);
+                        dev_err!(dev, "Error reading property {}: {:?}\n", $prop, e);
                         e
                     })?
                     .unwrap_or($default)
             }};
             ($prop:expr) => {{
                 node.get_property(c_str!($prop)).map_err(|e| {
-                    err!("Error reading property {}: {:?}\n", $prop, e);
+                    dev_err!(dev, "Error reading property {}: {:?}\n", $prop, e);
                     e
                 })?
             }};
@@ -552,7 +553,7 @@ impl PwrConfig {
         let pz_data = prop!("apple,power-zones", Vec::new());
 
         if pz_data.len() > 3 * MAX_POWERZONES || pz_data.len() % 3 != 0 {
-            err!("Invalid apple,power-zones value\n");
+            dev_err!(dev, "Invalid apple,power-zones value\n");
             return Err(EINVAL);
         }
 
@@ -570,11 +571,11 @@ impl PwrConfig {
         let sram_leak_coef: Vec<F32> = prop!("apple,sram-leak-coef");
 
         if core_leak_coef.len() != cfg.max_num_clusters as usize {
-            err!("Invalid apple,core-leak-coef\n");
+            dev_err!(dev, "Invalid apple,core-leak-coef\n");
             return Err(EINVAL);
         }
         if sram_leak_coef.len() != cfg.max_num_clusters as usize {
-            err!("Invalid apple,sram_leak_coef\n");
+            dev_err!(dev, "Invalid apple,sram_leak_coef\n");
             return Err(EINVAL);
         }
 

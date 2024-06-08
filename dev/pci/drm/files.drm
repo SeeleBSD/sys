@@ -1373,6 +1373,6 @@ device	apldrm: drmbase, wsemuldisplaydev, rasops32
 attach	apldrm at fdt
 file	dev/pci/drm/apple/apldrm.c				apldrm
 
-device	bronyadrm: drmbase, wsemuldisplaydev, rasops32
-attach	bronyadrm at fdt
-file	dev/pci/drm/bronya/bronyadrm.c				bronyadrm
+device	asahidrm: drmbase, wsemuldisplaydev, rasops32
+attach	asahidrm at fdt
+file	dev/pci/drm/asahi/asahidrm.c				asahidrm

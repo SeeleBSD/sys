@@ -33,7 +33,7 @@ use kernel::{
 
 use crate::alloc::Allocator;
 use crate::debug::*;
-use crate::driver::{BronyaDevRef, BronyaDevice};
+use crate::driver::{AsahiDevRef, AsahiDevice};
 use crate::fw::channels::PipeType;
 use crate::fw::types::{U32, U64};
 use crate::{
@@ -198,7 +198,7 @@ pub(crate) struct SequenceIDs {
 #[versions(AGX)]
 #[pin_data]
 pub(crate) struct GpuManager {
-    dev: BronyaDevRef,
+    dev: AsahiDevRef,
     cfg: &'static hw::HwConfig,
     dyncfg: hw::DynConfig,
     pub(crate) initdata: fw::types::GpuObject<fw::initdata::InitData::ver>,
@@ -301,10 +301,10 @@ impl rtkit::Operations for GpuManager::ver {
 
     fn recv_message(data: <Self::Data as ForeignOwnable>::Borrowed<'_>, ep: u8, msg: u64) {
         let dev = &data.dev;
-        //info!("RtKit message: {:#x}:{:#x}\n", ep, msg);
+        //dev_info!(dev, "RtKit message: {:#x}:{:#x}\n", ep, msg);
 
         if ep != EP_FIRMWARE || msg != MSG_RX_DOORBELL {
-            err!("Unknown message: {:#x}:{:#x}\n", ep, msg);
+            dev_err!(dev, "Unknown message: {:#x}:{:#x}\n", ep, msg);
             return;
         }
 
@@ -324,7 +324,7 @@ impl rtkit::Operations for GpuManager::ver {
         if debug_enabled(DebugFlags::OopsOnGpuCrash) {
             panic!("GPU firmware crashed");
         } else {
-            err!("GPU firmware crashed, failing all jobs\n");
+            dev_err!(dev, "GPU firmware crashed, failing all jobs\n");
             data.event_manager.fail_all(workqueue::WorkError::NoDevice);
         }
     }
@@ -356,7 +356,7 @@ impl GpuManager::ver {
     /// Create a new GpuManager of this version/GPU combination.
     #[inline(never)]
     pub(crate) fn new(
-        dev: &BronyaDevice,
+        dev: &AsahiDevice,
         res: &regs::Resources,
         cfg: &'static hw::HwConfig,
     ) -> Result<Arc<GpuManager::ver>> {
@@ -582,7 +582,7 @@ impl GpuManager::ver {
 
     /// Build the entire GPU InitData structure tree and return it as a boxed GpuObject.
     fn make_initdata(
-        dev: &BronyaDevice,
+        dev: &AsahiDevice,
         cfg: &'static hw::HwConfig,
         dyncfg: &hw::DynConfig,
         alloc: &mut KernelAllocators,
@@ -595,7 +595,7 @@ impl GpuManager::ver {
     ///
     /// Force disable inlining to avoid blowing up the stack.
     #[inline(never)]
-    fn make_uat(dev: &BronyaDevice, cfg: &'static hw::HwConfig) -> Result<Box<mmu::Uat>> {
+    fn make_uat(dev: &AsahiDevice, cfg: &'static hw::HwConfig) -> Result<Box<mmu::Uat>> {
         // G14X has a new thing in the Scene structure that unfortunately requires
         // write access from user contexts. Hopefully it's not security-sensitive.
         #[ver(G >= G14X)]
@@ -611,7 +611,7 @@ impl GpuManager::ver {
     /// Force disable inlining to avoid blowing up the stack.
     #[inline(never)]
     fn make_mgr(
-        dev: &BronyaDevice,
+        dev: &AsahiDevice,
         cfg: &'static hw::HwConfig,
         dyncfg: Box<hw::DynConfig>,
         uat: Box<mmu::Uat>,
@@ -693,44 +693,49 @@ impl GpuManager::ver {
     /// Force disable inlining to avoid blowing up the stack.
     #[inline(never)]
     fn make_dyncfg(
-        dev: &BronyaDevice,
+        dev: &AsahiDevice,
         res: &regs::Resources,
         cfg: &'static hw::HwConfig,
         uat: &mmu::Uat,
     ) -> Result<Box<hw::DynConfig>> {
         let gpu_id = res.get_gpu_id()?;
 
-        info!("GPU Information:\n");
-        info!(
+        dev_info!(dev, "GPU Information:\n");
+        dev_info!(
+            dev,
             "  Type: {:?}{:?}\n",
             gpu_id.gpu_gen,
             gpu_id.gpu_variant
         );
-        info!("  Clusters: {}\n", gpu_id.num_clusters);
-        info!(
+        dev_info!(dev, "  Clusters: {}\n", gpu_id.num_clusters);
+        dev_info!(
+            dev,
             "  Cores: {} ({})\n",
             gpu_id.num_cores,
             gpu_id.num_cores * gpu_id.num_clusters
         );
-        info!(
+        dev_info!(
+            dev,
             "  Frags: {} ({})\n",
             gpu_id.num_frags,
             gpu_id.num_frags * gpu_id.num_clusters
         );
-        info!(
+        dev_info!(
+            dev,
             "  GPs: {} ({})\n",
             gpu_id.num_gps,
             gpu_id.num_gps * gpu_id.num_clusters
         );
-        info!("  Core masks: {:#x?}\n", gpu_id.core_masks);
-        info!("  Active cores: {}\n", gpu_id.total_active_cores);
+        dev_info!(dev, "  Core masks: {:#x?}\n", gpu_id.core_masks);
+        dev_info!(dev, "  Active cores: {}\n", gpu_id.total_active_cores);
 
-        info!("Getting configuration from device tree...\n");
+        dev_info!(dev, "Getting configuration from device tree...\n");
         let pwr_cfg = hw::PwrConfig::load(dev, cfg)?;
-        info!("Dynamic configuration fetched\n");
+        dev_info!(dev, "Dynamic configuration fetched\n");
 
         if gpu_id.gpu_gen != cfg.gpu_gen || gpu_id.gpu_variant != cfg.gpu_variant {
-            err!(
+            dev_err!(
+                dev,
                 "GPU type mismatch (expected {:?}{:?}, found {:?}{:?})\n",
                 cfg.gpu_gen,
                 cfg.gpu_variant,
@@ -740,7 +745,8 @@ impl GpuManager::ver {
             return Err(EIO);
         }
         if gpu_id.num_clusters > cfg.max_num_clusters {
-            err!(
+            dev_err!(
+                dev,
                 "Too many clusters ({} > {})\n",
                 gpu_id.num_clusters,
                 cfg.max_num_clusters
@@ -748,7 +754,8 @@ impl GpuManager::ver {
             return Err(EIO);
         }
         if gpu_id.num_cores > cfg.max_num_cores {
-            err!(
+            dev_err!(
+                dev,
                 "Too many cores ({} > {})\n",
                 gpu_id.num_cores,
                 cfg.max_num_cores
@@ -756,7 +763,8 @@ impl GpuManager::ver {
             return Err(EIO);
         }
         if gpu_id.num_frags > cfg.max_num_frags {
-            err!(
+            dev_err!(
+                dev,
                 "Too many frags ({} > {})\n",
                 gpu_id.num_frags,
                 cfg.max_num_frags
@@ -764,7 +772,8 @@ impl GpuManager::ver {
             return Err(EIO);
         }
         if gpu_id.num_gps > cfg.max_num_gps {
-            err!(
+            dev_err!(
+                dev,
                 "Too many GPs ({} > {})\n",
                 gpu_id.num_gps,
                 cfg.max_num_gps
@@ -853,7 +862,7 @@ impl GpuManager::ver {
     /// Mark work associated with currently in-progress event slots as failed, after a fault or
     /// timeout.
     fn mark_pending_events(&self, culprit_slot: Option<u32>, error: workqueue::WorkError) {
-        err!("  Pending events:\n");
+        dev_err!(self.dev, "  Pending events:\n");
 
         self.initdata.globals.with(|raw, _inner| {
             for (index, i) in raw.pending_stamps.iter().enumerate() {
@@ -869,7 +878,8 @@ impl GpuManager::ver {
                     let flags = info & 0xf;
                     #[ver(V < V13_5)]
                     let flags = info & 0x7;
-                    err!(
+                    dev_err!(
+                        self.dev,
                         "    [{}:{}] flags={} value={:#x}\n",
                         index,
                         slot,
@@ -896,14 +906,14 @@ impl GpuManager::ver {
         let res = match data.resources() {
             Some(res) => res,
             None => {
-                err!("  Failed to acquire resources\n");
+                dev_err!(self.dev, "  Failed to acquire resources\n");
                 return None;
             }
         };
 
         let info = res.get_fault_info(self.cfg);
         if info.is_some() {
-            err!("  Fault info: {:#x?}\n", info.as_ref().unwrap());
+            dev_err!(self.dev, "  Fault info: {:#x?}\n", info.as_ref().unwrap());
         }
         info
     }
@@ -913,8 +923,8 @@ impl GpuManager::ver {
         self.initdata.fw_status.with(|raw, _inner| {
             let halt_count = raw.flags.halt_count.load(Ordering::Relaxed);
             let mut halted = raw.flags.halted.load(Ordering::Relaxed);
-            err!("  Halt count: {}\n", halt_count);
-            err!("  Halted: {}\n", halted);
+            dev_err!(self.dev, "  Halt count: {}\n", halt_count);
+            dev_err!(self.dev, "  Halted: {}\n", halted);
 
             if halted == 0 {
                 let start = clock::KernelTime::now();
@@ -929,13 +939,13 @@ impl GpuManager::ver {
             }
 
             if debug_enabled(DebugFlags::NoGpuRecovery) {
-                crit!("  GPU recovery is disabled, wedging forever!\n");
+                dev_crit!(self.dev, "  GPU recovery is disabled, wedging forever!\n");
             } else if halted != 0 {
-                err!("  Attempting recovery...\n");
+                dev_err!(self.dev, "  Attempting recovery...\n");
                 raw.flags.halted.store(0, Ordering::SeqCst);
                 raw.flags.resume.store(1, Ordering::SeqCst);
             } else {
-                err!("  Cannot recover.\n");
+                dev_err!(self.dev, "  Cannot recover.\n");
             }
         });
     }
@@ -1115,7 +1125,7 @@ impl GpuManager for GpuManager::ver {
 
         for ctx in garbage_ctx {
             if self.invalidate_context(&ctx).is_err() {
-                err!("GpuContext: Failed to invalidate GPU context!\n");
+                dev_err!(self.dev, "GpuContext: Failed to invalidate GPU context!\n");
                 if debug_enabled(DebugFlags::OopsOnGpuCrash) {
                     panic!("GPU firmware timed out");
                 }
@@ -1248,15 +1258,15 @@ impl GpuManager for GpuManager::ver {
     }
 
     fn handle_timeout(&self, counter: u32, event_slot: i32) {
-        err!(" (\\________/) \n");
-        err!("  |        |  \n");
-        err!("'.| \\  , / |.'\n");
-        err!("--| / (( \\ |--\n");
-        err!(".'|  _-_-  |'.\n");
-        err!("  |________|  \n");
-        err!("** GPU timeout nya~!!!!! **\n");
-        err!("  Event slot: {}\n", event_slot);
-        err!("  Timeout count: {}\n", counter);
+        dev_err!(self.dev, " (\\________/) \n");
+        dev_err!(self.dev, "  |        |  \n");
+        dev_err!(self.dev, "'.| \\  , / |.'\n");
+        dev_err!(self.dev, "--| / (( \\ |--\n");
+        dev_err!(self.dev, ".'|  _-_-  |'.\n");
+        dev_err!(self.dev, "  |________|  \n");
+        dev_err!(self.dev, "** GPU timeout nya~!!!!! **\n");
+        dev_err!(self.dev, "  Event slot: {}\n", event_slot);
+        dev_err!(self.dev, "  Timeout count: {}\n", counter);
 
         // If we have fault info, consider it a fault.
         let error = match self.get_fault_info() {
@@ -1268,13 +1278,13 @@ impl GpuManager for GpuManager::ver {
     }
 
     fn handle_fault(&self) {
-        err!(" (\\________/) \n");
-        err!("  |        |  \n");
-        err!("'.| \\  , / |.'\n");
-        err!("--| / (( \\ |--\n");
-        err!(".'|  _-_-  |'.\n");
-        err!("  |________|  \n");
-        err!("GPU fault nya~!!!!!\n");
+        dev_err!(self.dev, " (\\________/) \n");
+        dev_err!(self.dev, "  |        |  \n");
+        dev_err!(self.dev, "'.| \\  , / |.'\n");
+        dev_err!(self.dev, "--| / (( \\ |--\n");
+        dev_err!(self.dev, ".'|  _-_-  |'.\n");
+        dev_err!(self.dev, "  |________|  \n");
+        dev_err!(self.dev, "GPU fault nya~!!!!!\n");
         let error = match self.get_fault_info() {
             Some(info) => workqueue::WorkError::Fault(info),
             None => workqueue::WorkError::Unknown,
@@ -1350,7 +1360,8 @@ impl GpuManager for GpuManager::ver {
         let mut garbage = self.garbage_work.lock();
 
         if garbage.try_reserve(work.len()).is_err() {
-            err!(
+            dev_err!(
+                self.dev,
                 "Failed to reserve space for completed work, deadlock possible.\n"
             );
             return;
@@ -1367,7 +1378,8 @@ impl GpuManager for GpuManager::ver {
         let mut garbage = self.garbage_contexts.lock();
 
         if garbage.try_push(ctx).is_err() {
-            err!(
+            dev_err!(
+                self.dev,
                 "Failed to reserve space for freed context, deadlock possible.\n"
             );
         }

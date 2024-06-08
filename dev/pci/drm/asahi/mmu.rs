@@ -21,7 +21,7 @@ use kernel::{
     drm::mm,
     error::{to_result, Result},
     io_pgtable,
-    io_pgtable::{prot/*, AppleUAT, IoPageTable*/},
+    io_pgtable::{prot /*, AppleUAT, IoPageTable*/},
     prelude::*,
     static_lock_class,
     sync::{
@@ -83,41 +83,41 @@ const PTE_TABLE: u64 = 0x3; // BIT(0) | BIT(1)
 
 // Mapping protection types
 
-// Note: prot::CACHE means "cache coherency", which for UAT means *uncached*,
+// Note: 0 means "cache coherency", which for UAT means *uncached*,
 // since uncached mappings from the GFX ASC side are cache coherent with the AP cache.
 // Not having that flag means *cached noncoherent*.
 
 /// Firmware MMIO R/W
-pub(crate) const PROT_FW_MMIO_RW: u32 = prot::READ | prot::WRITE;
+pub(crate) const PROT_FW_MMIO_RW: u32 = 0 | prot::READ | prot::WRITE | 0 | 0;
 /// Firmware MMIO R/O
-pub(crate) const PROT_FW_MMIO_RO: u32 = prot::READ;
+pub(crate) const PROT_FW_MMIO_RO: u32 = 0 | prot::READ | 0 | 0;
 /// Firmware shared (uncached) RW
-pub(crate) const PROT_FW_SHARED_RW: u32 = prot::READ | prot::WRITE;
+pub(crate) const PROT_FW_SHARED_RW: u32 = 0 | prot::READ | prot::WRITE | 0;
 /// Firmware shared (uncached) RO
-pub(crate) const PROT_FW_SHARED_RO: u32 = prot::READ;
+pub(crate) const PROT_FW_SHARED_RO: u32 = 0 | prot::READ | 0;
 /// Firmware private (cached) RW
-pub(crate) const PROT_FW_PRIV_RW: u32 = prot::READ | prot::WRITE;
+pub(crate) const PROT_FW_PRIV_RW: u32 = 0 | prot::READ | prot::WRITE;
 /*
 /// Firmware private (cached) RO
-pub(crate) const PROT_FW_PRIV_RO: u32 = prot::PRIV | prot::READ;
+pub(crate) const PROT_FW_PRIV_RO: u32 = 0 | prot::READ;
 */
 /// Firmware/GPU shared (uncached) RW
-pub(crate) const PROT_GPU_FW_SHARED_RW: u32 = prot::READ | prot::WRITE;
+pub(crate) const PROT_GPU_FW_SHARED_RW: u32 = prot::READ | prot::WRITE | 0;
 /// Firmware/GPU shared (private) RW
 pub(crate) const PROT_GPU_FW_PRIV_RW: u32 = prot::READ | prot::WRITE;
 /// Firmware-RW/GPU-RO shared (private) RW
-pub(crate) const PROT_GPU_RO_FW_PRIV_RW: u32 = prot::PRIV | prot::WRITE;
+pub(crate) const PROT_GPU_RO_FW_PRIV_RW: u32 = 0 | prot::WRITE;
 /// GPU shared/coherent RW
-pub(crate) const PROT_GPU_SHARED_RW: u32 = prot::READ | prot::WRITE;
+pub(crate) const PROT_GPU_SHARED_RW: u32 = prot::READ | prot::WRITE | 0 | 0;
 /// GPU shared/coherent RO
-pub(crate) const PROT_GPU_SHARED_RO: u32 = prot::READ;
+pub(crate) const PROT_GPU_SHARED_RO: u32 = prot::READ | 0 | 0;
 /// GPU shared/coherent WO
-pub(crate) const PROT_GPU_SHARED_WO: u32 = prot::WRITE;
+pub(crate) const PROT_GPU_SHARED_WO: u32 = prot::WRITE | 0 | 0;
 /*
 /// GPU private/noncoherent RW
-pub(crate) const PROT_GPU_PRIV_RW: u32 = prot::READ | prot::WRITE | prot::NOEXEC;
+pub(crate) const PROT_GPU_PRIV_RW: u32 = prot::READ | prot::WRITE | 0;
 /// GPU private/noncoherent RO
-pub(crate) const PROT_GPU_PRIV_RO: u32 = prot::READ | prot::NOEXEC;
+pub(crate) const PROT_GPU_PRIV_RO: u32 = prot::READ | 0;
 */
 
 type PhysAddr = bindings::phys_addr_t;
@@ -128,7 +128,7 @@ struct UatRegion {
     map: NonNull<core::ffi::c_void>,
     size: bindings::bus_size_t,
     bst: bindings::bus_space_tag_t,
-    bsh: bindings::bus_space_handle_t
+    bsh: bindings::bus_space_handle_t,
 }
 
 /// It's safe to share UAT region records across threads.
@@ -178,11 +178,11 @@ const PAGETABLES_SIZE: usize = UAT_PGSZ;
 
 /// Inner data for a Vm instance. This is reference-counted by the outer Vm object.
 struct VmInner {
-    dev: driver::BronyaDevRef,
+    dev: driver::AsahiDevRef,
     is_kernel: bool,
     min_va: usize,
     max_va: usize,
-    //page_table: AppleUAT<Uat>,
+    // page_table: AppleUAT<Uat>,
     mm: mm::Allocator<(), MappingInner>,
     uat_inner: Arc<UatInner>,
     active_users: usize,
@@ -214,7 +214,7 @@ impl VmInner {
 
     /// Returns the translation table base for this Vm
     fn ttb(&self) -> u64 {
-        //self.page_table.cfg().ttbr
+        // self.page_table.cfg().ttbr
         todo!()
     }
 
@@ -280,7 +280,8 @@ impl VmInner {
             let len = range.dma_len();
 
             if (addr | len | iova) & UAT_PGMSK != 0 {
-                err!(
+                dev_err!(
+                    self.dev,
                     "MMU: Mapping {:#x}:{:#x} -> {:#x} is not page-aligned\n",
                     addr,
                     len,
@@ -398,16 +399,18 @@ impl Mapping {
             .unmap_pages(self.iova(), UAT_PGSZ, self.size() >> UAT_PGBIT)
             .is_err()
         {
-            err!(
+            dev_err!(
+                owner.dev,
                 "MMU: unmap for remap {:#x}:{:#x} failed\n",
                 self.iova(),
                 self.size()
             );
         }
 
-        let prot = self.0.prot | prot::CACHE;
+        let prot = self.0.prot | 0;
         if owner.map_node(&self.0, prot).is_err() {
-            err!(
+            dev_err!(
+                owner.dev,
                 "MMU: remap {:#x}:{:#x} failed\n",
                 self.iova(),
                 self.size()
@@ -528,8 +531,8 @@ impl Drop for Mapping {
         // 4. Unmap
         // 5. Flush the TLB range again
 
-        // prot::CACHE means "cache coherent" which means *uncached* here.
-        if self.0.prot & prot::CACHE == 0 {
+        // 0 means "cache coherent" which means *uncached* here.
+        if self.0.prot & 0 == 0 {
             self.remap_uncached_and_flush();
         }
 
@@ -545,7 +548,8 @@ impl Drop for Mapping {
             .unmap_pages(self.iova(), UAT_PGSZ, self.size() >> UAT_PGBIT)
             .is_err()
         {
-            err!(
+            dev_err!(
+                owner.dev,
                 "MMU: unmap {:#x}:{:#x} failed\n",
                 self.iova(),
                 self.size()
@@ -614,7 +618,7 @@ impl UatInner {
 
 /// Top-level UAT manager object
 pub(crate) struct Uat {
-    dev: driver::BronyaDevRef,
+    dev: driver::AsahiDevRef,
     cfg: &'static hw::HwConfig,
     pagetables_rgn: UatRegion,
 
@@ -628,7 +632,12 @@ pub(crate) struct Uat {
 impl Drop for UatRegion {
     fn drop(&mut self) {
         // SAFETY: the pointer is valid by the type invariant
-        unsafe { (*(self.bst as *const bindings::bus_space))._space_unmap.unwrap()(self.bst, self.bsh, self.size) };
+        // unsafe { bindings::memunmap(self.map.as_ptr()) };
+        unsafe {
+            (*(self.bst as *const bindings::bus_space))
+                ._space_unmap
+                .unwrap()(self.bst, self.bsh, self.size)
+        };
     }
 }
 
@@ -688,7 +697,7 @@ impl Handoff {
 
         if self.magic_fw.load(Ordering::Relaxed) != PPL_MAGIC {
             self.unlock();
-            err!("Handoff: Failed to initialize (firmware not running?)\n");
+            pr_err!("Handoff: Failed to initialize (firmware not running?)\n");
             return Err(EIO);
         }
 
@@ -720,7 +729,7 @@ impl HandoffFlush {
 
         let state = flush.state.load(Ordering::Relaxed);
         if state != 0 {
-            err!("Handoff: expected flush state 0, got {}\n", state);
+            pr_err!("Handoff: expected flush state 0, got {}\n", state);
         }
         flush.addr.store(start, Ordering::Relaxed);
         flush.size.store(size, Ordering::Relaxed);
@@ -732,7 +741,7 @@ impl HandoffFlush {
         let flush = unsafe { self.0.as_ref().unwrap() };
         let state = flush.state.load(Ordering::Relaxed);
         if state != 2 {
-            err!("Handoff: expected flush state 2, got {}\n", state);
+            pr_err!("Handoff: expected flush state 2, got {}\n", state);
         }
         flush.state.store(0, Ordering::Relaxed);
     }
@@ -740,7 +749,7 @@ impl HandoffFlush {
 
 // We do not implement FlushOps, since we flush manually in this module after
 // page table operations. Just provide dummy implementations.
-/*impl io_pgtable::FlushOps for Uat {
+impl io_pgtable::FlushOps for Uat {
     type Data = ();
 
     fn tlb_flush_all(_data: <Self::Data as ForeignOwnable>::Borrowed<'_>) {}
@@ -757,12 +766,12 @@ impl HandoffFlush {
         _granule: usize,
     ) {
     }
-}*/
+}
 
 impl Vm {
     /// Create a new virtual memory address space
     fn new(
-        dev: &driver::BronyaDevice,
+        dev: &driver::AsahiDevice,
         uat_inner: Arc<UatInner>,
         cfg: &'static hw::HwConfig,
         is_kernel: bool,
@@ -802,7 +811,7 @@ impl Vm {
                     min_va,
                     max_va,
                     is_kernel,
-                    //page_table,
+                    // page_table,
                     mm,
                     uat_inner,
                     binding: None,
@@ -890,7 +899,8 @@ impl Vm {
         let mut inner = self.inner.lock();
 
         if (iova as usize | phys | size) & UAT_PGMSK != 0 {
-            err!(
+            dev_err!(
+                inner.dev,
                 "MMU: Mapping {:#x}:{:#x} -> {:#x} is not page-aligned\n",
                 phys,
                 size,
@@ -899,7 +909,8 @@ impl Vm {
             return Err(EINVAL);
         }
 
-        info!(
+        dev_info!(
+            inner.dev,
             "MMU: IO map: {:#x}:{:#x} -> {:#x}\n",
             phys,
             size,
@@ -958,7 +969,7 @@ impl Drop for VmInner {
             let inval = ttb_cur == ttb;
             if inval {
                 if handoff_cur == Some(idx as u32) {
-                    err!(
+                    pr_err!(
                         "VmInner::drop owning slot {}, but it is currently in use by the ASC?\n",
                         idx
                     );
@@ -991,7 +1002,7 @@ impl Uat {
         name: &CStr,
         size: usize,
         cached: bool,
-        bst: bindings::bus_space_tag_t
+        bst: bindings::bus_space_tag_t,
     ) -> Result<UatRegion> {
         let rdev = dev.raw_device();
 
@@ -1011,13 +1022,15 @@ impl Uat {
                 idx,
             );
             if np.is_null() {
-                err!("Missing {} region\n", name);
+                dev_err!(dev, "Missing {} region\n", name);
                 return Err(EINVAL);
             }
             let ret = bindings::of_address_to_resource(np, 0, res.as_mut_ptr());
+            // #[cfg(CONFIG_OF_DYNAMIC)]
+            // bindings::of_node_put(np);
 
             if ret < 0 {
-                err!("Failed to get {} region\n", name);
+                dev_err!(dev, "Failed to get {} region\n", name);
                 to_result(ret)?
             }
 
@@ -1027,7 +1040,8 @@ impl Uat {
         let rgn_size: usize = unsafe { bindings::resource_size(&res) } as usize;
 
         if size > rgn_size {
-            err!(
+            dev_err!(
+                dev,
                 "Region {} is too small (expected {}, got {})\n",
                 name,
                 size,
@@ -1036,15 +1050,22 @@ impl Uat {
             return Err(ENOMEM);
         }
 
-        /*
-        let flags = if cached {
-            bindings::BINDINGS_MEMREMAP_WB
-        } else {
-            bindings::BINDINGS_MEMREMAP_WC
-        };
-        */
+        // let flags = if cached {
+        // bindings::MEMREMAP_WB
+        // } else {
+        // bindings::MEMREMAP_WC
+        // };
+        // let map = unsafe { bindings::memremap(res.start, rgn_size, flags.into()) };
+        // let map = NonNull::new(map);
         let mut bsh: bindings::bus_space_handle_t = 0;
-        if (*(bst as *const bindings::bus_space))._space_map.unwrap()(bst, res.start as bindings::bus_addr_t, rgn_size as bindings::bus_size_t, bindings::BUS_SPACE_MAP_LINEAR as i32, &mut bsh) != 0 {
+        if (*(bst as *const bindings::bus_space))._space_map.unwrap()(
+            bst,
+            res.start as bindings::bus_addr_t,
+            rgn_size as bindings::bus_size_t,
+            bindings::BUS_SPACE_MAP_LINEAR as i32,
+            &mut bsh,
+        ) != 0
+        {
             return Err(ENOMEM);
         }
         let map = (*(bst as *const bindings::bus_space))._space_vaddr.unwrap()(bst, bsh);
@@ -1052,7 +1073,7 @@ impl Uat {
 
         match map {
             None => {
-                err!("Failed to remap {} region\n", name);
+                dev_err!(dev, "Failed to remap {} region\n", name);
                 Err(ENOMEM)
             }
             Some(map) => Ok(UatRegion {
@@ -1112,7 +1133,7 @@ impl Uat {
                 let ttbs = uat_inner.ttbs();
                 uat_inner.handoff().lock();
                 if uat_inner.handoff().current_slot() == Some(idx as u32) {
-                    err!(
+                    pr_err!(
                         "Vm::bind to slot {}, but it is currently in use by the ASC?\n",
                         idx
                     );
@@ -1145,13 +1166,13 @@ impl Uat {
 
     /// Creates the reference-counted inner data for a new `Uat` instance.
     #[inline(never)]
-    fn make_inner(dev: &driver::BronyaDevice) -> Result<Arc<UatInner>> {
+    fn make_inner(dev: &driver::AsahiDevice) -> Result<Arc<UatInner>> {
         let handoff_rgn = Self::map_region(dev, c_str!("handoff"), HANDOFF_SIZE, false)?;
         let ttbs_rgn = Self::map_region(dev, c_str!("ttbs"), SLOTS_SIZE, false)?;
 
         let handoff = unsafe { &(handoff_rgn.map.as_ptr() as *mut Handoff).as_ref().unwrap() };
 
-        info!("MMU: Initializing kernel page table\n");
+        dev_info!(dev, "MMU: Initializing kernel page table\n");
 
         Arc::pin_init(try_pin_init!(UatInner {
             handoff_flush <- init::pin_init_array_from_fn(|i| {
@@ -1172,21 +1193,21 @@ impl Uat {
     /// Creates a new `Uat` instance given the relevant hardware config.
     #[inline(never)]
     pub(crate) fn new(
-        dev: &driver::BronyaDevice,
+        dev: &driver::AsahiDevice,
         cfg: &'static hw::HwConfig,
         map_kernel_to_user: bool,
     ) -> Result<Self> {
-        info!("MMU: Initializing...\n");
+        dev_info!(dev, "MMU: Initializing...\n");
 
         let inner = Self::make_inner(dev)?;
 
         let pagetables_rgn = Self::map_region(dev, c_str!("pagetables"), PAGETABLES_SIZE, true)?;
 
-        info!("MMU: Creating kernel page tables\n");
+        dev_info!(dev, "MMU: Creating kernel page tables\n");
         let kernel_lower_vm = Vm::new(dev, inner.clone(), cfg, false, 1, 0)?;
         let kernel_vm = Vm::new(dev, inner.clone(), cfg, true, 0, 0)?;
 
-        info!("MMU: Kernel page tables created\n");
+        dev_info!(dev, "MMU: Kernel page tables created\n");
 
         let ttb0 = kernel_lower_vm.ttb();
         let ttb1 = kernel_vm.ttb();
@@ -1237,7 +1258,7 @@ impl Uat {
 
         uat.kpt0()[2].store(ttb1 | PTE_TABLE, Ordering::Relaxed);
 
-        info!(dev, "MMU: initialized\n");
+        dev_info!(dev, "MMU: initialized\n");
 
         Ok(uat)
     }

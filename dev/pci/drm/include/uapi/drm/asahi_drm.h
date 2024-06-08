@@ -1,15 +1,14 @@
 /* SPDX-License-Identifier: MIT */
 /*
  * Copyright (C) The Asahi Linux Contributors
- * Copyright (C) SeeleBSD Contributors
  *
- * Based on bronya_drm.h which is
+ * Based on asahi_drm.h which is
  *
  * Copyright © 2014-2018 Broadcom
  * Copyright © 2019 Collabora ltd.
  */
-#ifndef _BRONYA_DRM_H_
-#define _BRONYA_DRM_H_
+#ifndef _ASAHI_DRM_H_
+#define _ASAHI_DRM_H_
 
 #include "drm.h"
 
@@ -17,22 +16,22 @@
 extern "C" {
 #endif
 
-#define DRM_BRONYA_UNSTABLE_UABI_VERSION		10009
+#define DRM_ASAHI_UNSTABLE_UABI_VERSION		10009
 
-#define DRM_BRONYA_GET_PARAMS			0x00
-#define DRM_BRONYA_VM_CREATE			0x01
-#define DRM_BRONYA_VM_DESTROY			0x02
-#define DRM_BRONYA_GEM_CREATE			0x03
-#define DRM_BRONYA_GEM_MMAP_OFFSET		0x04
-#define DRM_BRONYA_GEM_BIND			0x05
-#define DRM_BRONYA_QUEUE_CREATE			0x06
-#define DRM_BRONYA_QUEUE_DESTROY			0x07
-#define DRM_BRONYA_SUBMIT			0x08
-#define DRM_BRONYA_GET_TIME			0x09
+#define DRM_ASAHI_GET_PARAMS			0x00
+#define DRM_ASAHI_VM_CREATE			0x01
+#define DRM_ASAHI_VM_DESTROY			0x02
+#define DRM_ASAHI_GEM_CREATE			0x03
+#define DRM_ASAHI_GEM_MMAP_OFFSET		0x04
+#define DRM_ASAHI_GEM_BIND			0x05
+#define DRM_ASAHI_QUEUE_CREATE			0x06
+#define DRM_ASAHI_QUEUE_DESTROY			0x07
+#define DRM_ASAHI_SUBMIT			0x08
+#define DRM_ASAHI_GET_TIME			0x09
 
-#define DRM_BRONYA_MAX_CLUSTERS	32
+#define DRM_ASAHI_MAX_CLUSTERS	32
 
-struct drm_bronya_params_global {
+struct drm_asahi_params_global {
 	__u32 unstable_uabi_version;
 	__u32 pad0;
 
@@ -50,7 +49,7 @@ struct drm_bronya_params_global {
 	__u32 num_frags_per_cluster;
 	__u32 num_gps_per_cluster;
 	__u32 num_cores_total_active;
-	__u64 core_masks[DRM_BRONYA_MAX_CLUSTERS];
+	__u64 core_masks[DRM_ASAHI_MAX_CLUSTERS];
 
 	__u32 vm_page_size;
 	__u32 pad1;
@@ -76,15 +75,15 @@ struct drm_bronya_params_global {
 };
 
 /*
-enum drm_bronya_feat_compat {
+enum drm_asahi_feat_compat {
 };
 */
 
-enum drm_bronya_feat_incompat {
-	DRM_BRONYA_FEAT_MANDATORY_ZS_COMPRESSION = (1UL) << 0,
+enum drm_asahi_feat_incompat {
+	DRM_ASAHI_FEAT_MANDATORY_ZS_COMPRESSION = (1UL) << 0,
 };
 
-struct drm_bronya_get_params {
+struct drm_asahi_get_params {
 	/** @extensions: Pointer to the first extension struct, if any */
 	__u64 extensions;
 
@@ -101,7 +100,7 @@ struct drm_bronya_get_params {
 	__u64 size;
 };
 
-struct drm_bronya_vm_create {
+struct drm_asahi_vm_create {
 	/** @extensions: Pointer to the first extension struct, if any */
 	__u64 extensions;
 
@@ -112,7 +111,7 @@ struct drm_bronya_vm_create {
 	__u32 pad;
 };
 
-struct drm_bronya_vm_destroy {
+struct drm_asahi_vm_destroy {
 	/** @extensions: Pointer to the first extension struct, if any */
 	__u64 extensions;
 
@@ -123,10 +122,10 @@ struct drm_bronya_vm_destroy {
 	__u32 pad;
 };
 
-#define BRONYA_GEM_WRITEBACK	(1L << 0)
-#define BRONYA_GEM_VM_PRIVATE	(1L << 1)
+#define ASAHI_GEM_WRITEBACK	(1L << 0)
+#define ASAHI_GEM_VM_PRIVATE	(1L << 1)
 
-struct drm_bronya_gem_create {
+struct drm_asahi_gem_create {
 	/** @extensions: Pointer to the first extension struct, if any */
 	__u64 extensions;
 
@@ -136,14 +135,14 @@ struct drm_bronya_gem_create {
 	/** @flags: BO creation flags */
 	__u32 flags;
 
-	/** @handle: VM ID to assign to the BO, if BRONYA_GEM_VM_PRIVATE is set. */
+	/** @handle: VM ID to assign to the BO, if ASAHI_GEM_VM_PRIVATE is set. */
 	__u32 vm_id;
 
 	/** @handle: Returned GEM handle for the BO */
 	__u32 handle;
 };
 
-struct drm_bronya_gem_mmap_offset {
+struct drm_asahi_gem_mmap_offset {
 	/** @extensions: Pointer to the first extension struct, if any */
 	__u64 extensions;
 
@@ -157,23 +156,23 @@ struct drm_bronya_gem_mmap_offset {
 	__u64 offset;
 };
 
-enum drm_bronya_bind_op {
-	BRONYA_BIND_OP_BIND = 0,
-	BRONYA_BIND_OP_UNBIND = 1,
-	BRONYA_BIND_OP_UNBIND_ALL = 2,
+enum drm_asahi_bind_op {
+	ASAHI_BIND_OP_BIND = 0,
+	ASAHI_BIND_OP_UNBIND = 1,
+	ASAHI_BIND_OP_UNBIND_ALL = 2,
 };
 
-#define BRONYA_BIND_READ		(1L << 0)
-#define BRONYA_BIND_WRITE	(1L << 1)
+#define ASAHI_BIND_READ		(1L << 0)
+#define ASAHI_BIND_WRITE	(1L << 1)
 
-struct drm_bronya_gem_bind {
+struct drm_asahi_gem_bind {
 	/** @extensions: Pointer to the first extension struct, if any */
 	__u64 extensions;
 
 	/** @obj: Bind operation */
 	__u32 op;
 
-	/** @flags: One or more of BRONYA_BIND_* */
+	/** @flags: One or more of ASAHI_BIND_* */
 	__u32 flags;
 
 	/** @obj: GEM object to bind */
@@ -192,20 +191,20 @@ struct drm_bronya_gem_bind {
 	__u64 addr;
 };
 
-enum drm_bronya_cmd_type {
-	DRM_BRONYA_CMD_RENDER = 0,
-	DRM_BRONYA_CMD_BLIT = 1,
-	DRM_BRONYA_CMD_COMPUTE = 2,
+enum drm_asahi_cmd_type {
+	DRM_ASAHI_CMD_RENDER = 0,
+	DRM_ASAHI_CMD_BLIT = 1,
+	DRM_ASAHI_CMD_COMPUTE = 2,
 };
 
 /* Note: this is an enum so that it can be resolved by Rust bindgen. */
-enum drm_bronya_queue_cap {
-	DRM_BRONYA_QUEUE_CAP_RENDER	= (1UL << DRM_BRONYA_CMD_RENDER),
-	DRM_BRONYA_QUEUE_CAP_BLIT	= (1UL << DRM_BRONYA_CMD_BLIT),
-	DRM_BRONYA_QUEUE_CAP_COMPUTE	= (1UL << DRM_BRONYA_CMD_COMPUTE),
+enum drm_asahi_queue_cap {
+	DRM_ASAHI_QUEUE_CAP_RENDER	= (1UL << DRM_ASAHI_CMD_RENDER),
+	DRM_ASAHI_QUEUE_CAP_BLIT	= (1UL << DRM_ASAHI_CMD_BLIT),
+	DRM_ASAHI_QUEUE_CAP_COMPUTE	= (1UL << DRM_ASAHI_CMD_COMPUTE),
 };
 
-struct drm_bronya_queue_create {
+struct drm_asahi_queue_create {
 	/** @extensions: Pointer to the first extension struct, if any */
 	__u64 extensions;
 
@@ -215,7 +214,7 @@ struct drm_bronya_queue_create {
 	/** @vm_id: The ID of the VM this queue is bound to */
 	__u32 vm_id;
 
-	/** @type: Bitmask of DRM_BRONYA_QUEUE_CAP_* */
+	/** @type: Bitmask of DRM_ASAHI_QUEUE_CAP_* */
 	__u32 queue_caps;
 
 	/** @priority: Queue priority, 0-3 */
@@ -225,7 +224,7 @@ struct drm_bronya_queue_create {
 	__u32 queue_id;
 };
 
-struct drm_bronya_queue_destroy {
+struct drm_asahi_queue_destroy {
 	/** @extensions: Pointer to the first extension struct, if any */
 	__u64 extensions;
 
@@ -233,16 +232,16 @@ struct drm_bronya_queue_destroy {
 	__u32 queue_id;
 };
 
-enum drm_bronya_sync_type {
-	DRM_BRONYA_SYNC_SYNCOBJ = 0,
-	DRM_BRONYA_SYNC_TIMELINE_SYNCOBJ = 1,
+enum drm_asahi_sync_type {
+	DRM_ASAHI_SYNC_SYNCOBJ = 0,
+	DRM_ASAHI_SYNC_TIMELINE_SYNCOBJ = 1,
 };
 
-struct drm_bronya_sync {
+struct drm_asahi_sync {
 	/** @extensions: Pointer to the first extension struct, if any */
 	__u64 extensions;
 
-	/** @sync_type: One of drm_bronya_sync_type */
+	/** @sync_type: One of drm_asahi_sync_type */
 	__u32 sync_type;
 
 	/** @handle: The sync object handle */
@@ -252,19 +251,19 @@ struct drm_bronya_sync {
 	__u64 timeline_value;
 };
 
-enum drm_bronya_subqueue {
-	DRM_BRONYA_SUBQUEUE_RENDER = 0, /* Also blit */
-	DRM_BRONYA_SUBQUEUE_COMPUTE = 1,
-	DRM_BRONYA_SUBQUEUE_COUNT = 2,
+enum drm_asahi_subqueue {
+	DRM_ASAHI_SUBQUEUE_RENDER = 0, /* Also blit */
+	DRM_ASAHI_SUBQUEUE_COMPUTE = 1,
+	DRM_ASAHI_SUBQUEUE_COUNT = 2,
 };
 
-#define DRM_BRONYA_BARRIER_NONE ~(0U)
+#define DRM_ASAHI_BARRIER_NONE ~(0U)
 
-struct drm_bronya_command {
+struct drm_asahi_command {
 	/** @extensions: Pointer to the first extension struct, if any */
 	__u64 extensions;
 
-	/** @type: One of drm_bronya_cmd_type */
+	/** @type: One of drm_asahi_cmd_type */
 	__u32 cmd_type;
 
 	/** @flags: Flags for command submission */
@@ -283,20 +282,20 @@ struct drm_bronya_command {
 	__u64 result_size;
 
 	/** @barriers: Array of command indices per subqueue to wait on */
-	__u32 barriers[DRM_BRONYA_SUBQUEUE_COUNT];
+	__u32 barriers[DRM_ASAHI_SUBQUEUE_COUNT];
 };
 
-struct drm_bronya_submit {
+struct drm_asahi_submit {
 	/** @extensions: Pointer to the first extension struct, if any */
 	__u64 extensions;
 
-	/** @in_syncs: An optional array of drm_bronya_sync to wait on before starting this job. */
+	/** @in_syncs: An optional array of drm_asahi_sync to wait on before starting this job. */
 	__u64 in_syncs;
 
-	/** @in_syncs: An optional array of drm_bronya_sync objects to signal upon completion. */
+	/** @in_syncs: An optional array of drm_asahi_sync objects to signal upon completion. */
 	__u64 out_syncs;
 
-	/** @commands: Pointer to the drm_bronya_command array of commands to submit. */
+	/** @commands: Pointer to the drm_asahi_command array of commands to submit. */
 	__u64 commands;
 
 	/** @flags: Flags for command submission (MBZ) */
@@ -318,7 +317,7 @@ struct drm_bronya_submit {
 	__u32 command_count;
 };
 
-struct drm_bronya_attachment {
+struct drm_asahi_attachment {
 	/** @pointer: Base address of the attachment */
 	__u64 pointer;
 	/** @size: Size of the attachment in bytes */
@@ -329,16 +328,16 @@ struct drm_bronya_attachment {
 	__u32 flags;
 };
 
-#define BRONYA_RENDER_NO_CLEAR_PIPELINE_TEXTURES (1UL << 0)
-#define BRONYA_RENDER_SET_WHEN_RELOADING_Z_OR_S (1UL << 1)
-#define BRONYA_RENDER_VERTEX_SPILLS (1UL << 2)
-#define BRONYA_RENDER_PROCESS_EMPTY_TILES (1UL << 3)
-#define BRONYA_RENDER_NO_VERTEX_CLUSTERING (1UL << 4)
-#define BRONYA_RENDER_MSAA_ZS (1UL << 5)
+#define ASAHI_RENDER_NO_CLEAR_PIPELINE_TEXTURES (1UL << 0)
+#define ASAHI_RENDER_SET_WHEN_RELOADING_Z_OR_S (1UL << 1)
+#define ASAHI_RENDER_VERTEX_SPILLS (1UL << 2)
+#define ASAHI_RENDER_PROCESS_EMPTY_TILES (1UL << 3)
+#define ASAHI_RENDER_NO_VERTEX_CLUSTERING (1UL << 4)
+#define ASAHI_RENDER_MSAA_ZS (1UL << 5)
 /* XXX check */
-#define BRONYA_RENDER_NO_PREEMPTION (1UL << 6)
+#define ASAHI_RENDER_NO_PREEMPTION (1UL << 6)
 
-struct drm_bronya_cmd_render {
+struct drm_asahi_cmd_render {
 	/** @extensions: Pointer to the first extension struct, if any */
 	__u64 extensions;
 
@@ -436,36 +435,36 @@ struct drm_bronya_cmd_render {
 
 };
 
-#define BRONYA_RENDER_UNK_UNK1			(1UL << 0)
-#define BRONYA_RENDER_UNK_SET_TILE_CONFIG	(1UL << 1)
-#define BRONYA_RENDER_UNK_SET_UTILE_CONFIG	(1UL << 2)
-#define BRONYA_RENDER_UNK_SET_AUX_FB_UNK		(1UL << 3)
-#define BRONYA_RENDER_UNK_SET_G14_UNK		(1UL << 4)
+#define ASAHI_RENDER_UNK_UNK1			(1UL << 0)
+#define ASAHI_RENDER_UNK_SET_TILE_CONFIG	(1UL << 1)
+#define ASAHI_RENDER_UNK_SET_UTILE_CONFIG	(1UL << 2)
+#define ASAHI_RENDER_UNK_SET_AUX_FB_UNK		(1UL << 3)
+#define ASAHI_RENDER_UNK_SET_G14_UNK		(1UL << 4)
 
-#define BRONYA_RENDER_UNK_SET_FRG_UNK_140	(1UL << 20)
-#define BRONYA_RENDER_UNK_SET_FRG_UNK_158	(1UL << 21)
-#define BRONYA_RENDER_UNK_SET_FRG_TILECFG	(1UL << 22)
-#define BRONYA_RENDER_UNK_SET_LOAD_BGOBJVALS	(1UL << 23)
-#define BRONYA_RENDER_UNK_SET_FRG_UNK_38		(1UL << 24)
-#define BRONYA_RENDER_UNK_SET_FRG_UNK_3C		(1UL << 25)
-#define BRONYA_RENDER_UNK_SET_FRG_UNK_40		(1UL << 26)
-#define BRONYA_RENDER_UNK_SET_RELOAD_ZLSCTRL	(1UL << 27)
-#define BRONYA_RENDER_UNK_SET_UNK_BUF_10		(1UL << 28)
-#define BRONYA_RENDER_UNK_SET_FRG_UNK_MASK	(1UL << 29)
+#define ASAHI_RENDER_UNK_SET_FRG_UNK_140	(1UL << 20)
+#define ASAHI_RENDER_UNK_SET_FRG_UNK_158	(1UL << 21)
+#define ASAHI_RENDER_UNK_SET_FRG_TILECFG	(1UL << 22)
+#define ASAHI_RENDER_UNK_SET_LOAD_BGOBJVALS	(1UL << 23)
+#define ASAHI_RENDER_UNK_SET_FRG_UNK_38		(1UL << 24)
+#define ASAHI_RENDER_UNK_SET_FRG_UNK_3C		(1UL << 25)
+#define ASAHI_RENDER_UNK_SET_FRG_UNK_40		(1UL << 26)
+#define ASAHI_RENDER_UNK_SET_RELOAD_ZLSCTRL	(1UL << 27)
+#define ASAHI_RENDER_UNK_SET_UNK_BUF_10		(1UL << 28)
+#define ASAHI_RENDER_UNK_SET_FRG_UNK_MASK	(1UL << 29)
 
-#define BRONYA_RENDER_UNK_SET_IOGPU_UNK54	(1UL << 40)
-#define BRONYA_RENDER_UNK_SET_IOGPU_UNK56	(1UL << 41)
-#define BRONYA_RENDER_UNK_SET_TILING_CONTROL	(1UL << 42)
-#define BRONYA_RENDER_UNK_SET_TILING_CONTROL_2	(1UL << 43)
-#define BRONYA_RENDER_UNK_SET_VTX_UNK_F0		(1UL << 44)
-#define BRONYA_RENDER_UNK_SET_VTX_UNK_F8		(1UL << 45)
-#define BRONYA_RENDER_UNK_SET_VTX_UNK_118	(1UL << 46)
-#define BRONYA_RENDER_UNK_SET_VTX_UNK_MASK	(1UL << 47)
+#define ASAHI_RENDER_UNK_SET_IOGPU_UNK54	(1UL << 40)
+#define ASAHI_RENDER_UNK_SET_IOGPU_UNK56	(1UL << 41)
+#define ASAHI_RENDER_UNK_SET_TILING_CONTROL	(1UL << 42)
+#define ASAHI_RENDER_UNK_SET_TILING_CONTROL_2	(1UL << 43)
+#define ASAHI_RENDER_UNK_SET_VTX_UNK_F0		(1UL << 44)
+#define ASAHI_RENDER_UNK_SET_VTX_UNK_F8		(1UL << 45)
+#define ASAHI_RENDER_UNK_SET_VTX_UNK_118	(1UL << 46)
+#define ASAHI_RENDER_UNK_SET_VTX_UNK_MASK	(1UL << 47)
 
-#define BRONYA_RENDER_EXT_UNKNOWNS	0xff00
+#define ASAHI_RENDER_EXT_UNKNOWNS	0xff00
 
 /* XXX: Do not upstream this struct */
-struct drm_bronya_cmd_render_unknowns {
+struct drm_asahi_cmd_render_unknowns {
 	/** @type: Type ID of this extension */
 	__u32 type;
 	__u32 pad;
@@ -501,9 +500,9 @@ struct drm_bronya_cmd_render_unknowns {
 };
 
 /* XXX check */
-#define BRONYA_COMPUTE_NO_PREEMPTION (1UL << 0)
+#define ASAHI_COMPUTE_NO_PREEMPTION (1UL << 0)
 
-struct drm_bronya_cmd_compute {
+struct drm_asahi_cmd_compute {
 	__u64 flags;
 
 	__u64 encoder_ptr;
@@ -528,31 +527,31 @@ struct drm_bronya_cmd_compute {
 	__u32 unk_mask;
 };
 
-enum drm_bronya_status {
-	DRM_BRONYA_STATUS_PENDING = 0,
-	DRM_BRONYA_STATUS_COMPLETE,
-	DRM_BRONYA_STATUS_UNKNOWN_ERROR,
-	DRM_BRONYA_STATUS_TIMEOUT,
-	DRM_BRONYA_STATUS_FAULT,
-	DRM_BRONYA_STATUS_KILLED,
-	DRM_BRONYA_STATUS_NO_DEVICE,
+enum drm_asahi_status {
+	DRM_ASAHI_STATUS_PENDING = 0,
+	DRM_ASAHI_STATUS_COMPLETE,
+	DRM_ASAHI_STATUS_UNKNOWN_ERROR,
+	DRM_ASAHI_STATUS_TIMEOUT,
+	DRM_ASAHI_STATUS_FAULT,
+	DRM_ASAHI_STATUS_KILLED,
+	DRM_ASAHI_STATUS_NO_DEVICE,
 };
 
-enum drm_bronya_fault {
-	DRM_BRONYA_FAULT_NONE = 0,
-	DRM_BRONYA_FAULT_UNKNOWN,
-	DRM_BRONYA_FAULT_UNMAPPED,
-	DRM_BRONYA_FAULT_AF_FAULT,
-	DRM_BRONYA_FAULT_WRITE_ONLY,
-	DRM_BRONYA_FAULT_READ_ONLY,
-	DRM_BRONYA_FAULT_NO_ACCESS,
+enum drm_asahi_fault {
+	DRM_ASAHI_FAULT_NONE = 0,
+	DRM_ASAHI_FAULT_UNKNOWN,
+	DRM_ASAHI_FAULT_UNMAPPED,
+	DRM_ASAHI_FAULT_AF_FAULT,
+	DRM_ASAHI_FAULT_WRITE_ONLY,
+	DRM_ASAHI_FAULT_READ_ONLY,
+	DRM_ASAHI_FAULT_NO_ACCESS,
 };
 
-struct drm_bronya_result_info {
-	/** @status: One of enum drm_bronya_status */
+struct drm_asahi_result_info {
+	/** @status: One of enum drm_asahi_status */
 	__u32 status;
 
-	/** @reason: One of drm_bronya_fault_type */
+	/** @reason: One of drm_asahi_fault_type */
 	__u32 fault_type;
 
 	/** @unit: Unit number, hardware dependent */
@@ -577,15 +576,15 @@ struct drm_bronya_result_info {
 	__u64 address;
 };
 
-#define DRM_BRONYA_RESULT_RENDER_TVB_GROW_OVF (1UL << 0)
-#define DRM_BRONYA_RESULT_RENDER_TVB_GROW_MIN (1UL << 1)
-#define DRM_BRONYA_RESULT_RENDER_TVB_OVERFLOWED (1UL << 2)
+#define DRM_ASAHI_RESULT_RENDER_TVB_GROW_OVF (1UL << 0)
+#define DRM_ASAHI_RESULT_RENDER_TVB_GROW_MIN (1UL << 1)
+#define DRM_ASAHI_RESULT_RENDER_TVB_OVERFLOWED (1UL << 2)
 
-struct drm_bronya_result_render {
+struct drm_asahi_result_render {
 	/** @address: Common result information */
-	struct drm_bronya_result_info info;
+	struct drm_asahi_result_info info;
 
-	/** @flags: Zero or more of of DRM_BRONYA_RESULT_RENDER_* */
+	/** @flags: Zero or more of of DRM_ASAHI_RESULT_RENDER_* */
 	__u64 flags;
 
 	/** @vertex_ts_start: Timestamp of the start of vertex processing */
@@ -610,11 +609,11 @@ struct drm_bronya_result_render {
 	__u32 num_tvb_overflows;
 };
 
-struct drm_bronya_result_compute {
+struct drm_asahi_result_compute {
 	/** @address: Common result information */
-	struct drm_bronya_result_info info;
+	struct drm_asahi_result_info info;
 
-	/** @flags: Zero or more of of DRM_BRONYA_RESULT_COMPUTE_* */
+	/** @flags: Zero or more of of DRM_ASAHI_RESULT_COMPUTE_* */
 	__u64 flags;
 
 	/** @ts_start: Timestamp of the start of this compute command */
@@ -624,7 +623,7 @@ struct drm_bronya_result_compute {
 	__u64 ts_end;
 };
 
-struct drm_bronya_get_time {
+struct drm_asahi_get_time {
 	/** @extensions: Pointer to the first extension struct, if any */
 	__u64 extensions;
 
@@ -643,20 +642,20 @@ struct drm_bronya_get_time {
 
 /* Note: this is an enum so that it can be resolved by Rust bindgen. */
 enum {
-   DRM_IOCTL_BRONYA_GET_PARAMS       = DRM_IOWR(DRM_COMMAND_BASE + DRM_BRONYA_GET_PARAMS, struct drm_bronya_get_params),
-   DRM_IOCTL_BRONYA_VM_CREATE        = DRM_IOWR(DRM_COMMAND_BASE + DRM_BRONYA_VM_CREATE, struct drm_bronya_vm_create),
-   DRM_IOCTL_BRONYA_VM_DESTROY       = DRM_IOW(DRM_COMMAND_BASE + DRM_BRONYA_VM_DESTROY, struct drm_bronya_vm_destroy),
-   DRM_IOCTL_BRONYA_GEM_CREATE       = DRM_IOWR(DRM_COMMAND_BASE + DRM_BRONYA_GEM_CREATE, struct drm_bronya_gem_create),
-   DRM_IOCTL_BRONYA_GEM_MMAP_OFFSET  = DRM_IOWR(DRM_COMMAND_BASE + DRM_BRONYA_GEM_MMAP_OFFSET, struct drm_bronya_gem_mmap_offset),
-   DRM_IOCTL_BRONYA_GEM_BIND         = DRM_IOW(DRM_COMMAND_BASE + DRM_BRONYA_GEM_BIND, struct drm_bronya_gem_bind),
-   DRM_IOCTL_BRONYA_QUEUE_CREATE     = DRM_IOWR(DRM_COMMAND_BASE + DRM_BRONYA_QUEUE_CREATE, struct drm_bronya_queue_create),
-   DRM_IOCTL_BRONYA_QUEUE_DESTROY    = DRM_IOW(DRM_COMMAND_BASE + DRM_BRONYA_QUEUE_DESTROY, struct drm_bronya_queue_destroy),
-   DRM_IOCTL_BRONYA_SUBMIT           = DRM_IOW(DRM_COMMAND_BASE + DRM_BRONYA_SUBMIT, struct drm_bronya_submit),
-   DRM_IOCTL_BRONYA_GET_TIME         = DRM_IOWR(DRM_COMMAND_BASE + DRM_BRONYA_GET_TIME, struct drm_bronya_get_time),
+   DRM_IOCTL_ASAHI_GET_PARAMS       = DRM_IOWR(DRM_COMMAND_BASE + DRM_ASAHI_GET_PARAMS, struct drm_asahi_get_params),
+   DRM_IOCTL_ASAHI_VM_CREATE        = DRM_IOWR(DRM_COMMAND_BASE + DRM_ASAHI_VM_CREATE, struct drm_asahi_vm_create),
+   DRM_IOCTL_ASAHI_VM_DESTROY       = DRM_IOW(DRM_COMMAND_BASE + DRM_ASAHI_VM_DESTROY, struct drm_asahi_vm_destroy),
+   DRM_IOCTL_ASAHI_GEM_CREATE       = DRM_IOWR(DRM_COMMAND_BASE + DRM_ASAHI_GEM_CREATE, struct drm_asahi_gem_create),
+   DRM_IOCTL_ASAHI_GEM_MMAP_OFFSET  = DRM_IOWR(DRM_COMMAND_BASE + DRM_ASAHI_GEM_MMAP_OFFSET, struct drm_asahi_gem_mmap_offset),
+   DRM_IOCTL_ASAHI_GEM_BIND         = DRM_IOW(DRM_COMMAND_BASE + DRM_ASAHI_GEM_BIND, struct drm_asahi_gem_bind),
+   DRM_IOCTL_ASAHI_QUEUE_CREATE     = DRM_IOWR(DRM_COMMAND_BASE + DRM_ASAHI_QUEUE_CREATE, struct drm_asahi_queue_create),
+   DRM_IOCTL_ASAHI_QUEUE_DESTROY    = DRM_IOW(DRM_COMMAND_BASE + DRM_ASAHI_QUEUE_DESTROY, struct drm_asahi_queue_destroy),
+   DRM_IOCTL_ASAHI_SUBMIT           = DRM_IOW(DRM_COMMAND_BASE + DRM_ASAHI_SUBMIT, struct drm_asahi_submit),
+   DRM_IOCTL_ASAHI_GET_TIME         = DRM_IOWR(DRM_COMMAND_BASE + DRM_ASAHI_GET_TIME, struct drm_asahi_get_time),
 };
 
 #if defined(__cplusplus)
 }
 #endif
 
-#endif /* _BRONYA_DRM_H_ */
+#endif /* _ASAHI_DRM_H_ */

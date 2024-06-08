@@ -1,31 +1,31 @@
 // SPDX-License-Identifier: ISC
 
-use kernel::{types::ARef, drm::drv, drm::ioctl, device};
+use kernel::{device, drm, drm::drv, drm::ioctl, prelude::*, types::ARef};
 
-use crate::{gpu, gem, file, regs};
+use crate::{file, gem, gpu, regs};
 
 const INFO: drv::DriverInfo = drv::DriverInfo {
     major: 0,
     minor: 0,
     patchlevel: 0,
-    name: c_str!("bronya"),
+    name: c_str!("asahi"),
     desc: c_str!("Apple AGX Graphics"),
     date: c_str!("20240602"),
 };
 
-pub struct BronyaData {
+pub struct AsahiData {
     pub dev: device::Device,
     pub gpu: Arc<dyn gpu::GpuManager>,
 }
 
-type DeviceData = device::Data<drv::Registration<BronyaDriver>, regs::Resources, BronyaData>;
+type DeviceData = device::Data<drv::Registration<AsahiDriver>, regs::Resources, AsahiData>;
 
-pub struct BronyaDriver;
-pub type BronyaDevice = drm::device::Device<BronyaDriver>;
-pub type BronyaDevRef = ARef<BronyaDevice>;
+pub struct AsahiDriver;
+pub type AsahiDevice = drm::device::Device<AsahiDriver>;
+pub type AsahiDevRef = ARef<AsahiDevice>;
 
 #[vtable]
-impl drv::Driver for BronyaDriver {
+impl drv::Driver for AsahiDriver {
     type Data = Arc<DeviceData>;
     type File = file::File;
     type Object = gem::Object;
@@ -35,23 +35,23 @@ impl drv::Driver for BronyaDriver {
         drv::FEAT_GEM | drv::FEAT_RENDER | drv::FEAT_SYNCOBJ | drv::FEAT_SYNCOBJ_TIMELINE;
 
     kernel::declare_drm_ioctls! {
-        (BRONYA_GET_PARAMS,      drm_bronya_get_params,
+        (ASAHI_GET_PARAMS,      drm_asahi_get_params,
                           ioctl::RENDER_ALLOW, file::File::get_params),
-        (BRONYA_VM_CREATE,       drm_bronya_vm_create,
+        (ASAHI_VM_CREATE,       drm_asahi_vm_create,
             ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::vm_create),
-        (BRONYA_VM_DESTROY,      drm_bronya_vm_destroy,
+        (ASAHI_VM_DESTROY,      drm_asahi_vm_destroy,
             ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::vm_destroy),
-        (BRONYA_GEM_CREATE,      drm_bronya_gem_create,
+        (ASAHI_GEM_CREATE,      drm_asahi_gem_create,
             ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::gem_create),
-        (BRONYA_GEM_MMAP_OFFSET, drm_bronya_gem_mmap_offset,
+        (ASAHI_GEM_MMAP_OFFSET, drm_asahi_gem_mmap_offset,
             ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::gem_mmap_offset),
-        (BRONYA_GEM_BIND,        drm_bronya_gem_bind,
+        (ASAHI_GEM_BIND,        drm_asahi_gem_bind,
             ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::gem_bind),
-        (BRONYA_QUEUE_CREATE,    drm_bronya_queue_create,
+        (ASAHI_QUEUE_CREATE,    drm_asahi_queue_create,
             ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::queue_create),
-        (BRONYA_QUEUE_DESTROY,   drm_bronya_queue_destroy,
+        (ASAHI_QUEUE_DESTROY,   drm_asahi_queue_destroy,
             ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::queue_destroy),
-        (BRONYA_SUBMIT,          drm_bronya_submit,
+        (ASAHI_SUBMIT,          drm_asahi_submit,
             ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::submit),
     }
 }

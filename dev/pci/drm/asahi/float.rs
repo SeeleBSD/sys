@@ -23,7 +23,7 @@
 //! related to slightly non-compliant rounding.
 
 use core::ops;
-use kernel::{init::Zeroable, prelude::*};
+use kernel::{init::Zeroable, of, prelude::*};
 
 /// An IEEE754-compatible floating point number implemented in software.
 #[derive(Default, Debug, Copy, Clone)]
@@ -285,7 +285,7 @@ impl F32U {
     }
 }
 
-/*impl<'a> TryFrom<of::Property<'a>> for F32 {
+impl<'a> TryFrom<of::Property<'a>> for F32 {
     type Error = Error;
 
     fn try_from(p: of::Property<'_>) -> core::result::Result<F32, Self::Error> {
@@ -300,7 +300,7 @@ impl of::PropertyUnit for F32 {
     fn from_bytes(data: &[u8]) -> Result<Self> {
         Ok(F32::from_bits(<u32 as of::PropertyUnit>::from_bytes(data)?))
     }
-}*/
+}
 
 // TODO: Make this an actual test and figure out how to make it run.
 #[cfg(test)]

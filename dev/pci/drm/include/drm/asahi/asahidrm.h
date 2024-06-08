@@ -17,7 +17,7 @@
 #include <drm/drm_drv.h>
 #include <drm/drm_framebuffer.h>
 
-struct bronyadrm_softc {
+struct asahidrm_softc {
 	struct platform_device	sc_dev;
 	struct drm_device	sc_ddev;
 

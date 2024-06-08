@@ -199,7 +199,7 @@ libmacros.so: core.o
 	--crate-type proc-macro \
 	--crate-name macros $S/rust/macros/lib.rs
 
-.include "$S/dev/pci/drm/bronya/Makefile.inc"
+.include "$S/dev/pci/drm/asahi/Makefile.inc"
 
 # cc's -MD puts the source and output paths in the dependency file;
 # since those are temp files here we need to fix it up.  It also

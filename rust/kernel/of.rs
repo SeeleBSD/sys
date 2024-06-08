@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: ISC
 
 use crate::{bindings, prelude::*};
-use alloc::vec::Vec;
+use alloc::{vec, vec::Vec};
 
 pub struct NodeIter {
     curr: *mut bindings::device_node,

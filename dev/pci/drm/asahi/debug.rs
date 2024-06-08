@@ -72,13 +72,12 @@ pub(crate) enum DebugFlags {
 
 /// Update the cached global debug flags from the module parameter
 pub(crate) fn update_debug_flags() {
-    /*let flags = {
+    let flags = {
         let lock = crate::THIS_MODULE.kernel_param_lock();
         *crate::debug_flags.read(&lock)
     };
 
-    DEBUG_FLAGS.store(flags, Ordering::Relaxed);*/
-    todo!()
+    DEBUG_FLAGS.store(flags, Ordering::Relaxed);
 }
 
 /// Check whether debug is enabled for a given flag
@@ -101,15 +100,15 @@ macro_rules! debug {
 #[macro_export]
 macro_rules! mod_pr_debug (
     ($($arg:tt)*) => (
-        $crate::debug! { ::kernel::dbg! ( $($arg)* ); }
+        $crate::debug! { ::kernel::pr_info! ( $($arg)* ); }
     )
 );
 
 /// dev_info!() if debug is enabled for the calling module
 #[macro_export]
 macro_rules! mod_dev_dbg (
-    ($dev:tt, $($arg:tt)*) => (
-        $crate::debug! { ::kernel::dbg! ( $($arg)* ); }
+    ($($arg:tt)*) => (
+        $crate::debug! { ::kernel::dev_info! ( $($arg)* ); }
     )
 );
 
@@ -118,7 +117,7 @@ macro_rules! mod_dev_dbg (
 macro_rules! cls_pr_debug (
     ($cls:ident, $($arg:tt)*) => (
         if $crate::debug::debug_enabled($crate::debug::DebugFlags::$cls) {
-            ::kernel::dbg! ( $($arg)* );
+            ::kernel::pr_info! ( $($arg)* );
         }
     )
 );
@@ -126,9 +125,9 @@ macro_rules! cls_pr_debug (
 /// dev_info!() if debug is enabled for a specific module
 #[macro_export]
 macro_rules! cls_dev_dbg (
-    ($cls:ident, $dev:tt, $($arg:tt)*) => (
+    ($cls:ident, $($arg:tt)*) => (
         if $crate::debug::debug_enabled($crate::debug::DebugFlags::$cls) {
-            ::kernel::dbg! ( $($arg)* );
+            ::kernel::dev_info! ( $($arg)* );
         }
     )
 );

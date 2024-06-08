@@ -7,40 +7,37 @@
 #[macro_use]
 extern crate kernel;
 
-#[macro_use]
-extern crate alloc;
-
+pub(crate) mod alloc;
+pub(crate) mod buffer;
+pub(crate) mod channel;
 pub(crate) mod debug;
+pub(crate) mod driver;
+pub(crate) mod event;
+pub(crate) mod file;
 pub(crate) mod float;
+pub(crate) mod fw;
+pub(crate) mod gem;
+pub(crate) mod gpu;
+pub(crate) mod hw;
+pub(crate) mod initdata;
+pub(crate) mod mem;
+pub(crate) mod microseq;
+pub(crate) mod mmu;
+pub(crate) mod object;
+pub(crate) mod queue;
+pub(crate) mod regs;
 pub(crate) mod slotalloc;
 pub(crate) mod util;
 pub(crate) mod workqueue;
-pub(crate) mod fw;
-pub(crate) mod hw;
-pub(crate) mod driver;
-pub(crate) mod regs;
-pub(crate) mod object;
-pub(crate) mod mmu;
-pub(crate) mod microseq;
-pub(crate) mod mem;
-pub(crate) mod initdata;
-pub(crate) mod gpu;
-pub(crate) mod gem;
-pub(crate) mod file;
-pub(crate) mod event;
-pub(crate) mod channel;
-pub(crate) mod buffer;
-pub(crate) mod alloc;
-pub(crate) mod queue;
 
 use kernel::{of, prelude::*};
 
 use crate::hw::HwConfig;
 
-const __LOG_PREFIX: &'static str = "bronyadrm";
+const __LOG_PREFIX: &'static str = "asahidrm";
 static mut INFO: Option<&'static HwConfig> = None;
 
-id_table! { BRONYA_ID_TABLE, &'static hw::HwConfig, [
+id_table! { ASAHI_ID_TABLE, &'static hw::HwConfig, [
     (c_str!("apple,agx-t8103"), Some(&hw::t8103::HWCONFIG)),
     (c_str!("apple,agx-t8112"), Some(&hw::t8112::HWCONFIG)),
     (c_str!("apple,agx-t6000"), Some(&hw::t600x::HWCONFIG_T6000)),
@@ -52,7 +49,7 @@ id_table! { BRONYA_ID_TABLE, &'static hw::HwConfig, [
 ] }
 
 #[no_mangle]
-pub extern "C" fn bronyadrm_match(
+pub extern "C" fn asahidrm_match(
     parent: *mut bindings::device,
     _match: *mut core::ffi::c_void,
     aux: *mut core::ffi::c_void,
@@ -61,21 +58,21 @@ pub extern "C" fn bronyadrm_match(
     let handle = faa.fa_node;
     if let Some(node) = of::Node::from_handle(handle) {
         unsafe {
-            INFO = compatible_info!(node, BRONYA_ID_TABLE);
+            INFO = compatible_info!(node, ASAHI_ID_TABLE);
         }
-        compatible!(node, BRONYA_ID_TABLE)
+        compatible!(node, ASAHI_ID_TABLE)
     } else {
         0
     }
 }
 
 #[no_mangle]
-pub extern "C" fn bronyadrm_attach(
+pub extern "C" fn asahidrm_attach(
     parent: *mut bindings::device,
     _self: *mut bindings::device,
     aux: *mut core::ffi::c_void,
 ) {
-    let sc = _self as *mut bindings::bronyadrm_softc;
+    let sc = _self as *mut bindings::asahidrm_softc;
     let faa = aux as *mut bindings::fdt_attach_args;
     unsafe {
         (*sc).sc_node = (*faa).fa_node;
@@ -93,6 +90,6 @@ pub extern "C" fn bronyadrm_attach(
 }
 
 #[no_mangle]
-pub extern "C" fn bronyadrm_activate(_self: *mut bindings::device, act: i32) -> i32 {
+pub extern "C" fn asahidrm_activate(_self: *mut bindings::device, act: i32) -> i32 {
     0
 }
