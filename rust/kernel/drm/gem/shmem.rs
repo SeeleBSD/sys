@@ -25,22 +25,9 @@ pub trait DriverObject: gem::BaseDriverObject<Object<Self>> {
     type Driver: drv::Driver;
 }
 
-// FIXME: This is terrible and I don't know how to avoid it
-#[cfg(CONFIG_NUMA)]
 macro_rules! vm_numa_fields {
     ( $($field:ident: $val:expr),* $(,)? ) => {
-        bindings::vm_operations_struct {
-            $( $field: $val ),*,
-            set_policy: None,
-            get_policy: None,
-        }
-    }
-}
-
-#[cfg(not(CONFIG_NUMA))]
-macro_rules! vm_numa_fields {
-    ( $($field:ident: $val:expr),* $(,)? ) => {
-        bindings::vm_operations_struct {
+        bindings::uvm_pagerops {
             $( $field: $val ),*
         }
     }
@@ -84,7 +71,7 @@ unsafe extern "C" fn gem_create_object<T: DriverObject>(
     size: usize,
 ) -> *mut bindings::drm_gem_object {
     let p = unsafe {
-        bindings::krealloc(core::ptr::null(), Object::<T>::SIZE, bindings::GFP_KERNEL)
+        bindings::malloc(Object::<T>::SIZE, bindings::M_DRM as i32, bindings::M_WAITOK as i32)
             as *mut Object<T>
     };
 
@@ -102,7 +89,7 @@ unsafe extern "C" fn gem_create_object<T: DriverObject>(
     // SAFETY: p is a valid pointer to an uninitialized Object<T>.
     if let Err(e) = unsafe { init.__pinned_init(p) } {
         // SAFETY: p is a valid pointer from `krealloc` and __pinned_init guarantees we can dealloc it.
-        unsafe { bindings::kfree(p as *mut _) };
+        unsafe { bindings::free(p as *mut _, bindings::M_DRM as i32, 0) };
 
         return e.to_ptr();
     }

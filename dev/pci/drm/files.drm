@@ -41,6 +41,7 @@ file	dev/pci/drm/drm_format_helper.c		drm
 file	dev/pci/drm/drm_fourcc.c		drm
 file	dev/pci/drm/drm_framebuffer.c		drm
 file	dev/pci/drm/drm_gem.c			drm
+file	dev/pci/drm/drm_gem_shmem_helper.c	drm
 file	dev/pci/drm/drm_gem_atomic_helper.c	drm
 file	dev/pci/drm/drm_gem_dma_helper.c	drm
 file	dev/pci/drm/drm_gem_framebuffer_helper.c	drm
