@@ -150,10 +150,10 @@ struct aplsmc_softc *aplsmc_sc;
 
 struct aplsmc_sensor aplsmc_sensors[] = {
 	{ "ACDI", "ui16", SENSOR_INDICATOR, 1, "power supply" },
-	{ "B0RM", "ui16", SENSOR_AMPHOUR, 1000, "remaining battery capacity",
+	{ "B0RM", "ui16", SENSOR_AMPHOUR, 1000, "remaining capacity",
 	  APLSMC_BE },
-	{ "B0FC", "ui16", SENSOR_AMPHOUR, 1000, "last full battery capacity" },
-	{ "B0DC", "ui16", SENSOR_AMPHOUR, 1000, "battery design capacity" },
+	{ "B0FC", "ui16", SENSOR_AMPHOUR, 1000, "last full capacity" },
+	{ "B0DC", "ui16", SENSOR_AMPHOUR, 1000, "design capacity" },
 	{ "B0AV", "ui16", SENSOR_VOLTS_DC, 1000, "battery" },
 	{ "B0CT", "ui16", SENSOR_INTEGER, 1, "battery discharge cycles" },
 	{ "B0TF", "ui16", SENSOR_INTEGER, 1, "battery time-to-full",
