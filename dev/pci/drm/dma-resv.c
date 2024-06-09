@@ -797,3 +797,14 @@ static int __init dma_resv_lockdep(void)
 }
 subsys_initcall(dma_resv_lockdep);
 #endif
+
+int BINDINGS_dma_resv_lock(struct dma_resv *obj,
+				struct ww_acquire_ctx *ctx)
+{
+	return dma_resv_lock(obj, ctx);
+}
+
+void BINDINGS_dma_resv_unlock(struct dma_resv *obj)
+{
+	dma_resv_unlock(obj);
+}

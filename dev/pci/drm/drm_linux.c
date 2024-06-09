@@ -4020,3 +4020,9 @@ BINDINGS_xa_empty(const struct xarray *xa)
 {
 	return xa_empty(xa);
 }
+
+struct scatterlist *
+BINDINGS_sg_next(struct scatterlist *sgl)
+{
+	return sg_next(sgl);
+}

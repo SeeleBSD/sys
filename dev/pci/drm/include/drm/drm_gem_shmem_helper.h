@@ -12,6 +12,9 @@
 #include <drm/drm_ioctl.h>
 #include <drm/drm_prime.h>
 
+#include <uvm/uvm_pager.h>
+#include <uvm/uvm_fault.h>
+
 struct dma_buf_attachment;
 struct drm_mode_create_dumb;
 struct drm_printer;
@@ -29,7 +32,7 @@ struct drm_gem_shmem_object {
 	/**
 	 * @pages: Page table
 	 */
-	struct page **pages;
+	struct vm_page **pages;
 
 	/**
 	 * @pages_use_count:
@@ -106,7 +109,9 @@ int drm_gem_shmem_vmap(struct drm_gem_shmem_object *shmem,
 		       struct iosys_map *map);
 void drm_gem_shmem_vunmap(struct drm_gem_shmem_object *shmem,
 			  struct iosys_map *map);
+#ifdef __linux__
 int drm_gem_shmem_mmap(struct drm_gem_shmem_object *shmem, struct vm_area_struct *vma);
+#endif
 
 int drm_gem_shmem_madvise(struct drm_gem_shmem_object *shmem, int madv);
 
@@ -125,10 +130,17 @@ struct sg_table *drm_gem_shmem_get_pages_sgt(struct drm_gem_shmem_object *shmem)
 void drm_gem_shmem_print_info(const struct drm_gem_shmem_object *shmem,
 			      struct drm_printer *p, unsigned int indent);
 
+#ifdef __linux__
 extern const struct vm_operations_struct drm_gem_shmem_vm_ops;
 vm_fault_t drm_gem_shmem_fault(struct vm_fault *vmf);
+#else
+extern const struct uvm_pagerops drm_gem_shmem_vm_ops;
+vm_fault_t drm_gem_shmem_fault(struct uvm_faultinfo *vmf);
+#endif
+#ifdef __linux__
 void drm_gem_shmem_vm_open(struct vm_area_struct *vma);
 void drm_gem_shmem_vm_close(struct vm_area_struct *vma);
+#endif
 
 /*
  * GEM object functions
@@ -148,6 +160,8 @@ static inline void drm_gem_shmem_object_free(struct drm_gem_object *obj)
 	drm_gem_shmem_free(shmem);
 }
 
+void BINDINGS_drm_gem_shmem_object_free(struct drm_gem_object *obj);
+
 /**
  * drm_gem_shmem_object_print_info() - Print &drm_gem_shmem_object info for debugfs
  * @p: DRM printer
@@ -165,6 +179,9 @@ static inline void drm_gem_shmem_object_print_info(struct drm_printer *p, unsign
 	drm_gem_shmem_print_info(shmem, p, indent);
 }
 
+void BINDINGS_drm_gem_shmem_object_print_info(struct drm_printer *p, unsigned int indent,
+						   const struct drm_gem_object *obj);
+
 /**
  * drm_gem_shmem_object_pin - GEM object function for drm_gem_shmem_pin()
  * @obj: GEM object
@@ -179,6 +196,8 @@ static inline int drm_gem_shmem_object_pin(struct drm_gem_object *obj)
 	return drm_gem_shmem_pin(shmem);
 }
 
+int BINDINGS_drm_gem_shmem_object_pin(struct drm_gem_object *obj);
+
 /**
  * drm_gem_shmem_object_unpin - GEM object function for drm_gem_shmem_unpin()
  * @obj: GEM object
@@ -192,6 +211,8 @@ static inline void drm_gem_shmem_object_unpin(struct drm_gem_object *obj)
 
 	drm_gem_shmem_unpin(shmem);
 }
+
+void BINDINGS_drm_gem_shmem_object_unpin(struct drm_gem_object *obj);
 
 /**
  * drm_gem_shmem_object_get_sg_table - GEM object function for drm_gem_shmem_get_sg_table()
@@ -209,6 +230,8 @@ static inline struct sg_table *drm_gem_shmem_object_get_sg_table(struct drm_gem_
 
 	return drm_gem_shmem_get_sg_table(shmem);
 }
+
+struct sg_table *BINDINGS_drm_gem_shmem_object_get_sg_table(struct drm_gem_object *obj);
 
 /*
  * drm_gem_shmem_object_vmap - GEM object function for drm_gem_shmem_vmap()
@@ -229,6 +252,9 @@ static inline int drm_gem_shmem_object_vmap(struct drm_gem_object *obj,
 	return drm_gem_shmem_vmap(shmem, map);
 }
 
+int BINDINGS_drm_gem_shmem_object_vmap(struct drm_gem_object *obj,
+					    struct iosys_map *map);
+
 /*
  * drm_gem_shmem_object_vunmap - GEM object function for drm_gem_shmem_vunmap()
  * @obj: GEM object
@@ -245,6 +271,10 @@ static inline void drm_gem_shmem_object_vunmap(struct drm_gem_object *obj,
 	drm_gem_shmem_vunmap(shmem, map);
 }
 
+void BINDINGS_drm_gem_shmem_object_vunmap(struct drm_gem_object *obj,
+					       struct iosys_map *map);
+
+#ifdef __linux__
 /**
  * drm_gem_shmem_object_mmap - GEM object function for drm_gem_shmem_mmap()
  * @obj: GEM object
@@ -262,6 +292,7 @@ static inline int drm_gem_shmem_object_mmap(struct drm_gem_object *obj, struct v
 
 	return drm_gem_shmem_mmap(shmem, vma);
 }
+#endif
 
 /*
  * Driver ops

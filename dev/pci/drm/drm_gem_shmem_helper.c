@@ -45,7 +45,9 @@ static const struct drm_gem_object_funcs drm_gem_shmem_funcs = {
 	.get_sg_table = drm_gem_shmem_object_get_sg_table,
 	.vmap = drm_gem_shmem_object_vmap,
 	.vunmap = drm_gem_shmem_object_vunmap,
+#ifdef __linux__
 	.mmap = drm_gem_shmem_object_mmap,
+#endif
 	.vm_ops = &drm_gem_shmem_vm_ops,
 };
 
@@ -98,8 +100,8 @@ __drm_gem_shmem_create(struct drm_device *dev, size_t size, bool private)
 		 * why this is required _and_ expected if you're
 		 * going to pin these pages.
 		 */
-		mapping_set_gfp_mask(obj->filp->f_mapping, GFP_HIGHUSER |
-				     __GFP_RETRY_MAYFAIL | __GFP_NOWARN);
+		// mapping_set_gfp_mask(obj->filp->f_mapping, GFP_HIGHUSER |
+				     // __GFP_RETRY_MAYFAIL | __GFP_NOWARN);
 	}
 
 	return shmem;
@@ -168,7 +170,7 @@ EXPORT_SYMBOL_GPL(drm_gem_shmem_free);
 static int drm_gem_shmem_get_pages(struct drm_gem_shmem_object *shmem)
 {
 	struct drm_gem_object *obj = &shmem->base;
-	struct page **pages;
+	struct vm_page **pages;
 
 	dma_resv_assert_held(shmem->base.resv);
 
@@ -312,7 +314,7 @@ int drm_gem_shmem_vmap(struct drm_gem_shmem_object *shmem,
 {
 	struct drm_gem_object *obj = &shmem->base;
 	int ret = 0;
-
+/*
 	dma_resv_assert_held(obj->resv);
 
 	if (obj->import_attach) {
@@ -359,7 +361,7 @@ err_put_pages:
 		drm_gem_shmem_put_pages(shmem);
 err_zero_use:
 	shmem->vmap_use_count = 0;
-
+*/
 	return ret;
 }
 EXPORT_SYMBOL(drm_gem_shmem_vmap);
@@ -379,6 +381,7 @@ EXPORT_SYMBOL(drm_gem_shmem_vmap);
 void drm_gem_shmem_vunmap(struct drm_gem_shmem_object *shmem,
 			  struct iosys_map *map)
 {
+	/*
 	struct drm_gem_object *obj = &shmem->base;
 
 	dma_resv_assert_held(obj->resv);
@@ -397,6 +400,7 @@ void drm_gem_shmem_vunmap(struct drm_gem_shmem_object *shmem,
 		vunmap(shmem->vaddr);
 		drm_gem_shmem_put_pages(shmem);
 	}
+	*/
 
 	shmem->vaddr = NULL;
 }
@@ -459,7 +463,7 @@ void drm_gem_shmem_purge(struct drm_gem_shmem_object *shmem)
 
 	shmem->madv = -1;
 
-	drm_vma_node_unmap(&obj->vma_node, dev->anon_inode->i_mapping);
+	// drm_vma_node_unmap(&obj->vma_node, dev->anon_inode->i_mapping);
 	drm_gem_free_mmap_offset(obj);
 
 	/* Our goal here is to return as much of the memory as
@@ -467,9 +471,9 @@ void drm_gem_shmem_purge(struct drm_gem_shmem_object *shmem)
 	 * To do this we must instruct the shmfs to drop all of its
 	 * backing pages, *now*.
 	 */
-	shmem_truncate_range(file_inode(obj->filp), 0, (loff_t)-1);
+	// shmem_truncate_range(file_inode(obj->filp), 0, (loff_t)-1);
 
-	invalidate_mapping_pages(file_inode(obj->filp)->i_mapping, 0, (loff_t)-1);
+	// invalidate_mapping_pages(file_inode(obj->filp)->i_mapping, 0, (loff_t)-1);
 }
 EXPORT_SYMBOL(drm_gem_shmem_purge);
 
@@ -510,6 +514,7 @@ int drm_gem_shmem_dumb_create(struct drm_file *file, struct drm_device *dev,
 }
 EXPORT_SYMBOL_GPL(drm_gem_shmem_dumb_create);
 
+#ifdef __linux__
 vm_fault_t drm_gem_shmem_fault(struct vm_fault *vmf)
 {
 	struct vm_area_struct *vma = vmf->vma;
@@ -540,7 +545,15 @@ vm_fault_t drm_gem_shmem_fault(struct vm_fault *vmf)
 	return ret;
 }
 EXPORT_SYMBOL_GPL(drm_gem_shmem_fault);
+#else
+vm_fault_t drm_gem_shmem_fault(struct uvm_faultinfo *vmf)
+{
+	vm_fault_t ret = 0;
+	return ret;	
+}
+#endif
 
+#ifdef __linux___
 void drm_gem_shmem_vm_open(struct vm_area_struct *vma)
 {
 	struct drm_gem_object *obj = vma->vm_private_data;
@@ -576,14 +589,22 @@ void drm_gem_shmem_vm_close(struct vm_area_struct *vma)
 	drm_gem_vm_close(vma);
 }
 EXPORT_SYMBOL_GPL(drm_gem_shmem_vm_close);
+#endif
 
+#ifdef __linux__
 const struct vm_operations_struct drm_gem_shmem_vm_ops = {
 	.fault = drm_gem_shmem_fault,
 	.open = drm_gem_shmem_vm_open,
 	.close = drm_gem_shmem_vm_close,
 };
 EXPORT_SYMBOL_GPL(drm_gem_shmem_vm_ops);
+#else
+const struct uvm_pagerops drm_gem_shmem_vm_ops = {
+	
+};
+#endif
 
+#ifdef __linux__
 /**
  * drm_gem_shmem_mmap - Memory-map a shmem GEM object
  * @shmem: shmem GEM object
@@ -632,6 +653,7 @@ int drm_gem_shmem_mmap(struct drm_gem_shmem_object *shmem, struct vm_area_struct
 	return 0;
 }
 EXPORT_SYMBOL_GPL(drm_gem_shmem_mmap);
+#endif
 
 /**
  * drm_gem_shmem_print_info() - Print &drm_gem_shmem_object info for debugfs
@@ -763,7 +785,7 @@ drm_gem_shmem_prime_import_sg_table(struct drm_device *dev,
 				    struct dma_buf_attachment *attach,
 				    struct sg_table *sgt)
 {
-	size_t size = PAGE_ALIGN(attach->dmabuf->size);
+/*	size_t size = PAGE_ALIGN(attach->dmabuf->size);
 	struct drm_gem_shmem_object *shmem;
 
 	shmem = __drm_gem_shmem_create(dev, size, true);
@@ -774,9 +796,48 @@ drm_gem_shmem_prime_import_sg_table(struct drm_device *dev,
 
 	drm_dbg_prime(dev, "size = %zu\n", size);
 
-	return &shmem->base;
+	return &shmem->base;*/
+	return NULL;
 }
 EXPORT_SYMBOL_GPL(drm_gem_shmem_prime_import_sg_table);
+
+void BINDINGS_drm_gem_shmem_object_free(struct drm_gem_object *obj)
+{
+	drm_gem_shmem_object_free(obj);
+}
+
+void BINDINGS_drm_gem_shmem_object_print_info(struct drm_printer *p, unsigned int indent,
+						   const struct drm_gem_object *obj) 
+{
+	drm_gem_shmem_object_print_info(p, indent, obj);	
+}
+
+int BINDINGS_drm_gem_shmem_object_pin(struct drm_gem_object *obj)
+{
+	return drm_gem_shmem_object_pin(obj);	
+}
+
+void BINDINGS_drm_gem_shmem_object_unpin(struct drm_gem_object *obj)
+{
+	drm_gem_shmem_object_unpin(obj);	
+}
+
+struct sg_table *BINDINGS_drm_gem_shmem_object_get_sg_table(struct drm_gem_object *obj)
+{
+	return drm_gem_shmem_object_get_sg_table(obj);
+}
+
+int BINDINGS_drm_gem_shmem_object_vmap(struct drm_gem_object *obj,
+					    struct iosys_map *map)
+{
+	return drm_gem_shmem_object_vmap(obj, map);	
+}
+
+void BINDINGS_drm_gem_shmem_object_vunmap(struct drm_gem_object *obj,
+					       struct iosys_map *map)
+{
+	drm_gem_shmem_object_vunmap(obj, map);	
+}
 
 MODULE_DESCRIPTION("DRM SHMEM memory-management helpers");
 MODULE_IMPORT_NS(DMA_BUF);

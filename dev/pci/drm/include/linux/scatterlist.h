@@ -56,6 +56,8 @@ sg_next(struct scatterlist *sgl)
 	return sg_is_last(sgl) ? NULL : ++sgl;
 }
 
+struct scatterlist *BINDINGS_sg_next(struct scatterlist *sgl);
+
 int sg_alloc_table(struct sg_table *, unsigned int, gfp_t);
 void sg_free_table(struct sg_table *);
 

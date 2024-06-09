@@ -346,6 +346,9 @@ static inline int dma_resv_lock(struct dma_resv *obj,
 	return ww_mutex_lock(&obj->lock, ctx);
 }
 
+int BINDINGS_dma_resv_lock(struct dma_resv *obj,
+				struct ww_acquire_ctx *ctx);
+
 /**
  * dma_resv_lock_interruptible - lock the reservation object
  * @obj: the reservation object
@@ -464,6 +467,8 @@ static inline void dma_resv_unlock(struct dma_resv *obj)
 	dma_resv_reset_max_fences(obj);
 	ww_mutex_unlock(&obj->lock);
 }
+
+void BINDINGS_dma_resv_unlock(struct dma_resv *obj);
 
 void dma_resv_init(struct dma_resv *obj);
 void dma_resv_fini(struct dma_resv *obj);

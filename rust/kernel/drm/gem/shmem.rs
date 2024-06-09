@@ -33,21 +33,16 @@ macro_rules! vm_numa_fields {
     }
 }
 
-const SHMEM_VM_OPS: bindings::vm_operations_struct = vm_numa_fields! {
-    open: Some(bindings::drm_gem_shmem_vm_open),
-    close: Some(bindings::drm_gem_shmem_vm_close),
-    may_split: None,
-    mremap: None,
-    mprotect: None,
-    fault: Some(bindings::drm_gem_shmem_fault),
-    huge_fault: None,
-    map_pages: None,
-    pagesize: None,
-    page_mkwrite: None,
-    pfn_mkwrite: None,
-    access: None,
-    name: None,
-    find_special_page: None,
+const SHMEM_VM_OPS: bindings::uvm_pagerops = vm_numa_fields! {
+    pgo_init: None,
+    pgo_reference: None,
+    pgo_detach: None,
+    pgo_fault: None,
+    pgo_flush: None,
+    pgo_get: None,
+    pgo_put: None,
+    pgo_cluster: None,
+    pgo_mk_pcluster: None,
 };
 
 /// A shmem-backed GEM object.
@@ -71,8 +66,11 @@ unsafe extern "C" fn gem_create_object<T: DriverObject>(
     size: usize,
 ) -> *mut bindings::drm_gem_object {
     let p = unsafe {
-        bindings::malloc(Object::<T>::SIZE, bindings::M_DRM as i32, bindings::M_WAITOK as i32)
-            as *mut Object<T>
+        bindings::malloc(
+            Object::<T>::SIZE,
+            bindings::M_DRM as i32,
+            bindings::M_WAITOK as i32,
+        ) as *mut Object<T>
     };
 
     if p.is_null() {
@@ -127,14 +125,15 @@ impl<T: DriverObject> Object<T> {
         free: Some(free_callback::<T>),
         open: Some(super::open_callback::<T, Object<T>>),
         close: Some(super::close_callback::<T, Object<T>>),
-        print_info: Some(bindings::drm_gem_shmem_object_print_info),
+        print_info: Some(bindings::BINDINGS_drm_gem_shmem_object_print_info),
         export: None,
-        pin: Some(bindings::drm_gem_shmem_object_pin),
-        unpin: Some(bindings::drm_gem_shmem_object_unpin),
-        get_sg_table: Some(bindings::drm_gem_shmem_object_get_sg_table),
-        vmap: Some(bindings::drm_gem_shmem_object_vmap),
-        vunmap: Some(bindings::drm_gem_shmem_object_vunmap),
-        mmap: Some(bindings::drm_gem_shmem_object_mmap),
+        pin: Some(bindings::BINDINGS_drm_gem_shmem_object_pin),
+        unpin: Some(bindings::BINDINGS_drm_gem_shmem_object_unpin),
+        get_sg_table: Some(bindings::BINDINGS_drm_gem_shmem_object_get_sg_table),
+        vmap: Some(bindings::BINDINGS_drm_gem_shmem_object_vmap),
+        vunmap: Some(bindings::BINDINGS_drm_gem_shmem_object_vunmap),
+        // mmap: Some(bindings::drm_gem_shmem_object_mmap),
+        mmap: None,
         status: None,
         vm_ops: &SHMEM_VM_OPS,
         evict: None,
@@ -189,9 +188,9 @@ impl<T: DriverObject> Object<T> {
         // SAFETY: drm_gem_shmem_vmap can be called with the DMA reservation lock held
         to_result(unsafe {
             let resv = self.obj.base.resv as *const _ as *mut _;
-            bindings::dma_resv_lock(resv, core::ptr::null_mut());
+            bindings::BINDINGS_dma_resv_lock(resv, core::ptr::null_mut());
             let ret = bindings::drm_gem_shmem_vmap(self.mut_shmem(), map.as_mut_ptr());
-            bindings::dma_resv_unlock(resv);
+            bindings::BINDINGS_dma_resv_unlock(resv);
             ret
         })?;
 
@@ -300,9 +299,9 @@ impl<T: DriverObject> Drop for VMap<T> {
         // SAFETY: This function is safe to call with the DMA reservation lock held
         unsafe {
             let resv = self.owner.obj.base.resv as *const _ as *mut _;
-            bindings::dma_resv_lock(resv, core::ptr::null_mut());
+            bindings::BINDINGS_dma_resv_lock(resv, core::ptr::null_mut());
             bindings::drm_gem_shmem_vunmap(self.owner.mut_shmem(), &mut self.map);
-            bindings::dma_resv_unlock(resv);
+            bindings::BINDINGS_dma_resv_unlock(resv);
         }
     }
 }
@@ -320,12 +319,12 @@ pub struct SGEntry(bindings::scatterlist);
 impl SGEntry {
     /// Returns the starting DMA address of this span
     pub fn dma_address(&self) -> usize {
-        (unsafe { bindings::sg_dma_address(&self.0) }) as usize
+        self.0.dma_address as usize
     }
 
     /// Returns the length of this span in bytes
     pub fn dma_len(&self) -> usize {
-        (unsafe { bindings::sg_dma_len(&self.0) }) as usize
+        self.0.length as usize
     }
 }
 
@@ -381,7 +380,7 @@ impl<'a> Iterator for SGTableIter<'a> {
             None
         } else {
             let sg = self.sg;
-            self.sg = unsafe { bindings::sg_next(self.sg) };
+            self.sg = unsafe { bindings::BINDINGS_sg_next(self.sg) };
             self.left -= 1;
             Some(unsafe { &(*(sg as *const SGEntry)) })
         }
