@@ -376,3 +376,9 @@ void drm_memcpy_init_early(void)
 {
 }
 #endif /* CONFIG_X86 */
+
+
+resource_size_t BINDINGS_resource_size(const struct resource *r)
+{
+	return resource_size(r);
+}

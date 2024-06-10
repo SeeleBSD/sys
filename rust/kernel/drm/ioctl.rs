@@ -5,35 +5,33 @@
 //!
 //! C header: [`include/linux/drm/drm_ioctl.h`](../../../../include/linux/drm/drm_ioctl.h)
 
-//use crate::ioctl;
+use crate::ioctl;
 
-const BASE: u32 = bindings::DRM_IOCTL_BASE as u32;
+const BASE: u64 = bindings::DRM_IOCTL_BASE as u64;
 
-/*
 /// Construct a DRM ioctl number with no argument.
 #[inline(always)]
-pub const fn IO(nr: u32) -> u32 {
+pub const fn IO(nr: u64) -> u64 {
     ioctl::_IO(BASE, nr)
 }
 
 /// Construct a DRM ioctl number with a read-only argument.
 #[inline(always)]
-pub const fn IOR<T>(nr: u32) -> u32 {
+pub const fn IOR<T>(nr: u64) -> u64 {
     ioctl::_IOR::<T>(BASE, nr)
 }
 
 /// Construct a DRM ioctl number with a write-only argument.
 #[inline(always)]
-pub const fn IOW<T>(nr: u32) -> u32 {
+pub const fn IOW<T>(nr: u64) -> u64 {
     ioctl::_IOW::<T>(BASE, nr)
 }
 
 /// Construct a DRM ioctl number with a read-write argument.
 #[inline(always)]
-pub const fn IOWR<T>(nr: u32) -> u32 {
+pub const fn IOWR<T>(nr: u64) -> u64 {
     ioctl::_IOWR::<T>(BASE, nr)
 }
-*/
 
 /// Descriptor type for DRM ioctls. Use the `declare_drm_ioctls!{}` macro to construct them.
 pub type DrmIoctlDescriptor = bindings::drm_ioctl_desc;
@@ -78,7 +76,6 @@ pub mod internal {
     pub use bindings::drm_ioctl_desc;
 }
 
-/*
 /// Declare the DRM ioctls for a driver.
 ///
 /// Each entry in the list should have the form:
@@ -109,7 +106,7 @@ macro_rules! declare_drm_ioctls {
     ( $(($cmd:ident, $struct:ident, $flags:expr, $func:expr)),* $(,)? ) => {
         const IOCTLS: &'static [$crate::drm::ioctl::DrmIoctlDescriptor] = {
             use $crate::uapi::*;
-            const _:() = {
+            /*const _:() = {
                 let i: u32 = $crate::uapi::DRM_COMMAND_BASE;
                 // Assert that all the IOCTLs are in the right order and there are no gaps,
                 // and that the sizeof of the specified type is correct.
@@ -119,7 +116,7 @@ macro_rules! declare_drm_ioctls {
                     ::core::assert!(core::mem::size_of::<$crate::uapi::$struct>() == $crate::ioctl::_IOC_SIZE(cmd));
                     let i: u32 = i + 1;
                 )*
-            };
+            };*/
 
             let ioctls = &[$(
                 $crate::drm::ioctl::internal::drm_ioctl_desc {
@@ -158,4 +155,4 @@ macro_rules! declare_drm_ioctls {
             ioctls
         };
     };
-}*/
+}

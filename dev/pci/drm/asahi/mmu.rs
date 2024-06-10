@@ -747,6 +747,7 @@ impl HandoffFlush {
     }
 }
 
+/*
 // We do not implement FlushOps, since we flush manually in this module after
 // page table operations. Just provide dummy implementations.
 impl io_pgtable::FlushOps for Uat {
@@ -767,6 +768,7 @@ impl io_pgtable::FlushOps for Uat {
     ) {
     }
 }
+*/
 
 impl Vm {
     /// Create a new virtual memory address space
@@ -1037,7 +1039,7 @@ impl Uat {
             res.assume_init()
         };
 
-        let rgn_size: usize = unsafe { bindings::resource_size(&res) } as usize;
+        let rgn_size: usize = unsafe { bindings::BINDINGS_resource_size(&res) } as usize;
 
         if size > rgn_size {
             dev_err!(

@@ -131,7 +131,7 @@ LINKFLAGS+=	-S
 
 bindgen_target_flags = \
 	--opaque-type kunit_try_catch \
-	--experimental --wrap-static-fns-*
+	--wrap-static-fns
 bindings/bindings_generated.rs: $S/rust/bindgen_parameters
 	@mkdir -p bindings
 	$(BINDGEN) $S/rust/bindings/bindings_helper.h $(bindgen_target_flags) \
@@ -144,7 +144,7 @@ bindings/bindings_generated.rs: $S/rust/bindgen_parameters
 bindgen_target_flags = \
 	--blocklist-type '.*' --allowlist-var '' \
 	--allowlist-function 'rust_helper_.*' \
-	--experimental --wrap-static-fns-* \
+	--wrap-static-fns
 bindgen_target_cflags = -Wno-missing-prototypes -Wno-missing-declarations
 bindings/bindings_helpers_generated.rs:
 	@mkdir -p bindings

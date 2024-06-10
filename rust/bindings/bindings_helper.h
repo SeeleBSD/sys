@@ -16,6 +16,7 @@
 #include <sys/rwlock.h>
 #include <sys/time.h>
 #include <sys/param.h>
+#include <sys/ioccom.h>
 #include <machine/bus.h>
 #include <machine/fdt.h>
 #include <drm/asahi/asahidrm.h>
@@ -109,3 +110,11 @@ const u_long BINDINGS_IORESOURCE_MEM = IORESOURCE_MEM;
 
 const uint32_t BINDINGS_IOMMU_READ = IOMMU_READ;
 const uint32_t BINDINGS_IOMMU_WRITE = IOMMU_WRITE;
+
+const unsigned long BINDINGS_IOCPARM_MASK = IOCPARM_MASK;
+const size_t BINDINGS_IOCPARM_MAX = IOCPARM_MAX;
+const unsigned long BINDINGS_IOC_VOID = IOC_VOID;
+const unsigned long BINDINGS_IOC_OUT = IOC_OUT;
+const unsigned long BINDINGS_IOC_IN = IOC_IN;
+const unsigned long BINDINGS_IOC_INOUT = IOC_INOUT;
+const unsigned long BINDINGS_IOC_DIRMASK = IOC_DIRMASK;

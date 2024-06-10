@@ -9,11 +9,13 @@
 #![feature(allocator_api)]
 #![feature(alloc_error_handler)]
 #![feature(strict_provenance)]
+#![feature(duration_constants)]
 
 extern crate self as kernel;
 
 pub mod allocator;
 pub mod build_assert;
+pub mod delay;
 pub mod device;
 pub mod dma_fence;
 pub mod drm;
@@ -23,7 +25,9 @@ pub mod io;
 pub mod io_buffer;
 pub mod io_mem;
 pub mod io_pgtable;
+pub mod ioctl;
 pub mod of;
+pub mod platform;
 pub mod prelude;
 pub(crate) mod private;
 pub mod proc;
