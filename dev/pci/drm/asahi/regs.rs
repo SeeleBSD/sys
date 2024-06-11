@@ -163,22 +163,22 @@ impl Resources {
     }
 
     fn sgx_read32(&self, off: usize) -> u32 {
-        self.sgx.readl_relaxed(off)
+        self.sgx.readl(off)
     }
 
     /* Not yet used
     fn sgx_write32(&self, off: usize, val: u32) {
-        self.sgx.writel_relaxed(val, off)
+        self.sgx.writel(val, off)
     }
     */
 
     fn sgx_read64(&self, off: usize) -> u64 {
-        self.sgx.readq_relaxed(off)
+        self.sgx.readq(off)
     }
 
     /* Not yet used
     fn sgx_write64(&self, off: usize, val: u64) {
-        self.sgx.writeq_relaxed(val, off)
+        self.sgx.writeq(val, off)
     }
     */
 
@@ -191,9 +191,9 @@ impl Resources {
 
     /// Start the ASC coprocessor CPU.
     pub(crate) fn start_cpu(&self) -> Result {
-        let val = self.asc.readl_relaxed(CPU_CONTROL);
+        let val = self.asc.readl(CPU_CONTROL);
 
-        self.asc.writel_relaxed(val | CPU_RUN, CPU_CONTROL);
+        self.asc.writel(val | CPU_RUN, CPU_CONTROL);
 
         Ok(())
     }
@@ -246,7 +246,7 @@ impl Resources {
         };
 
         let mut core_masks_packed = Vec::new();
-        core_masks_packed.try_extend_from_slice(&core_mask_regs)?;
+        core_masks_packed.extend_from_slice(&core_mask_regs);
 
         dev_info!(self.dev, "Core masks: {:#x?}\n", core_masks_packed);
 

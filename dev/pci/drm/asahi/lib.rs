@@ -34,6 +34,7 @@ use kernel::{of, prelude::*};
 
 use crate::hw::HwConfig;
 
+const INITIAL_TVB_SIZE: usize = 0x8;
 const __LOG_PREFIX: &'static str = "asahidrm";
 static mut INFO: Option<&'static HwConfig> = None;
 

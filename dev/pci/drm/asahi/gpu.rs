@@ -359,8 +359,9 @@ impl GpuManager::ver {
         dev: &AsahiDevice,
         res: &regs::Resources,
         cfg: &'static hw::HwConfig,
+        bst: bindings::bus_space_tag_t,
     ) -> Result<Arc<GpuManager::ver>> {
-        let uat = Self::make_uat(dev, cfg)?;
+        let uat = Self::make_uat(dev, cfg, bst)?;
         let dyncfg = Self::make_dyncfg(dev, res, cfg, &uat)?;
 
         let mut alloc = KernelAllocators {
@@ -595,7 +596,11 @@ impl GpuManager::ver {
     ///
     /// Force disable inlining to avoid blowing up the stack.
     #[inline(never)]
-    fn make_uat(dev: &AsahiDevice, cfg: &'static hw::HwConfig) -> Result<Box<mmu::Uat>> {
+    fn make_uat(
+        dev: &AsahiDevice,
+        cfg: &'static hw::HwConfig,
+        bst: bindings::bus_space_tag_t,
+    ) -> Result<Box<mmu::Uat>> {
         // G14X has a new thing in the Scene structure that unfortunately requires
         // write access from user contexts. Hopefully it's not security-sensitive.
         #[ver(G >= G14X)]
@@ -603,7 +608,7 @@ impl GpuManager::ver {
         #[ver(G < G14X)]
         let map_kernel_to_user = false;
 
-        Ok(Box::new(mmu::Uat::new(dev, cfg, map_kernel_to_user)?))
+        Ok(Box::new(mmu::Uat::new(dev, cfg, map_kernel_to_user, bst)?))
     }
 
     /// Actually create the final GpuManager instance, as a UniqueArc.
@@ -903,7 +908,7 @@ impl GpuManager::ver {
     fn get_fault_info(&self) -> Option<regs::FaultInfo> {
         let data = self.dev.data();
 
-        let res = match data.resources() {
+        let res = match data.res() {
             Some(res) => res,
             None => {
                 dev_err!(self.dev, "  Failed to acquire resources\n");
@@ -1368,8 +1373,7 @@ impl GpuManager for GpuManager::ver {
         }
 
         for i in work {
-            garbage
-                .push(i);
+            garbage.push(i);
         }
     }
 

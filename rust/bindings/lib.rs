@@ -28,10 +28,7 @@ mod bindings_raw {
     // Use glob import here to expose all helpers.
     // Symbols defined within the module will take precedence to the glob import.
     pub use super::bindings_helper::*;
-    include!(concat!(
-        env!("O"),
-        "/bindings/bindings_generated.rs"
-    ));
+    include!(concat!(env!("O"), "/bindings/bindings_generated.rs"));
 }
 
 // When both a directly exposed symbol and a helper exists for the same function,

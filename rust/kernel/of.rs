@@ -59,6 +59,16 @@ impl Node {
         }
     }
 
+    pub fn parse_phandle(&self, name: &CStr, index: usize) -> Option<Self> {
+        unsafe {
+            Node::from_raw(bindings::__of_parse_phandle(
+                self.raw_node,
+                name.as_char_ptr(),
+                index as i32,
+            ))
+        }
+    }
+
     pub fn node(&self) -> &bindings::device_node {
         unsafe { &*self.raw_node }
     }

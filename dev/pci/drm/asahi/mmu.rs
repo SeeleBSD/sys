@@ -1039,7 +1039,7 @@ impl Uat {
             res.assume_init()
         };
 
-        let rgn_size: usize = unsafe { bindings::BINDINGS_resource_size(&res) } as usize;
+        let rgn_size: usize = (res.end - res.start + 1) as usize;
 
         if size > rgn_size {
             dev_err!(
@@ -1060,17 +1060,19 @@ impl Uat {
         // let map = unsafe { bindings::memremap(res.start, rgn_size, flags.into()) };
         // let map = NonNull::new(map);
         let mut bsh: bindings::bus_space_handle_t = 0;
-        if (*(bst as *const bindings::bus_space))._space_map.unwrap()(
-            bst,
-            res.start as bindings::bus_addr_t,
-            rgn_size as bindings::bus_size_t,
-            bindings::BUS_SPACE_MAP_LINEAR as i32,
-            &mut bsh,
-        ) != 0
+        if unsafe {
+            (*(bst as *const bindings::bus_space))._space_map.unwrap()(
+                bst,
+                res.start as bindings::bus_addr_t,
+                rgn_size as bindings::bus_size_t,
+                bindings::BUS_SPACE_MAP_LINEAR as i32,
+                &mut bsh,
+            )
+        } != 0
         {
             return Err(ENOMEM);
         }
-        let map = (*(bst as *const bindings::bus_space))._space_vaddr.unwrap()(bst, bsh);
+        let map = unsafe { (*(bst as *const bindings::bus_space))._space_vaddr.unwrap()(bst, bsh) };
         let map = NonNull::new(map as *mut core::ffi::c_void);
 
         match map {
@@ -1168,9 +1170,12 @@ impl Uat {
 
     /// Creates the reference-counted inner data for a new `Uat` instance.
     #[inline(never)]
-    fn make_inner(dev: &driver::AsahiDevice) -> Result<Arc<UatInner>> {
-        let handoff_rgn = Self::map_region(dev, c_str!("handoff"), HANDOFF_SIZE, false)?;
-        let ttbs_rgn = Self::map_region(dev, c_str!("ttbs"), SLOTS_SIZE, false)?;
+    fn make_inner(
+        dev: &driver::AsahiDevice,
+        bst: bindings::bus_space_tag_t,
+    ) -> Result<Arc<UatInner>> {
+        let handoff_rgn = Self::map_region(dev, c_str!("handoff"), HANDOFF_SIZE, false, bst)?;
+        let ttbs_rgn = Self::map_region(dev, c_str!("ttbs"), SLOTS_SIZE, false, bst)?;
 
         let handoff = unsafe { &(handoff_rgn.map.as_ptr() as *mut Handoff).as_ref().unwrap() };
 
@@ -1198,12 +1203,14 @@ impl Uat {
         dev: &driver::AsahiDevice,
         cfg: &'static hw::HwConfig,
         map_kernel_to_user: bool,
+        bst: bindings::bus_space_tag_t,
     ) -> Result<Self> {
         dev_info!(dev, "MMU: Initializing...\n");
 
-        let inner = Self::make_inner(dev)?;
+        let inner = Self::make_inner(dev, bst)?;
 
-        let pagetables_rgn = Self::map_region(dev, c_str!("pagetables"), PAGETABLES_SIZE, true)?;
+        let pagetables_rgn =
+            Self::map_region(dev, c_str!("pagetables"), PAGETABLES_SIZE, true, bst)?;
 
         dev_info!(dev, "MMU: Creating kernel page tables\n");
         let kernel_lower_vm = Vm::new(dev, inner.clone(), cfg, false, 1, 0)?;

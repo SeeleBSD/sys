@@ -447,10 +447,11 @@ impl Queue::ver {
 
         // Rendering structures
         if caps & uapi::drm_asahi_queue_cap_DRM_ASAHI_QUEUE_CAP_RENDER != 0 {
-            let tvb_blocks = {
+            /*let tvb_blocks = {
                 let lock = crate::THIS_MODULE.kernel_param_lock();
                 *crate::initial_tvb_size.read(&lock)
-            };
+            };*/
+            let tvb_blocks = crate::INITIAL_TVB_SIZE;
 
             ret.buffer.as_ref().unwrap().ensure_blocks(tvb_blocks)?;
 

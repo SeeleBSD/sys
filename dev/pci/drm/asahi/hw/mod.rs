@@ -484,7 +484,7 @@ impl PwrConfig {
         let node = dev.of_node().ok_or(EIO)?;
         let opps = node.parse_phandle(name, 0).ok_or(EIO)?;
 
-        for opp in opps.children() {
+        for opp in opps.child() {
             let freq_hz: u64 = opp.get_property(c_str!("opp-hz"))?;
             let mut volt_uv: Vec<u32> = opp.get_property(c_str!("opp-microvolt"))?;
             let pwr_uw: u32 = if is_main {

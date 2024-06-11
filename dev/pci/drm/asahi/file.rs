@@ -114,7 +114,7 @@ impl SyncItem {
     }
 
     fn parse_array(file: &DrmFile, ptr: u64, count: u32, out: bool) -> Result<Vec<SyncItem>> {
-        let mut vec = Vec::try_with_capacity(count as usize)?;
+        let mut vec = Vec::with_capacity(count as usize);
 
         const STRIDE: usize = core::mem::size_of::<uapi::drm_asahi_sync>();
         let size = STRIDE * count as usize;
@@ -787,7 +787,7 @@ impl File {
             data.queue_id,
             id
         );
-        let mut commands = Vec::try_with_capacity(data.command_count as usize)?;
+        let mut commands = Vec::with_capacity(data.command_count as usize);
 
         const STRIDE: usize = core::mem::size_of::<uapi::drm_asahi_command>();
         let size = STRIDE * data.command_count as usize;
