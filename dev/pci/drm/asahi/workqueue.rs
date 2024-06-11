@@ -116,10 +116,10 @@ impl GpuContext {
     ) -> Result<GpuContext> {
         Ok(GpuContext {
             dev: dev.into(),
-            data: Some(Box::try_new(alloc.shared.new_object(
+            data: Some(Box::new(alloc.shared.new_object(
                 fw::workqueue::GpuContextData { _buffer: buffer },
                 |_inner| Default::default(),
-            )?)?),
+            )?)),
         })
     }
 
@@ -308,7 +308,7 @@ impl Job::ver {
             return Err(EINVAL);
         }
 
-        self.pending.try_push(Box::try_new(SubmittedWork::<_, _> {
+        self.pending.push(Box::new(SubmittedWork::<_, _> {
             object: command,
             value: self.event_info.value.next(),
             error: None,
@@ -316,7 +316,7 @@ impl Job::ver {
             wptr: 0,
             vm_slot,
             fence: self.fence.clone(),
-        })?)?;
+        }));
 
         Ok(())
     }
@@ -425,8 +425,7 @@ impl Job::ver {
             // Cannot fail, since we did a try_reserve(1) above
             inner
                 .pending
-                .try_push(command)
-                .expect("try_push() failed after try_reserve()");
+                .push(command);
         }
 
         self.submitted = true;
@@ -786,12 +785,7 @@ impl WorkQueue for WorkQueue::ver {
         let pipe_type = inner.pipe_type;
 
         for cmd in inner.pending.drain(..completed_commands) {
-            if completed.try_push(cmd).is_err() {
-                pr_crit!(
-                    "WorkQueue({:?}): Failed to signal a completed command\n",
-                    pipe_type,
-                );
-            }
+            completed.push(cmd);
         }
 
         mod_pr_debug!(

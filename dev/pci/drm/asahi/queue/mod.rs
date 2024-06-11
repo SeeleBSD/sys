@@ -566,8 +566,8 @@ impl Queue for Queue::ver {
         let mut events: [Vec<Option<workqueue::QueueEventInfo::ver>>; SQ_COUNT] =
             Default::default();
 
-        events[SQ_RENDER].try_push(self.q_frag.as_ref().and_then(|a| a.wq.event_info()))?;
-        events[SQ_COMPUTE].try_push(self.q_comp.as_ref().and_then(|a| a.wq.event_info()))?;
+        events[SQ_RENDER].push(self.q_frag.as_ref().and_then(|a| a.wq.event_info()));
+        events[SQ_COMPUTE].push(self.q_comp.as_ref().and_then(|a| a.wq.event_info()));
 
         let vm_bind = gpu.bind_vm(&self.vm)?;
         let vm_slot = vm_bind.slot();
@@ -723,7 +723,7 @@ impl Queue for Queue::ver {
                         id,
                         last_render.unwrap() == i,
                     )?;
-                    events[SQ_RENDER].try_push(Some(
+                    events[SQ_RENDER].push(Some(
                         job.sj_frag
                             .as_ref()
                             .expect("No frag queue?")
@@ -731,7 +731,7 @@ impl Queue for Queue::ver {
                             .as_ref()
                             .expect("No frag job?")
                             .event_info(),
-                    ))?;
+                    ));
                 }
                 uapi::drm_asahi_cmd_type_DRM_ASAHI_CMD_COMPUTE => {
                     self.submit_compute(
@@ -741,7 +741,7 @@ impl Queue for Queue::ver {
                         id,
                         last_compute.unwrap() == i,
                     )?;
-                    events[SQ_COMPUTE].try_push(Some(
+                    events[SQ_COMPUTE].push(Some(
                         job.sj_comp
                             .as_ref()
                             .expect("No comp queue?")
@@ -749,7 +749,7 @@ impl Queue for Queue::ver {
                             .as_ref()
                             .expect("No comp job?")
                             .event_info(),
-                    ))?;
+                    ));
                 }
                 _ => return Err(EINVAL),
             }

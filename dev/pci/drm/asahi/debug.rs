@@ -72,12 +72,12 @@ pub(crate) enum DebugFlags {
 
 /// Update the cached global debug flags from the module parameter
 pub(crate) fn update_debug_flags() {
-    let flags = {
+    /*let flags = {
         let lock = crate::THIS_MODULE.kernel_param_lock();
         *crate::debug_flags.read(&lock)
     };
 
-    DEBUG_FLAGS.store(flags, Ordering::Relaxed);
+    DEBUG_FLAGS.store(flags, Ordering::Relaxed);*/
 }
 
 /// Check whether debug is enabled for a given flag
