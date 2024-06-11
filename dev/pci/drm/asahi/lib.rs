@@ -30,8 +30,14 @@ pub(crate) mod slotalloc;
 pub(crate) mod util;
 pub(crate) mod workqueue;
 
-use kernel::{of, prelude::*};
+use kernel::{
+    device::{Device, RawDevice},
+    drm, of, platform,
+    prelude::*,
+    sync::Arc,
+};
 
+use crate::driver::AsahiDriver;
 use crate::hw::HwConfig;
 
 const INITIAL_TVB_SIZE: usize = 0x8;
@@ -87,6 +93,64 @@ pub extern "C" fn asahidrm_attach(
         (*sc).sc_dev.faa = faa;
         bindings::platform_device_register(&mut (*sc).sc_dev as *mut bindings::platform_device);
     }
+
+    let cfg = unsafe { INFO.expect("No GPU information!") };
+
+    let dev = unsafe { Device::new(_self) };
+    let reg =
+        drm::drv::Registration::<AsahiDriver>::new(&dev, unsafe { &mut (*sc).sc_ddev as *mut _ })
+            .expect("Failed to create reg");
+
+    let mut pdev =
+        unsafe { platform::Device::from_ptr(&mut (*sc).sc_dev as *mut bindings::platform_device) };
+    info!("{}", unsafe { (*sc).sc_dev.num_resources });
+    let res = regs::Resources::new(&mut pdev).expect("Failed to create res");
+
+    res.init_mmio().ok();
+    res.start_cpu().ok();
+
+    let node = dev.of_node().unwrap();
+    let compat: Vec<u32> = node
+        .get_property(c_str!("apple,firmware-compat"))
+        .expect("Failed to get compat");
+
+    let gpu = unsafe {
+        match (cfg.gpu_gen, cfg.gpu_variant, compat.as_slice()) {
+            (hw::GpuGen::G13, _, &[12, 3, 0]) => {
+                gpu::GpuManagerG13V12_3::new(reg.device(), &res, cfg, (*sc).sc_iot).unwrap()
+                    as Arc<dyn gpu::GpuManager>
+            }
+            (hw::GpuGen::G14, hw::GpuVariant::G, &[12, 4, 0]) => {
+                gpu::GpuManagerG14V12_4::new(reg.device(), &res, cfg, (*sc).sc_iot).unwrap()
+                    as Arc<dyn gpu::GpuManager>
+            }
+            (hw::GpuGen::G13, _, &[13, 5, 0]) => {
+                gpu::GpuManagerG13V13_5::new(reg.device(), &res, cfg, (*sc).sc_iot).unwrap()
+                    as Arc<dyn gpu::GpuManager>
+            }
+            (hw::GpuGen::G14, hw::GpuVariant::G, &[13, 5, 0]) => {
+                gpu::GpuManagerG14V13_5::new(reg.device(), &res, cfg, (*sc).sc_iot).unwrap()
+                    as Arc<dyn gpu::GpuManager>
+            }
+            (hw::GpuGen::G14, _, &[13, 5, 0]) => {
+                gpu::GpuManagerG14XV13_5::new(reg.device(), &res, cfg, (*sc).sc_iot).unwrap()
+                    as Arc<dyn gpu::GpuManager>
+            }
+            _ => {
+                dev_info!(
+                    dev,
+                    "Unsupported GPU/firmware combination ({:?}, {:?}, {:?})\n",
+                    cfg.gpu_gen,
+                    cfg.gpu_variant,
+                    compat
+                );
+                return;
+            }
+        }
+    };
+
+    gpu.init().ok();
+
     info!("attached!");
 }
 

@@ -35,7 +35,7 @@ impl Device {
     ///
     /// `ptr` must be non-null and valid. It must remain valid for the lifetime of the returned
     /// instance.
-    unsafe fn from_ptr(ptr: *mut bindings::platform_device) -> Self {
+    pub unsafe fn from_ptr(ptr: *mut bindings::platform_device) -> Self {
         // INVARIANT: The safety requirements of the function ensure the lifetime invariant.
         Self {
             ptr,

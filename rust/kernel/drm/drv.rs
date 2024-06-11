@@ -236,10 +236,9 @@ impl<T: Driver> Registration<T> {
     /// Creates a new [`Registration`] but does not register it yet.
     ///
     /// It is allowed to move.
-    pub fn new(parent: &dyn device::RawDevice) -> Result<Self> {
+    pub fn new(parent: &dyn device::RawDevice, raw: *mut bindings::drm_device) -> Result<Self> {
         let vtable = Pin::new(Box::try_new(Self::VTABLE)?);
-        let raw_drm = unsafe { bindings::drm_dev_alloc(&*vtable, parent.raw_device()) };
-        let raw_drm = NonNull::new(from_err_ptr(raw_drm)? as *mut _).ok_or(ENOMEM)?;
+        let raw_drm = NonNull::new(from_err_ptr(raw)? as *mut _).ok_or(ENOMEM)?;
 
         // The reference count is one, and now we take ownership of that reference as a
         // drm::device::Device.

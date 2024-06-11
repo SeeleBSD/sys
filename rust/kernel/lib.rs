@@ -63,7 +63,7 @@ pub extern "C" fn __udivti3() -> ! {
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo<'_>) -> ! {
     print!("{}\n", info);
-    unreachable!()
+    loop {}
 }
 
 #[no_mangle]
