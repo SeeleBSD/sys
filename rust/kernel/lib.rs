@@ -100,14 +100,14 @@ macro_rules! dbg {
 
 #[macro_export]
 macro_rules! pr_dbg {
-	($fmt:expr)              => ($crate::println!("{}:dbg: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
-	($fmt:expr, $($arg:tt)+) => ($crate::println!("{}:dbg: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
+	($fmt:expr)              => ($crate::print!("{}:dbg: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
+	($fmt:expr, $($arg:tt)+) => ($crate::print!("{}:dbg: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
 }
 
 #[macro_export]
 macro_rules! dev_dbg {
-	($dev:expr, $fmt:expr)              => ($crate::println!("{}:dbg: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
-	($dev:expr, $fmt:expr, $($arg:tt)+) => ($crate::println!("{}:dbg: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
+	($dev:expr, $fmt:expr)              => ($crate::print!("{}:dbg: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
+	($dev:expr, $fmt:expr, $($arg:tt)+) => ($crate::print!("{}:dbg: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
 }
 
 #[macro_export]
@@ -118,14 +118,14 @@ macro_rules! info {
 
 #[macro_export]
 macro_rules! pr_info {
-	($fmt:expr)              => ($crate::println!("{}:info: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
-	($fmt:expr, $($arg:tt)+) => ($crate::println!("{}:info: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
+	($fmt:expr)              => ($crate::print!("{}:info: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
+	($fmt:expr, $($arg:tt)+) => ($crate::print!("{}:info: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
 }
 
 #[macro_export]
 macro_rules! dev_info {
-	($dev:expr, $fmt:expr)              => ($crate::println!("{}:info: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
-	($dev:expr, $fmt:expr, $($arg:tt)+) => ($crate::println!("{}:info: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
+	($dev:expr, $fmt:expr)              => ($crate::print!("{}:info: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
+	($dev:expr, $fmt:expr, $($arg:tt)+) => ($crate::print!("{}:info: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
 }
 
 #[macro_export]
@@ -136,14 +136,14 @@ macro_rules! notice {
 
 #[macro_export]
 macro_rules! pr_notice {
-	($fmt:expr)              => ($crate::println!("{}:notice: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
-	($fmt:expr, $($arg:tt)+) => ($crate::println!("{}:notice: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
+	($fmt:expr)              => ($crate::print!("{}:notice: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
+	($fmt:expr, $($arg:tt)+) => ($crate::print!("{}:notice: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
 }
 
 #[macro_export]
 macro_rules! dev_notice {
-	($dev:expr, $fmt:expr)              => ($crate::println!("{}:notice: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
-	($dev:expr, $fmt:expr, $($arg:tt)+) => ($crate::println!("{}:notice: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
+	($dev:expr, $fmt:expr)              => ($crate::print!("{}:notice: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
+	($dev:expr, $fmt:expr, $($arg:tt)+) => ($crate::print!("{}:notice: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
 }
 
 #[macro_export]
@@ -154,14 +154,14 @@ macro_rules! warn {
 
 #[macro_export]
 macro_rules! pr_warn {
-	($fmt:expr)              => ($crate::println!("{}:warn: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
-	($fmt:expr, $($arg:tt)+) => ($crate::println!("{}:warn: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
+	($fmt:expr)              => ($crate::print!("{}:warn: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
+	($fmt:expr, $($arg:tt)+) => ($crate::print!("{}:warn: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
 }
 
 #[macro_export]
 macro_rules! dev_warn {
-	($dev:expr, $fmt:expr)              => ($crate::println!("{}:warn: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
-	($dev:expr, $fmt:expr, $($arg:tt)+) => ($crate::println!("{}:warn: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
+	($dev:expr, $fmt:expr)              => ($crate::print!("{}:warn: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
+	($dev:expr, $fmt:expr, $($arg:tt)+) => ($crate::print!("{}:warn: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
 }
 
 #[macro_export]
@@ -172,14 +172,14 @@ macro_rules! err {
 
 #[macro_export]
 macro_rules! pr_err {
-	($fmt:expr)              => ($crate::println!("{}:err: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
-	($fmt:expr, $($arg:tt)+) => ($crate::println!("{}:err: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
+	($fmt:expr)              => ($crate::print!("{}:err: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
+	($fmt:expr, $($arg:tt)+) => ($crate::print!("{}:err: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
 }
 
 #[macro_export]
 macro_rules! dev_err {
-	($dev:expr, $fmt:expr)              => ($crate::println!("{}:err: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
-	($dev:expr, $fmt:expr, $($arg:tt)+) => ($crate::println!("{}:err: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
+	($dev:expr, $fmt:expr)              => ($crate::print!("{}:err: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
+	($dev:expr, $fmt:expr, $($arg:tt)+) => ($crate::print!("{}:err: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
 }
 
 #[macro_export]
@@ -190,14 +190,14 @@ macro_rules! crit {
 
 #[macro_export]
 macro_rules! pr_crit {
-	($fmt:expr)              => ($crate::println!("{}:crit: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
-	($fmt:expr, $($arg:tt)+) => ($crate::println!("{}:crit: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
+	($fmt:expr)              => ($crate::print!("{}:crit: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
+	($fmt:expr, $($arg:tt)+) => ($crate::print!("{}:crit: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
 }
 
 #[macro_export]
 macro_rules! dev_crit {
-	($dev:expr, $fmt:expr)              => ($crate::println!("{}:crit: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
-	($dev:expr, $fmt:expr, $($arg:tt)+) => ($crate::println!("{}:crit: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
+	($dev:expr, $fmt:expr)              => ($crate::print!("{}:crit: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt)));
+	($dev:expr, $fmt:expr, $($arg:tt)+) => ($crate::print!("{}:crit: {}", crate::__LOG_PREFIX, $crate::alloc::format!($fmt, $($arg)*)));
 }
 
 /// Print kernel debug messages with a trailing newline

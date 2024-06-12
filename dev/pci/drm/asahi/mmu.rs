@@ -1017,6 +1017,7 @@ impl Uat {
                 name.as_char_ptr(),
             );
             to_result(idx)?;
+            dbg!("matching");
 
             let np = bindings::__of_parse_phandle(
                 (*rdev).dv_cfdata as *mut bindings::device_node,
@@ -1051,6 +1052,7 @@ impl Uat {
             );
             return Err(ENOMEM);
         }
+        dbg!("res {}", bst as usize);
 
         // let flags = if cached {
         // bindings::MEMREMAP_WB

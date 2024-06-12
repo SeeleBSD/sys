@@ -34,6 +34,7 @@ use kernel::{
     device::{Device, RawDevice},
     drm, of, platform,
     prelude::*,
+    str::CStr,
     sync::Arc,
 };
 
@@ -117,6 +118,9 @@ pub extern "C" fn asahidrm_attach(
         .expect("Failed to get compat");
     dbg!("get property");
 
+    let rdev = dev.raw_device();
+    let dnode = unsafe { (*rdev).dv_cfdata as *mut bindings::device_node };
+    dbg!("{}", unsafe { CStr::from_char_ptr((*dnode).full_name) });
     let gpu = unsafe {
         match (cfg.gpu_gen, cfg.gpu_variant, compat.as_slice()) {
             (hw::GpuGen::G13, _, &[12, 3, 0]) => {
