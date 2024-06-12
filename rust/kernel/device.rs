@@ -23,7 +23,7 @@ pub unsafe trait RawDevice {
 
     fn of_node(&self) -> Option<Node> {
         let rdev = self.raw_device();
-        let rnode = unsafe { (*rdev).dv_cfdata as *mut bindings::device_node };
+        let rnode = unsafe { bindings::__of_devnode((*rdev).dv_cfdata as *mut core::ffi::c_void) };
         unsafe { Node::from_raw(rnode) }
     }
 }

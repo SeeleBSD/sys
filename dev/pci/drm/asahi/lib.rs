@@ -119,7 +119,7 @@ pub extern "C" fn asahidrm_attach(
     dbg!("get property");
 
     let rdev = dev.raw_device();
-    let dnode = unsafe { (*rdev).dv_cfdata as *mut bindings::device_node };
+    let dnode = unsafe { bindings::__of_devnode((*rdev).dv_cfdata as *mut core::ffi::c_void) };
     dbg!("{}", unsafe { CStr::from_char_ptr((*dnode).full_name) });
     let gpu = unsafe {
         match (cfg.gpu_gen, cfg.gpu_variant, compat.as_slice()) {

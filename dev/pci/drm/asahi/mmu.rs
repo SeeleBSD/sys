@@ -1012,7 +1012,7 @@ impl Uat {
 
         let res = unsafe {
             let idx = bindings::__of_property_match_string(
-                (*rdev).dv_cfdata as *mut bindings::device_node,
+                bindings::__of_devnode((*rdev).dv_cfdata as *mut core::ffi::c_void),
                 c_str!("memory-region-names").as_char_ptr(),
                 name.as_char_ptr(),
             );
@@ -1020,7 +1020,7 @@ impl Uat {
             dbg!("matching");
 
             let np = bindings::__of_parse_phandle(
-                (*rdev).dv_cfdata as *mut bindings::device_node,
+                bindings::__of_devnode((*rdev).dv_cfdata as *mut core::ffi::c_void),
                 c_str!("memory-region").as_char_ptr(),
                 idx,
             );
