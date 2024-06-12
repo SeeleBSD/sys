@@ -275,18 +275,35 @@ impl Resources {
         let mut core_masks = Vec::new();
         let mut total_active_cores: u32 = 0;
 
+        dbg!("asdf {}", num_clusters);
+
         let max_core_mask = ((1u64 << num_cores) - 1) as u32;
         for _ in 0..num_clusters {
+            dbg!("1");
             let mask = core_mask_regs[0] & max_core_mask;
+            dbg!("2");
             core_masks.push(mask);
+            dbg!("3");
             for i in 0..core_mask_regs.len() {
+                dbg!("4");
                 core_mask_regs[i] >>= num_cores;
                 if i < (core_mask_regs.len() - 1) {
                     core_mask_regs[i] |= core_mask_regs[i + 1] << (32 - num_cores);
                 }
             }
-            total_active_cores += mask.count_ones();
+            dbg!("5");
+            // KERNEL PANIC by count_ones(): workaround
+            let mut mask_t = mask;
+            while mask_t > 0 {
+                if (mask_t & 1) != 0 {
+                    total_active_cores += 1;
+                }
+                mask_t >>= 1;
+            }
+            // total_active_cores += mask.count_ones();
         }
+
+        dbg!("asdf3");
 
         if core_mask_regs.iter().any(|a| *a != 0) {
             dev_err!(self.dev, "Leftover core mask: {:#x?}\n", core_mask_regs);

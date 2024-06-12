@@ -22,6 +22,7 @@ use kernel::{
     error::{to_result, Result},
     io_pgtable,
     io_pgtable::{prot /*, AppleUAT, IoPageTable*/},
+    platform,
     prelude::*,
     static_lock_class,
     sync::{
@@ -1005,6 +1006,7 @@ impl Uat {
         size: usize,
         cached: bool,
         bst: bindings::bus_space_tag_t,
+        node: i32,
     ) -> Result<UatRegion> {
         let rdev = dev.raw_device();
 
@@ -1012,7 +1014,7 @@ impl Uat {
 
         let res = unsafe {
             let idx = bindings::__of_property_match_string(
-                bindings::__of_devnode((*rdev).dv_cfdata as *mut core::ffi::c_void),
+                node as usize as *mut _,
                 c_str!("memory-region-names").as_char_ptr(),
                 name.as_char_ptr(),
             );
@@ -1020,7 +1022,7 @@ impl Uat {
             dbg!("matching");
 
             let np = bindings::__of_parse_phandle(
-                bindings::__of_devnode((*rdev).dv_cfdata as *mut core::ffi::c_void),
+                node as usize as *mut _,
                 c_str!("memory-region").as_char_ptr(),
                 idx,
             );
@@ -1175,9 +1177,10 @@ impl Uat {
     fn make_inner(
         dev: &driver::AsahiDevice,
         bst: bindings::bus_space_tag_t,
+        node: i32,
     ) -> Result<Arc<UatInner>> {
-        let handoff_rgn = Self::map_region(dev, c_str!("handoff"), HANDOFF_SIZE, false, bst)?;
-        let ttbs_rgn = Self::map_region(dev, c_str!("ttbs"), SLOTS_SIZE, false, bst)?;
+        let handoff_rgn = Self::map_region(dev, c_str!("handoff"), HANDOFF_SIZE, false, bst, node)?;
+        let ttbs_rgn = Self::map_region(dev, c_str!("ttbs"), SLOTS_SIZE, false, bst, node)?;
 
         let handoff = unsafe { &(handoff_rgn.map.as_ptr() as *mut Handoff).as_ref().unwrap() };
 
@@ -1206,13 +1209,14 @@ impl Uat {
         cfg: &'static hw::HwConfig,
         map_kernel_to_user: bool,
         bst: bindings::bus_space_tag_t,
+        node: i32,
     ) -> Result<Self> {
         dev_info!(dev, "MMU: Initializing...\n");
 
-        let inner = Self::make_inner(dev, bst)?;
+        let inner = Self::make_inner(dev, bst, node)?;
 
         let pagetables_rgn =
-            Self::map_region(dev, c_str!("pagetables"), PAGETABLES_SIZE, true, bst)?;
+            Self::map_region(dev, c_str!("pagetables"), PAGETABLES_SIZE, true, bst, node)?;
 
         dev_info!(dev, "MMU: Creating kernel page tables\n");
         let kernel_lower_vm = Vm::new(dev, inner.clone(), cfg, false, 1, 0)?;
@@ -1220,8 +1224,8 @@ impl Uat {
 
         dev_info!(dev, "MMU: Kernel page tables created\n");
 
-        let ttb0 = kernel_lower_vm.ttb();
-        let ttb1 = kernel_vm.ttb();
+        // let ttb0 = kernel_lower_vm.ttb();
+        // let ttb1 = kernel_vm.ttb();
 
         let uat = Self {
             dev: dev.into(),
@@ -1251,7 +1255,7 @@ impl Uat {
 
         inner.handoff().lock();
 
-        let ttbs = inner.ttbs();
+        /*let ttbs = inner.ttbs();
 
         ttbs[0].ttb0.store(ttb0 | TTBR_VALID, Ordering::Relaxed);
         ttbs[0]
@@ -1261,13 +1265,13 @@ impl Uat {
         for ctx in &ttbs[1..] {
             ctx.ttb0.store(0, Ordering::Relaxed);
             ctx.ttb1.store(0, Ordering::Relaxed);
-        }
+        }*/
 
         inner.handoff().unlock();
 
         core::mem::drop(inner);
 
-        uat.kpt0()[2].store(ttb1 | PTE_TABLE, Ordering::Relaxed);
+        // uat.kpt0()[2].store(ttb1 | PTE_TABLE, Ordering::Relaxed);
 
         dev_info!(dev, "MMU: initialized\n");
 

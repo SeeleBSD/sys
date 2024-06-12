@@ -3,11 +3,15 @@ rust_common_flags :=	--edition=2021 \
 
 rust_depfile =		rust.d
 
-RSFLAGS := 		$(rust_common_flags) \
-			-O \
+RSFLAGS := 		$(rust_common_flags) -O \
 			--target=$(RUSTC_TARGET) \
 			-Ccodegen-units=1 \
-			-Cforce-unwind-tables=n
+			-Cforce-unwind-tables=n \
+			-Clto=n \
+			-Cembed-bitcode=n \
+			-Csymbol-mangling-version=v0 \
+			-Crelocation-model=static \
+			-Zfunction-sections=n
 		    
 rustc_sysroot := $(shell $(RUSTC) --print sysroot)
 RUST_LIB_SRC ?= /usr/local/lib/rustlib/src/rust/library

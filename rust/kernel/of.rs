@@ -49,6 +49,15 @@ impl Node {
         }
     }
 
+    pub fn from_node(node: i32) -> Option<Node> {
+        let rnode = node as usize as *mut bindings::device_node;
+        if rnode.is_null() {
+            None
+        } else {
+            Some(Node { raw_node: rnode })
+        }
+    }
+
     pub fn from_handle(handle: i32) -> Option<Node> {
         let node = unsafe {
             (bindings::fdt_get().header as *mut core::ffi::c_char).offset(handle as isize)
@@ -88,7 +97,7 @@ impl Node {
 
     pub fn child(&self) -> NodeIter {
         NodeIter {
-            curr: self.raw_node,
+            curr: unsafe { bindings::fdt_child_node(self.raw_node as *mut _) },
             is_halt: false,
             is_first: true,
         }

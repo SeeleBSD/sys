@@ -113,35 +113,36 @@ pub extern "C" fn asahidrm_attach(
     dbg!("started cpu");
 
     let node = of::Node::from_handle(unsafe { (*faa).fa_node }).unwrap();
+    // let node = dev.of_node().unwrap();
     let compat: Vec<u32> = node
         .get_property(c_str!("apple,firmware-compat"))
         .expect("Failed to get compat");
     dbg!("get property");
 
-    let rdev = dev.raw_device();
-    let dnode = unsafe { bindings::__of_devnode((*rdev).dv_cfdata as *mut core::ffi::c_void) };
-    dbg!("{}", unsafe { CStr::from_char_ptr((*dnode).full_name) });
+    // let rdev = dev.raw_device();
+    // let dnode = unsafe { bindings::__of_devnode((*rdev).dv_cfdata as *mut core::ffi::c_void) };
+    // dbg!("{}", unsafe { CStr::from_char_ptr((*dnode).full_name) });
     let gpu = unsafe {
         match (cfg.gpu_gen, cfg.gpu_variant, compat.as_slice()) {
             (hw::GpuGen::G13, _, &[12, 3, 0]) => {
-                gpu::GpuManagerG13V12_3::new(reg.device(), &res, cfg, (*sc).sc_iot).unwrap()
-                    as Arc<dyn gpu::GpuManager>
+                gpu::GpuManagerG13V12_3::new(reg.device(), &res, cfg, (*sc).sc_iot, (*sc).sc_node)
+                    .unwrap() as Arc<dyn gpu::GpuManager>
             }
             (hw::GpuGen::G14, hw::GpuVariant::G, &[12, 4, 0]) => {
-                gpu::GpuManagerG14V12_4::new(reg.device(), &res, cfg, (*sc).sc_iot).unwrap()
-                    as Arc<dyn gpu::GpuManager>
+                gpu::GpuManagerG14V12_4::new(reg.device(), &res, cfg, (*sc).sc_iot, (*sc).sc_node)
+                    .unwrap() as Arc<dyn gpu::GpuManager>
             }
             (hw::GpuGen::G13, _, &[13, 5, 0]) => {
-                gpu::GpuManagerG13V13_5::new(reg.device(), &res, cfg, (*sc).sc_iot).unwrap()
-                    as Arc<dyn gpu::GpuManager>
+                gpu::GpuManagerG13V13_5::new(reg.device(), &res, cfg, (*sc).sc_iot, (*sc).sc_node)
+                    .unwrap() as Arc<dyn gpu::GpuManager>
             }
             (hw::GpuGen::G14, hw::GpuVariant::G, &[13, 5, 0]) => {
-                gpu::GpuManagerG14V13_5::new(reg.device(), &res, cfg, (*sc).sc_iot).unwrap()
-                    as Arc<dyn gpu::GpuManager>
+                gpu::GpuManagerG14V13_5::new(reg.device(), &res, cfg, (*sc).sc_iot, (*sc).sc_node)
+                    .unwrap() as Arc<dyn gpu::GpuManager>
             }
             (hw::GpuGen::G14, _, &[13, 5, 0]) => {
-                gpu::GpuManagerG14XV13_5::new(reg.device(), &res, cfg, (*sc).sc_iot).unwrap()
-                    as Arc<dyn gpu::GpuManager>
+                gpu::GpuManagerG14XV13_5::new(reg.device(), &res, cfg, (*sc).sc_iot, (*sc).sc_node)
+                    .unwrap() as Arc<dyn gpu::GpuManager>
             }
             _ => {
                 dev_info!(

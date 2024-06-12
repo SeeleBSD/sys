@@ -21,6 +21,7 @@ use kernel::{
     device::RawDevice,
     error::code::*,
     macros::versions,
+    platform,
     prelude::*,
     soc::apple::rtkit,
     sync::{
@@ -360,9 +361,10 @@ impl GpuManager::ver {
         res: &regs::Resources,
         cfg: &'static hw::HwConfig,
         bst: bindings::bus_space_tag_t,
+        node: i32,
     ) -> Result<Arc<GpuManager::ver>> {
-        let uat = Self::make_uat(dev, cfg, bst)?;
-        let dyncfg = Self::make_dyncfg(dev, res, cfg, &uat)?;
+        let uat = Self::make_uat(dev, cfg, bst, node)?;
+        let dyncfg = Self::make_dyncfg(dev, res, cfg, &uat, node)?;
 
         let mut alloc = KernelAllocators {
             private: alloc::DefaultAllocator::new(
@@ -600,6 +602,7 @@ impl GpuManager::ver {
         dev: &AsahiDevice,
         cfg: &'static hw::HwConfig,
         bst: bindings::bus_space_tag_t,
+        node: i32,
     ) -> Result<Box<mmu::Uat>> {
         // G14X has a new thing in the Scene structure that unfortunately requires
         // write access from user contexts. Hopefully it's not security-sensitive.
@@ -608,7 +611,13 @@ impl GpuManager::ver {
         #[ver(G < G14X)]
         let map_kernel_to_user = false;
 
-        Ok(Box::new(mmu::Uat::new(dev, cfg, map_kernel_to_user, bst)?))
+        Ok(Box::new(mmu::Uat::new(
+            dev,
+            cfg,
+            map_kernel_to_user,
+            bst,
+            node,
+        )?))
     }
 
     /// Actually create the final GpuManager instance, as a UniqueArc.
@@ -702,6 +711,7 @@ impl GpuManager::ver {
         res: &regs::Resources,
         cfg: &'static hw::HwConfig,
         uat: &mmu::Uat,
+        node: i32,
     ) -> Result<Box<hw::DynConfig>> {
         let gpu_id = res.get_gpu_id()?;
 
@@ -735,7 +745,7 @@ impl GpuManager::ver {
         dev_info!(dev, "  Active cores: {}\n", gpu_id.total_active_cores);
 
         dev_info!(dev, "Getting configuration from device tree...\n");
-        let pwr_cfg = hw::PwrConfig::load(dev, cfg)?;
+        let pwr_cfg = hw::PwrConfig::load(dev, cfg, node)?;
         dev_info!(dev, "Dynamic configuration fetched\n");
 
         if gpu_id.gpu_gen != cfg.gpu_gen || gpu_id.gpu_variant != cfg.gpu_variant {
