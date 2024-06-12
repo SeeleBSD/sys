@@ -106,13 +106,16 @@ pub extern "C" fn asahidrm_attach(
     info!("{}", unsafe { (*sc).sc_dev.num_resources });
     let res = regs::Resources::new(&mut pdev).expect("Failed to create res");
 
+    dbg!("variables init");
     res.init_mmio().ok();
     res.start_cpu().ok();
+    dbg!("started cpu");
 
-    let node = dev.of_node().unwrap();
+    let node = of::Node::from_handle(unsafe { (*faa).fa_node }).unwrap();
     let compat: Vec<u32> = node
         .get_property(c_str!("apple,firmware-compat"))
         .expect("Failed to get compat");
+    dbg!("get property");
 
     let gpu = unsafe {
         match (cfg.gpu_gen, cfg.gpu_variant, compat.as_slice()) {
@@ -148,6 +151,7 @@ pub extern "C" fn asahidrm_attach(
             }
         }
     };
+    dbg!("get gpu manager");
 
     gpu.init().ok();
 

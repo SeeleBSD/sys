@@ -50,8 +50,9 @@ impl Node {
     }
 
     pub fn from_handle(handle: i32) -> Option<Node> {
-        let node = (unsafe { bindings::fdt_get().header.addr() } + (handle as usize))
-            as *mut bindings::device_node;
+        let node = unsafe {
+            (bindings::fdt_get().header as *mut core::ffi::c_char).offset(handle as isize)
+        } as *mut bindings::device_node;
         if node.is_null() {
             None
         } else {
@@ -74,7 +75,11 @@ impl Node {
     }
 
     pub fn handle(&self) -> i32 {
-        (self.raw_node.addr() - unsafe { bindings::fdt_get().header.addr() }) as i32
+        unsafe {
+            (self.raw_node as *const core::ffi::c_char)
+                .offset_from(bindings::fdt_get().header as *const core::ffi::c_char)
+                as i32
+        }
     }
 
     pub fn full_name(&self) -> &CStr {
@@ -109,7 +114,8 @@ impl Node {
     pub fn find_property(&self, name: &CStr) -> Option<Property> {
         unsafe {
             let len = bindings::OF_getproplen(self.handle(), name.as_char_ptr() as *mut i8);
-            let mut buf = vec![0u8; len as usize];
+            let mut buf = vec![0u8; (len + 1) as usize];
+            crate::dbg!("{}", len);
             if len
                 == bindings::OF_getprop(
                     self.handle(),
@@ -169,10 +175,10 @@ impl<T: PropertyUnit> TryFrom<Property> for Vec<T> {
     type Error = Error;
 
     fn try_from(prop: Property) -> core::result::Result<Vec<T>, Self::Error> {
-        if prop.len() % T::UNIT_SIZE == 0 {
+        if (prop.len() - 1) % T::UNIT_SIZE == 0 {
             let mut ret = vec![];
             let val = prop.value();
-            for i in (0..prop.len()).step_by(T::UNIT_SIZE) {
+            for i in (0..prop.len() - 1).step_by(T::UNIT_SIZE) {
                 ret.push(T::from_bytes(&val[i..i + T::UNIT_SIZE])?);
             }
             Ok(ret)

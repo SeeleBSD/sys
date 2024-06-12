@@ -204,7 +204,7 @@ impl Error {
             // SAFETY: The string returned by `errname` is static and `NUL`-terminated.
             Some(unsafe { CStr::from_char_ptr(ptr) })
         }*/
-        todo!()
+        None
     }
 
     /// Returns a string representing the error, if one exists.
