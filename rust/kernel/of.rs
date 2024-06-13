@@ -18,15 +18,20 @@ impl Iterator for NodeIter {
         } else {
             if self.is_first {
                 self.is_first = false;
+                crate::dbg!("1");
                 if self.curr.is_null() {
+                    crate::dbg!("2");
+                    self.is_halt = true;
                     None
                 } else {
+                    crate::dbg!("2");
                     unsafe { Node::from_raw(self.curr) }
                 }
             } else {
+                crate::dbg!("4");
+                let handle = self.curr as usize as i32;
                 self.curr = unsafe {
-                    bindings::fdt_next_node(self.curr as *mut core::ffi::c_void)
-                        as *mut bindings::device_node
+                    bindings::OF_peer(self.curr as usize as i32) as *mut bindings::device_node
                 };
                 self.is_halt = self.curr.is_null();
                 unsafe { Node::from_raw(self.curr) }
@@ -45,23 +50,13 @@ impl Node {
         if node.is_null() {
             None
         } else {
+            crate::dbg!("3");
             Some(Node { raw_node: node })
         }
     }
 
-    pub fn from_node(node: i32) -> Option<Node> {
-        let rnode = node as usize as *mut bindings::device_node;
-        if rnode.is_null() {
-            None
-        } else {
-            Some(Node { raw_node: rnode })
-        }
-    }
-
     pub fn from_handle(handle: i32) -> Option<Node> {
-        let node = unsafe {
-            (bindings::fdt_get().header as *mut core::ffi::c_char).offset(handle as isize)
-        } as *mut bindings::device_node;
+        let node = handle as usize as *mut bindings::device_node;
         if node.is_null() {
             None
         } else {
@@ -84,39 +79,37 @@ impl Node {
     }
 
     pub fn handle(&self) -> i32 {
-        unsafe {
-            (self.raw_node as *const core::ffi::c_char)
-                .offset_from(bindings::fdt_get().header as *const core::ffi::c_char)
-                as i32
-        }
+        unsafe { self.raw_node as usize as i32 }
     }
 
-    pub fn full_name(&self) -> &CStr {
-        unsafe { CStr::from_char_ptr(self.node().full_name) }
-    }
+    // pub fn full_name(&self) -> &CStr {
+    // unsafe { CStr::from_char_ptr(self.node().full_name) }
+    // }
 
     pub fn child(&self) -> NodeIter {
+        let handle = self.handle();
+        crate::dbg!("{}", unsafe { bindings::OF_child(handle) });
         NodeIter {
-            curr: unsafe { bindings::fdt_child_node(self.raw_node as *mut _) },
+            curr: unsafe { bindings::OF_child(handle) as usize as *mut _ },
             is_halt: false,
             is_first: true,
         }
     }
 
     pub fn parent(&self) -> Option<Self> {
-        let par = unsafe { bindings::fdt_parent_node(self.raw_node as *mut core::ffi::c_void) };
+        let handle = self.handle();
+        let par = unsafe { bindings::OF_parent(handle) as usize as *mut bindings::device_node };
         if par.is_null() {
             None
         } else {
-            Some(Self {
-                raw_node: par as *mut bindings::device_node,
-            })
+            Some(Self { raw_node: par })
         }
     }
 
     pub fn is_compatible(&self, name: &CStr) -> i32 {
         unsafe {
-            bindings::fdt_is_compatible(self.raw_node as *mut core::ffi::c_void, name.as_char_ptr())
+            let handle = self.handle();
+            bindings::OF_is_compatible(handle, name.as_char_ptr())
         }
     }
 

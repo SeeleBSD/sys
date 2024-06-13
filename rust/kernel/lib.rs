@@ -60,6 +60,11 @@ pub extern "C" fn __udivti3() -> ! {
     todo!()
 }
 
+#[no_mangle]
+pub extern "C" fn __umodti3() -> ! {
+    todo!()
+}
+
 #[panic_handler]
 fn panic(info: &core::panic::PanicInfo<'_>) -> ! {
     print!("{}\n", info);

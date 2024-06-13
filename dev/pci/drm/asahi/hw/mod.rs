@@ -473,6 +473,8 @@ pub(crate) struct PwrConfig {
     pub(crate) se_reset_criteria: u32,
 }
 
+use kernel::bindings;
+
 impl PwrConfig {
     fn load_opp(
         dev: &AsahiDevice,
@@ -483,11 +485,10 @@ impl PwrConfig {
     ) -> Result<Vec<PState>> {
         let mut perf_states = Vec::new();
 
-        let node = of::Node::from_node(node).ok_or(EIO)?;
+        let node = of::Node::from_handle(node).ok_or(EIO)?;
         let opps = node.parse_phandle(name, 0).ok_or(EIO)?;
 
         for opp in opps.child() {
-            dbg!("asdf");
             let freq_hz: u64 = opp.get_property(c_str!("opp-hz"))?;
             let mut volt_uv: Vec<u32> = opp.get_property(c_str!("opp-microvolt"))?;
             let pwr_uw: u32 = if is_main {
@@ -512,11 +513,9 @@ impl PwrConfig {
                 return Err(EINVAL);
             }
 
-            dbg!("1");
             volt_uv.iter_mut().for_each(|a| *a /= 1000);
             let volt_mv = volt_uv;
 
-            dbg!("2");
             let pwr_mw = pwr_uw / 1000;
 
             perf_states.push(PState {
@@ -534,9 +533,9 @@ impl PwrConfig {
     }
 
     /// Load the GPU power configuration from the device tree.
-    pub(crate) fn load(dev: &AsahiDevice, cfg: &HwConfig, node_addr: i32) -> Result<PwrConfig> {
-        let perf_states = Self::load_opp(dev, c_str!("operating-points-v2"), cfg, true, node_addr)?;
-        let node = of::Node::from_node(node_addr).ok_or(EIO)?;
+    pub(crate) fn load(dev: &AsahiDevice, cfg: &HwConfig, handle: i32) -> Result<PwrConfig> {
+        let perf_states = Self::load_opp(dev, c_str!("operating-points-v2"), cfg, true, handle)?;
+        let node = of::Node::from_handle(handle).ok_or(EIO)?;
 
         macro_rules! prop {
             ($prop:expr, $default:expr) => {{
@@ -586,14 +585,8 @@ impl PwrConfig {
 
         let csafr = if cfg.has_csafr {
             Some(CsAfrPwrConfig {
-                perf_states_cs: Self::load_opp(dev, c_str!("apple,cs-opp"), cfg, false, node_addr)?,
-                perf_states_afr: Self::load_opp(
-                    dev,
-                    c_str!("apple,afr-opp"),
-                    cfg,
-                    false,
-                    node_addr,
-                )?,
+                perf_states_cs: Self::load_opp(dev, c_str!("apple,cs-opp"), cfg, false, handle)?,
+                perf_states_afr: Self::load_opp(dev, c_str!("apple,afr-opp"), cfg, false, handle)?,
                 leak_coef_cs: prop!("apple,cs-leak-coef"),
                 leak_coef_afr: prop!("apple,afr-leak-coef"),
                 min_sram_microvolt: prop!("apple,csafr-min-sram-microvolt"),

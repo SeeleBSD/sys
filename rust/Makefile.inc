@@ -12,11 +12,11 @@ RSFLAGS := 		$(rust_common_flags) -O \
 			-Csymbol-mangling-version=v0 \
 			-Crelocation-model=static \
 			-Zfunction-sections=n
-		    
+			
 rustc_sysroot := $(shell $(RUSTC) --print sysroot)
 RUST_LIB_SRC ?= /usr/local/lib/rustlib/src/rust/library
 
-OBJS+=	core.o alloc.o bindings.o kernel.o
+OBJS+=	core.o alloc.o bindings.o kernel.o build_error.o
 
 bindgen_c_flags = ${CFLAGS} ${CPPFLAGS} ${PROF} -D__BINDGEN__ -w --target=$(BINDGEN_TARGET)
 
