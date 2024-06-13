@@ -10,6 +10,7 @@
 #![feature(alloc_error_handler)]
 #![feature(strict_provenance)]
 #![feature(duration_constants)]
+#![feature(lang_items)]
 
 extern crate self as kernel;
 
@@ -49,6 +50,33 @@ pub use macros;
 pub use uapi;
 
 const __LOG_PREFIX: &'static str = "rust_kernel";
+
+#[no_mangle]
+unsafe extern "C" fn _Unwind_Resume() {}
+
+#[lang = "eh_personality"]
+#[no_mangle]
+pub extern "C" fn rust_eh_personality() {}
+
+#[no_mangle]
+pub extern "C" fn __eqsf2() -> ! {
+    todo!()
+}
+
+#[no_mangle]
+pub extern "C" fn __nesf2() -> ! {
+    todo!()
+}
+
+#[no_mangle]
+pub extern "C" fn __unordsf2() -> ! {
+    todo!()
+}
+
+#[no_mangle]
+pub extern "C" fn __unorddf2() -> ! {
+    todo!()
+}
 
 #[no_mangle]
 pub extern "C" fn __muloti4() -> ! {

@@ -115,13 +115,13 @@ impl Node {
 
     pub fn find_property(&self, name: &CStr) -> Option<Property> {
         unsafe {
-            let len = bindings::OF_getproplen(self.handle(), name.as_char_ptr() as *mut i8);
+            let len = bindings::OF_getproplen(self.handle(), name.as_char_ptr() as *mut _);
             let mut buf = vec![0u8; (len + 1) as usize];
             crate::dbg!("{}", len);
             if len
                 == bindings::OF_getprop(
                     self.handle(),
-                    name.as_char_ptr() as *mut i8,
+                    name.as_char_ptr() as *mut _,
                     buf.as_mut_ptr() as *mut core::ffi::c_void,
                     len as i32,
                 )

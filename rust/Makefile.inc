@@ -12,7 +12,8 @@ RSFLAGS := 		$(rust_common_flags) -O \
 			-Csymbol-mangling-version=v0 \
 			-Crelocation-model=static \
 			-Zfunction-sections=n \
-			-Zemit-stack-sizes
+			-Zemit-stack-sizes \
+			-Ctarget-feature="-neon"
 			
 rustc_sysroot := $(shell $(RUSTC) --print sysroot)
 RUST_LIB_SRC ?= /usr/local/lib/rustlib/src/rust/library
