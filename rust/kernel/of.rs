@@ -18,17 +18,13 @@ impl Iterator for NodeIter {
         } else {
             if self.is_first {
                 self.is_first = false;
-                crate::dbg!("1");
                 if self.curr.is_null() {
-                    crate::dbg!("2");
                     self.is_halt = true;
                     None
                 } else {
-                    crate::dbg!("2");
                     unsafe { Node::from_raw(self.curr) }
                 }
             } else {
-                crate::dbg!("4");
                 let handle = self.curr as usize as i32;
                 self.curr = unsafe {
                     bindings::OF_peer(self.curr as usize as i32) as *mut bindings::device_node
@@ -50,7 +46,6 @@ impl Node {
         if node.is_null() {
             None
         } else {
-            crate::dbg!("3");
             Some(Node { raw_node: node })
         }
     }
@@ -117,7 +112,6 @@ impl Node {
         unsafe {
             let len = bindings::OF_getproplen(self.handle(), name.as_char_ptr() as *mut _);
             let mut buf = vec![0u8; (len + 1) as usize];
-            crate::dbg!("{}", len);
             if len
                 == bindings::OF_getprop(
                     self.handle(),
@@ -126,6 +120,7 @@ impl Node {
                     len as i32,
                 )
             {
+                buf.pop();
                 Some(Property::from_vec(buf))
             } else {
                 None
@@ -177,10 +172,10 @@ impl<T: PropertyUnit> TryFrom<Property> for Vec<T> {
     type Error = Error;
 
     fn try_from(prop: Property) -> core::result::Result<Vec<T>, Self::Error> {
-        if (prop.len() - 1) % T::UNIT_SIZE == 0 {
+        if prop.len() % T::UNIT_SIZE == 0 {
             let mut ret = vec![];
             let val = prop.value();
-            for i in (0..prop.len() - 1).step_by(T::UNIT_SIZE) {
+            for i in (0..prop.len()).step_by(T::UNIT_SIZE) {
                 ret.push(T::from_bytes(&val[i..i + T::UNIT_SIZE])?);
             }
             Ok(ret)
