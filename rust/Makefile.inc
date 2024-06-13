@@ -11,7 +11,8 @@ RSFLAGS := 		$(rust_common_flags) -O \
 			-Cembed-bitcode=n \
 			-Csymbol-mangling-version=v0 \
 			-Crelocation-model=static \
-			-Zfunction-sections=n
+			-Zfunction-sections=n \
+			-Zemit-stack-sizes
 			
 rustc_sysroot := $(shell $(RUSTC) --print sysroot)
 RUST_LIB_SRC ?= /usr/local/lib/rustlib/src/rust/library

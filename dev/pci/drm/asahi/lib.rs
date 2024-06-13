@@ -119,10 +119,7 @@ pub extern "C" fn asahidrm_attach(
         .expect("Failed to get compat");
     dbg!("get property");
 
-    // let rdev = dev.raw_device();
-    // let dnode = unsafe { bindings::__of_devnode((*rdev).dv_cfdata as *mut core::ffi::c_void) };
-    // dbg!("{}", unsafe { CStr::from_char_ptr((*dnode).full_name) });
-    /*let gpu = unsafe {
+    let gpu = unsafe {
         match (cfg.gpu_gen, cfg.gpu_variant, compat.as_slice()) {
             (hw::GpuGen::G13, _, &[12, 3, 0]) => {
                 gpu::GpuManagerG13V12_3::new(reg.device(), &res, cfg, (*sc).sc_iot, (*sc).sc_node)
@@ -158,7 +155,7 @@ pub extern "C" fn asahidrm_attach(
     };
     dbg!("get gpu manager");
 
-    gpu.init().ok();*/
+    gpu.init().ok();
 
     info!("attached!");
 }
