@@ -539,14 +539,17 @@ impl PwrConfig {
 
         macro_rules! prop {
             ($prop:expr, $default:expr) => {{
+                dbg!("Getting {}...", $prop);
                 node.get_opt_property(c_str!($prop))
                     .map_err(|e| {
-                        dev_err!(dev, "Error reading property {}: {:?}\n", $prop, e);
+                        dev_err!(dev, "Error reading property {}: {:?}\n", $prop, e,);
                         e
-                    })?
+                    })
+                    .unwrap_or(None)
                     .unwrap_or($default)
             }};
             ($prop:expr) => {{
+                dbg!("Getting {}...", $prop);
                 node.get_property(c_str!($prop)).map_err(|e| {
                     dev_err!(dev, "Error reading property {}: {:?}\n", $prop, e);
                     e
@@ -597,6 +600,7 @@ impl PwrConfig {
 
         let power_sample_period: u32 = prop!("apple,power-sample-period");
 
+        dbg!("end");
         Ok(PwrConfig {
             core_leak_coef,
             sram_leak_coef,

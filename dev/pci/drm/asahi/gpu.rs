@@ -21,7 +21,7 @@ use kernel::{
     device::RawDevice,
     error::code::*,
     macros::versions,
-    platform,
+    of, platform,
     prelude::*,
     soc::apple::rtkit,
     sync::{
@@ -796,7 +796,7 @@ impl GpuManager::ver {
             return Err(EIO);
         }
 
-        let node = dev.of_node().ok_or(EIO)?;
+        let node = of::Node::from_handle(node).ok_or(EIO)?;
 
         Ok(Box::new(hw::DynConfig {
             pwr: pwr_cfg,

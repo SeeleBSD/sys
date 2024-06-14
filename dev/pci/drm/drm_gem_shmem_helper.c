@@ -54,6 +54,7 @@ static const struct drm_gem_object_funcs drm_gem_shmem_funcs = {
 static struct drm_gem_shmem_object *
 __drm_gem_shmem_create(struct drm_device *dev, size_t size, bool private)
 {
+	printk("1");
 	struct drm_gem_shmem_object *shmem;
 	struct drm_gem_object *obj;
 	int ret = 0;
@@ -62,11 +63,15 @@ __drm_gem_shmem_create(struct drm_device *dev, size_t size, bool private)
 
 	if (dev->driver->gem_create_object) {
 		obj = dev->driver->gem_create_object(dev, size);
+		printk("2-1");
 		if (IS_ERR(obj))
 			return ERR_CAST(obj);
+		printk("2-2");
 		shmem = to_drm_gem_shmem_obj(obj);
+		printk("2-3");
 	} else {
 		shmem = kzalloc(sizeof(*shmem), GFP_KERNEL);
+		printk("2!");
 		if (!shmem)
 			return ERR_PTR(-ENOMEM);
 		obj = &shmem->base;
@@ -81,15 +86,16 @@ __drm_gem_shmem_create(struct drm_device *dev, size_t size, bool private)
 	} else {
 		ret = drm_gem_object_init(dev, obj, size);
 	}
+	printk("3");
 	if (ret) {
 		drm_gem_private_object_fini(obj);
 		goto err_free;
 	}
-
+	printk("4");
 	ret = drm_gem_create_mmap_offset(obj);
 	if (ret)
 		goto err_release;
-
+	printk("5");
 	INIT_LIST_HEAD(&shmem->madv_list);
 
 	if (!private) {
