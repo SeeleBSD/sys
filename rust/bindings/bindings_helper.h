@@ -56,6 +56,8 @@
 #include <linux/printk.h>
 #include <linux/gfp_types.h>
 
+int drm_gem_init(struct drm_device *);
+
 #define IS_ERR_VALUE(x) unlikely((x) >= (unsigned long)-ELAST)
 
 void *

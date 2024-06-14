@@ -201,7 +201,7 @@ macro_rules! drm_device_register {
 }
 
 impl<T: Driver> Registration<T> {
-    const VTABLE: bindings::drm_driver = drm_legacy_fields! {
+    pub const VTABLE: bindings::drm_driver = drm_legacy_fields! {
         load: None,
         open: Some(drm::file::open_callback::<T::File>),
         postclose: Some(drm::file::postclose_callback::<T::File>),
@@ -231,6 +231,10 @@ impl<T: Driver> Registration<T> {
         ioctls: T::IOCTLS.as_ptr(),
         num_ioctls: T::IOCTLS.len() as i32,
         fops: core::ptr::null_mut(),
+
+        gem_fault: None,
+        gem_size: 0,
+        mmap: None,
     };
 
     /// Creates a new [`Registration`] but does not register it yet.

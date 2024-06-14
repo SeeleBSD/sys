@@ -62,6 +62,7 @@ __drm_gem_shmem_create(struct drm_device *dev, size_t size, bool private)
 	size = PAGE_ALIGN(size);
 
 	if (dev->driver->gem_create_object) {
+		printk("2");
 		obj = dev->driver->gem_create_object(dev, size);
 		printk("2-1");
 		if (IS_ERR(obj))

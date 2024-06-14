@@ -143,7 +143,9 @@ impl ObjectRef {
             }
         }
 
+        dbg!("1");
         let sgt = self.gem.sg_table()?;
+        dbg!("2");
         let new_mapping =
             vm.map_in_range(self.gem.size(), sgt, alignment, start, end, prot, guard)?;
 

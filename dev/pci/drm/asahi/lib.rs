@@ -92,7 +92,22 @@ pub extern "C" fn asahidrm_attach(
 
     unsafe {
         (*sc).sc_dev.faa = faa;
-        bindings::platform_device_register(&mut (*sc).sc_dev as *mut bindings::platform_device);
+        (*sc).sc_ddev.driver = &drm::drv::Registration::<AsahiDriver>::VTABLE as *const _ as *mut _;
+        (*sc).sc_ddev.managed.resources.next = &mut (*sc).sc_ddev.managed.resources as *mut _;
+        (*sc).sc_ddev.managed.resources.prev = &mut (*sc).sc_ddev.managed.resources as *mut _;
+        bindings::__mtx_init(
+            &mut (*sc).sc_ddev.managed.lock as *mut _,
+            bindings::IPL_VM as i32,
+        );
+        bindings::drm_gem_init(&mut (*sc).sc_ddev as *mut _);
+        bindings::platform_device_register(&mut (*sc).sc_dev as *mut _);
+        /*bindings::drm_attach_platform(
+            &drm::drv::Registration::<AsahiDriver>::VTABLE as *const _ as *mut _,
+            (*sc).sc_iot,
+            (*sc).sc_dmat,
+            _self,
+            &mut (*sc).sc_ddev as *mut _,
+        );*/
     }
 
     let cfg = unsafe { INFO.expect("No GPU information!") };
