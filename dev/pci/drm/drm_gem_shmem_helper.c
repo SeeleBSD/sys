@@ -184,7 +184,47 @@ static int drm_gem_shmem_get_pages(struct drm_gem_shmem_object *shmem)
 	if (shmem->pages_use_count++ > 0)
 		return 0;
 
+#ifdef __linux__
 	pages = drm_gem_get_pages(obj);
+#else
+	long npages = obj->size >> PAGE_SHIFT;
+	pages = kvmalloc_array(npages, sizeof(struct vm_page *), GFP_KERNEL);
+	if (pages == NULL)
+		pages = ERR_PTR(-ENOMEM);
+	else {
+		for (long i = 0; i < npages; i++) {
+			struct vm_page *page;
+			struct pglist plist;
+			struct scatterlist *sg;
+			struct sg_table *st = kmalloc(sizeof(struct sg_table), GFP_KERNEL);
+			unsigned int page_count;
+			page_count = shmem->base.size / PAGE_SIZE;
+			if (sg_alloc_table(st, page_count, GFP_KERNEL | __GFP_NOWARN))
+				return -ENOMEM;
+			TAILQ_INIT(&plist);
+			sg = st->sgl;
+			st->nents = 0;
+			if (uvm_obj_wire(shmem->base.uao, 0, shmem->base.size, &plist)) {
+				sg_free_table(st);
+				kfree(st);
+				return -ENOMEM;
+			}
+			long j = 0;
+			TAILQ_FOREACH(page, &plist, pageq) {
+				if (j)
+					sg = sg_next(sg);
+				st->nents++;
+				sg_set_page(sg, page, PAGE_SIZE, 0);
+				j++;
+			}
+			pages[i] = page;
+if (sg) /* loop terminated early; short sg table */
+			sg_mark_end(sg);
+		
+sg_free_table(st);
+				kfree(st);		}
+	}
+#endif
 	if (IS_ERR(pages)) {
 		drm_dbg_kms(obj->dev, "Failed to get pages (%ld)\n",
 			    PTR_ERR(pages));
