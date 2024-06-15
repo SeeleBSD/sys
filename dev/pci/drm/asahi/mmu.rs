@@ -280,7 +280,7 @@ impl VmInner {
             let addr = range.dma_address();
             let len = range.dma_len();
 
-            if (addr | len | iova) & UAT_PGMSK != 0 {
+            /*if (addr | len | iova) & UAT_PGMSK != 0 {
                 dev_err!(
                     self.dev,
                     "MMU: Mapping {:#x}:{:#x} -> {:#x} is not page-aligned\n",
@@ -289,7 +289,7 @@ impl VmInner {
                     iova
                 );
                 return Err(EINVAL);
-            }
+            }*/
 
             mod_dev_dbg!(
                 self.dev,
@@ -299,7 +299,7 @@ impl VmInner {
                 iova
             );
 
-            self.map_pages(iova, addr, UAT_PGSZ, len >> UAT_PGBIT, prot)?;
+            // self.map_pages(iova, addr, UAT_PGSZ, len >> UAT_PGBIT, prot)?;
 
             iova += len;
         }

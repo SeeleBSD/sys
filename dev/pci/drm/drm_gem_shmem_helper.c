@@ -192,37 +192,35 @@ static int drm_gem_shmem_get_pages(struct drm_gem_shmem_object *shmem)
 	if (pages == NULL)
 		pages = ERR_PTR(-ENOMEM);
 	else {
-		for (long i = 0; i < npages; i++) {
-			struct vm_page *page;
-			struct pglist plist;
-			struct scatterlist *sg;
-			struct sg_table *st = kmalloc(sizeof(struct sg_table), GFP_KERNEL);
-			unsigned int page_count;
-			page_count = shmem->base.size / PAGE_SIZE;
-			if (sg_alloc_table(st, page_count, GFP_KERNEL | __GFP_NOWARN))
-				return -ENOMEM;
-			TAILQ_INIT(&plist);
-			sg = st->sgl;
-			st->nents = 0;
-			if (uvm_obj_wire(shmem->base.uao, 0, shmem->base.size, &plist)) {
-				sg_free_table(st);
-				kfree(st);
-				return -ENOMEM;
-			}
-			long j = 0;
-			TAILQ_FOREACH(page, &plist, pageq) {
-				if (j)
-					sg = sg_next(sg);
-				st->nents++;
-				sg_set_page(sg, page, PAGE_SIZE, 0);
-				j++;
-			}
+		struct vm_page *page;
+		struct pglist plist;
+		struct scatterlist *sg;
+		struct sg_table *st = kmalloc(sizeof(struct sg_table), GFP_KERNEL);
+		if (sg_alloc_table(st, npages, GFP_KERNEL | __GFP_NOWARN))
+			return -ENOMEM;
+		TAILQ_INIT(&plist);
+		sg = st->sgl;
+		st->nents = 0;
+		if (uvm_obj_wire(shmem->base.uao, 0, shmem->base.size, &plist)) {
+			sg_free_table(st);
+			kfree(st);
+			return -ENOMEM;
+		}
+		long i = 0;
+		TAILQ_FOREACH(page, &plist, pageq) {
+			if (i)
+				sg = sg_next(sg);
+			st->nents++;
+			sg_set_page(sg, page, PAGE_SIZE, 0);
 			pages[i] = page;
-if (sg) /* loop terminated early; short sg table */
+			i++;
+		}
+		printk("%ld %ld\n", st->nents, npages);
+		if (sg)
 			sg_mark_end(sg);
-		
-sg_free_table(st);
-				kfree(st);		}
+		shmem->sgt = st;
+// sg_free_table(st);
+				// kfree(st);
 	}
 #endif
 	if (IS_ERR(pages)) {
@@ -759,26 +757,26 @@ static struct sg_table *drm_gem_shmem_get_pages_sgt_locked(struct drm_gem_shmem_
 	if (ret)
 		return ERR_PTR(ret);
 
-	sgt = drm_gem_shmem_get_sg_table(shmem);
-	if (IS_ERR(sgt)) {
-		ret = PTR_ERR(sgt);
-		goto err_put_pages;
-	}
+	// sgt = drm_gem_shmem_get_sg_table(shmem);
+	// if (IS_ERR(sgt)) {
+		// ret = PTR_ERR(sgt);
+		// goto err_put_pages;
+	// }
 	/* Map the pages for use by the h/w. */
 	// ret = dma_map_sgtable(obj->dev->dev, sgt, DMA_BIDIRECTIONAL, 0);
-	if (ret)
-		goto err_free_sgt;
+	// if (ret)
+		// goto err_free_sgt;
 
-	shmem->sgt = sgt;
+	// shmem->sgt = sgt;
 
-	return sgt;
+	return shmem->sgt;
 
-err_free_sgt:
-	sg_free_table(sgt);
-	kfree(sgt);
-err_put_pages:
-	drm_gem_shmem_put_pages(shmem);
-	return ERR_PTR(ret);
+// err_free_sgt:
+	// sg_free_table(sgt);
+	// kfree(sgt);
+// err_put_pages:
+	// drm_gem_shmem_put_pages(shmem);
+	// return ERR_PTR(ret);
 }
 
 /**
