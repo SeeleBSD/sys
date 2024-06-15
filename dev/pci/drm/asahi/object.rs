@@ -638,9 +638,10 @@ impl<T: Default, U: Allocation<T>> GpuArray<T, U> {
         let p = alloc.ptr().ok_or(EINVAL)?.as_ptr();
         let inner = GpuOnlyArray::new(alloc, count)?;
         let mut pi = p;
-        for _i in 0..count {
+        for i in 0..count {
             // SAFETY: `pi` is valid per the Allocation type invariant, and GpuOnlyArray guarantees
             // that it can never iterate beyond the buffer length.
+            dbg!("{}", i);
             unsafe {
                 pi.write(Default::default());
                 pi = pi.add(1);
