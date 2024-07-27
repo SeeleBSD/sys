@@ -239,20 +239,32 @@ impl VmInner {
         pgcount: usize,
         prot: u32,
     ) -> Result<usize> {
-        /*let mut left = pgcount;
+        let mut left = pgcount;
         while left > 0 {
-            let mapped_iova = self.map_iova(iova, pgsize * left)?;
-            let mapped = self
-                .page_table
-                .map_pages(mapped_iova, paddr, pgsize, left, prot)?;
-            assert!(mapped <= left * pgsize);
+            let mapped_iova = self.map_iova(iova, bindings::PAGE_SIZE as usize * left)?;
+            let mapped = unsafe {
+                bindings::pmap_enter(
+                    crate::PMAP,
+                    iova as u64,
+                    paddr as u64,
+                    prot as i32,
+                    ((prot as u32) | bindings::PMAP_WIRED) as i32,
+                )
+            };
 
-            left -= mapped / pgsize;
-            paddr += mapped;
-            iova += mapped;
+            if mapped != 0 {
+                return Err(Error::from_errno(mapped as _));
+            }
+
+            left -= 1;
+            paddr += bindings::PAGE_SIZE as usize;
+            iova += bindings::PAGE_SIZE as usize;
         }
-        Ok(pgcount * pgsize)*/
-        todo!()
+        unsafe {
+            bindings::pmap_update(crate::PMAP);
+        }
+
+        Ok(pgcount * bindings::PAGE_SIZE as usize)
     }
 
     /// Unmap a contiguous range of pages.
@@ -299,7 +311,7 @@ impl VmInner {
                 iova
             );
 
-            // self.map_pages(iova, addr, UAT_PGSZ, len >> UAT_PGBIT, prot)?;
+            self.map_pages(iova, addr, UAT_PGSZ, len >> UAT_PGBIT, prot)?;
 
             iova += len;
         }

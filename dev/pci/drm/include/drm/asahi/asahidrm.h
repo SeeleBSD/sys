@@ -38,6 +38,8 @@ struct asahidrm_softc {
 
 	int			sc_burner_fblank;
 	struct task		sc_burner_task;
+
+	pmap_t sc_pm;
 };
 
 

@@ -44,6 +44,7 @@ use crate::hw::HwConfig;
 const INITIAL_TVB_SIZE: usize = 0x8;
 const __LOG_PREFIX: &'static str = "asahidrm";
 static mut INFO: Option<&'static HwConfig> = None;
+static mut PMAP: bindings::pmap_t = core::ptr::null_mut();
 
 id_table! { ASAHI_ID_TABLE, &'static hw::HwConfig, [
     (c_str!("apple,agx-t8103"), Some(&hw::t8103::HWCONFIG)),
@@ -91,6 +92,8 @@ pub extern "C" fn asahidrm_attach(
     print!("\n");
 
     unsafe {
+        (*sc).sc_pm = bindings::pmap_create();
+        PMAP = (*sc).sc_pm;
         (*sc).sc_dev.faa = faa;
         (*sc).sc_ddev.driver = &drm::drv::Registration::<AsahiDriver>::VTABLE as *const _ as *mut _;
         (*sc).sc_ddev.managed.resources.next = &mut (*sc).sc_ddev.managed.resources as *mut _;
@@ -134,27 +137,27 @@ pub extern "C" fn asahidrm_attach(
         .expect("Failed to get compat");
     dbg!("get property");
 
-    let gpu = unsafe {
+    /*    let gpu = unsafe {
         match (cfg.gpu_gen, cfg.gpu_variant, compat.as_slice()) {
             (hw::GpuGen::G13, _, &[12, 3, 0]) => {
-                gpu::GpuManagerG13V12_3::new(reg.device(), &res, cfg, (*sc).sc_iot, (*sc).sc_node)
-                    .unwrap() as Arc<dyn gpu::GpuManager>
+                gpu::GpuManagerG13V12_3::new(reg.device(), &res, cfg, sc).unwrap()
+                    as Arc<dyn gpu::GpuManager>
             }
             (hw::GpuGen::G14, hw::GpuVariant::G, &[12, 4, 0]) => {
-                gpu::GpuManagerG14V12_4::new(reg.device(), &res, cfg, (*sc).sc_iot, (*sc).sc_node)
-                    .unwrap() as Arc<dyn gpu::GpuManager>
+                gpu::GpuManagerG14V12_4::new(reg.device(), &res, cfg, sc).unwrap()
+                    as Arc<dyn gpu::GpuManager>
             }
             (hw::GpuGen::G13, _, &[13, 5, 0]) => {
-                gpu::GpuManagerG13V13_5::new(reg.device(), &res, cfg, (*sc).sc_iot, (*sc).sc_node)
-                    .unwrap() as Arc<dyn gpu::GpuManager>
+                gpu::GpuManagerG13V13_5::new(reg.device(), &res, cfg, sc).unwrap()
+                    as Arc<dyn gpu::GpuManager>
             }
             (hw::GpuGen::G14, hw::GpuVariant::G, &[13, 5, 0]) => {
-                gpu::GpuManagerG14V13_5::new(reg.device(), &res, cfg, (*sc).sc_iot, (*sc).sc_node)
-                    .unwrap() as Arc<dyn gpu::GpuManager>
+                gpu::GpuManagerG14V13_5::new(reg.device(), &res, cfg, sc).unwrap()
+                    as Arc<dyn gpu::GpuManager>
             }
             (hw::GpuGen::G14, _, &[13, 5, 0]) => {
-                gpu::GpuManagerG14XV13_5::new(reg.device(), &res, cfg, (*sc).sc_iot, (*sc).sc_node)
-                    .unwrap() as Arc<dyn gpu::GpuManager>
+                gpu::GpuManagerG14XV13_5::new(reg.device(), &res, cfg, sc).unwrap()
+                    as Arc<dyn gpu::GpuManager>
             }
             _ => {
                 dev_info!(
@@ -170,7 +173,7 @@ pub extern "C" fn asahidrm_attach(
     };
     dbg!("get gpu manager");
 
-    gpu.init().ok();
+    gpu.init().ok();*/
 
     info!("attached!");
 }

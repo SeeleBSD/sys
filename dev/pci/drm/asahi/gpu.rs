@@ -360,11 +360,10 @@ impl GpuManager::ver {
         dev: &AsahiDevice,
         res: &regs::Resources,
         cfg: &'static hw::HwConfig,
-        bst: bindings::bus_space_tag_t,
-        node: i32,
+        softc: *mut bindings::asahidrm_softc,
     ) -> Result<Arc<GpuManager::ver>> {
-        let uat = Self::make_uat(dev, cfg, bst, node)?;
-        let dyncfg = Self::make_dyncfg(dev, res, cfg, &uat, node)?;
+        let uat = Self::make_uat(dev, cfg, softc)?;
+        let dyncfg = Self::make_dyncfg(dev, res, cfg, &uat, softc)?;
 
         let mut alloc = KernelAllocators {
             private: alloc::DefaultAllocator::new(
@@ -601,9 +600,10 @@ impl GpuManager::ver {
     fn make_uat(
         dev: &AsahiDevice,
         cfg: &'static hw::HwConfig,
-        bst: bindings::bus_space_tag_t,
-        node: i32,
+        softc: *mut bindings::asahidrm_softc,
     ) -> Result<Box<mmu::Uat>> {
+        let bst = unsafe { (*softc).sc_iot };
+        let node = unsafe { (*softc).sc_node };
         // G14X has a new thing in the Scene structure that unfortunately requires
         // write access from user contexts. Hopefully it's not security-sensitive.
         #[ver(G >= G14X)]
@@ -711,8 +711,10 @@ impl GpuManager::ver {
         res: &regs::Resources,
         cfg: &'static hw::HwConfig,
         uat: &mmu::Uat,
-        node: i32,
+        softc: *mut bindings::asahidrm_softc,
     ) -> Result<Box<hw::DynConfig>> {
+        let node = unsafe { (*softc).sc_node };
+
         let gpu_id = res.get_gpu_id()?;
 
         dev_info!(dev, "GPU Information:\n");

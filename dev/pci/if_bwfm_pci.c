@@ -348,6 +348,7 @@ static const struct pci_matchid bwfm_pci_devices[] = {
 	{ PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_BCM4371 },
 	{ PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_BCM4378 },
 	{ PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_BCM4387 },
+	{ PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_BCM4388 },
 };
 
 int
@@ -501,6 +502,12 @@ bwfm_pci_preinit(struct bwfm_softc *bwfm)
 		break;
 	case BRCM_CC_4387_CHIP_ID:
 		chip = "4387c2";
+		break;
+	case BRCM_CC_4388_CHIP_ID:
+		if (bwfm->sc_chip.ch_chiprev <= 3)
+			chip = "4388b0";
+		else
+			chip = "4388c0";
 		break;
 	default:
 		printf("%s: unknown firmware for chip %s\n",
@@ -1031,6 +1038,11 @@ bwfm_pci_read_otp(struct bwfm_pci_softc *sc)
 		coreid = BWFM_AGENT_CORE_GCI;
 		base = 0x113c;
 		words = 0x170;
+		break;
+	case BRCM_CC_4388_CHIP_ID:
+		coreid = BWFM_AGENT_CORE_GCI;
+		base = 0x115c;
+		words = 0x150;
 		break;
 	default:
 		return 0;
