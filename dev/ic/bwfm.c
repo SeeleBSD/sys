@@ -1580,6 +1580,7 @@ bwfm_chip_tcm_rambase(struct bwfm_softc *sc)
 	case BRCM_CC_4366_CHIP_ID:
 	case BRCM_CC_43664_CHIP_ID:
 	case BRCM_CC_43666_CHIP_ID:
+	case BRCM_CC_4388_CHIP_ID:
 		sc->sc_chip.ch_rambase = 0x200000;
 		break;
 	case BRCM_CC_4359_CHIP_ID:
