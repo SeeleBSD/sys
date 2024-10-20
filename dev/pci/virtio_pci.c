@@ -1,4 +1,4 @@
-/*	$OpenBSD: virtio_pci.c,v 1.36 2024/01/15 02:35:23 dv Exp $	*/
+/*	$OpenBSD: virtio_pci.c,v 1.43 2024/09/19 06:19:05 sf Exp $	*/
 /*	$NetBSD: virtio.c,v 1.3 2011/11/02 23:05:52 njoly Exp $	*/
 
 /*
@@ -53,6 +53,7 @@
 #define MAX_MSIX_VECS	8
 
 struct virtio_pci_softc;
+struct virtio_pci_attach_args;
 
 int		virtio_pci_match(struct device *, void *, void *);
 void		virtio_pci_attach(struct device *, struct device *, void *);
@@ -72,13 +73,15 @@ void		virtio_pci_write_device_config_4(struct virtio_softc *, int, uint32_t);
 void		virtio_pci_write_device_config_8(struct virtio_softc *, int, uint64_t);
 uint16_t	virtio_pci_read_queue_size(struct virtio_softc *, uint16_t);
 void		virtio_pci_setup_queue(struct virtio_softc *, struct virtqueue *, uint64_t);
+void		virtio_pci_setup_intrs(struct virtio_softc *);
+int		virtio_pci_get_status(struct virtio_softc *);
 void		virtio_pci_set_status(struct virtio_softc *, int);
 int		virtio_pci_negotiate_features(struct virtio_softc *, const struct virtio_feature_name *);
 int		virtio_pci_negotiate_features_10(struct virtio_softc *, const struct virtio_feature_name *);
 void		virtio_pci_set_msix_queue_vector(struct virtio_pci_softc *, uint32_t, uint16_t);
 void		virtio_pci_set_msix_config_vector(struct virtio_pci_softc *, uint16_t);
-int		virtio_pci_msix_establish(struct virtio_pci_softc *, struct pci_attach_args *, int, int (*)(void *), void *);
-int		virtio_pci_setup_msix(struct virtio_pci_softc *, struct pci_attach_args *, int);
+int		virtio_pci_msix_establish(struct virtio_pci_softc *, struct virtio_pci_attach_args *, int, int (*)(void *), void *);
+int		virtio_pci_setup_msix(struct virtio_pci_softc *, struct virtio_pci_attach_args *, int);
 void		virtio_pci_free_irqs(struct virtio_pci_softc *);
 int		virtio_pci_poll_intr(void *);
 int		virtio_pci_legacy_intr(void *);
@@ -95,6 +98,11 @@ enum irq_type {
 	IRQ_NO_MSIX,
 	IRQ_MSIX_SHARED, /* vec 0: config irq, vec 1 shared by all vqs */
 	IRQ_MSIX_PER_VQ, /* vec 0: config irq, vec n: irq of vq[n-1] */
+};
+
+struct virtio_pci_intr {
+	char	 name[16];
+	void	*ih;
 };
 
 struct virtio_pci_softc {
@@ -130,10 +138,17 @@ struct virtio_pci_softc {
 	bus_space_handle_t	sc_isr_ioh;
 	bus_size_t		sc_isr_iosize;
 
-	void			*sc_ih[MAX_MSIX_VECS];
+	struct virtio_pci_intr	*sc_intr;
+	int			sc_nintr;
 
 	enum irq_type		sc_irq_type;
 };
+
+struct virtio_pci_attach_args {
+	struct virtio_attach_args	 vpa_va;
+	struct pci_attach_args		*vpa_pa;
+};
+
 
 const struct cfattach virtio_pci_ca = {
 	sizeof(struct virtio_pci_softc),
@@ -143,7 +158,7 @@ const struct cfattach virtio_pci_ca = {
 	NULL
 };
 
-struct virtio_ops virtio_pci_ops = {
+const struct virtio_ops virtio_pci_ops = {
 	virtio_pci_kick,
 	virtio_pci_read_device_config_1,
 	virtio_pci_read_device_config_2,
@@ -155,13 +170,15 @@ struct virtio_ops virtio_pci_ops = {
 	virtio_pci_write_device_config_8,
 	virtio_pci_read_queue_size,
 	virtio_pci_setup_queue,
+	virtio_pci_setup_intrs,
+	virtio_pci_get_status,
 	virtio_pci_set_status,
 	virtio_pci_negotiate_features,
 	virtio_pci_poll_intr,
 };
 
-static inline
-uint64_t _cread(struct virtio_pci_softc *sc, unsigned off, unsigned size)
+static inline uint64_t
+_cread(struct virtio_pci_softc *sc, unsigned off, unsigned size)
 {
 	uint64_t val;
 	switch (size) {
@@ -256,23 +273,35 @@ virtio_pci_setup_queue(struct virtio_softc *vsc, struct virtqueue *vq,
 		bus_space_write_4(sc->sc_iot, sc->sc_ioh,
 		    VIRTIO_CONFIG_QUEUE_ADDRESS, addr / VIRTIO_PAGE_SIZE);
 	}
+}
 
-	/*
-	 * This path is only executed if this function is called after
-	 * the child's attach function has finished. In other cases,
-	 * it's done in virtio_pci_setup_msix().
-	 */
-	if (sc->sc_irq_type != IRQ_NO_MSIX) {
-		int vec = 1;
-		if (sc->sc_irq_type == IRQ_MSIX_PER_VQ)
-		       vec += vq->vq_index;
-		if (sc->sc_sc.sc_version_1) {
-			CWRITE(sc, queue_msix_vector, vec);
-		} else {
-			bus_space_write_2(sc->sc_iot, sc->sc_ioh,
-			    VIRTIO_MSI_QUEUE_VECTOR, vec);
-		}
+void
+virtio_pci_setup_intrs(struct virtio_softc *vsc)
+{
+	struct virtio_pci_softc *sc = (struct virtio_pci_softc *)vsc;
+	int i;
+
+	if (sc->sc_irq_type == IRQ_NO_MSIX)
+		return;
+
+	for (i = 0; i < vsc->sc_nvqs; i++) {
+		unsigned vec = vsc->sc_vqs[i].vq_intr_vec;
+		virtio_pci_set_msix_queue_vector(sc, i, vec);
 	}
+	if (vsc->sc_config_change)
+		virtio_pci_set_msix_config_vector(sc, 0);
+}
+
+int
+virtio_pci_get_status(struct virtio_softc *vsc)
+{
+	struct virtio_pci_softc *sc = (struct virtio_pci_softc *)vsc;
+
+	if (sc->sc_sc.sc_version_1)
+		return CREAD(sc, device_status);
+	else
+		return bus_space_read_1(sc->sc_iot, sc->sc_ioh,
+		    VIRTIO_CONFIG_DEVICE_STATUS);
 }
 
 void
@@ -563,6 +592,7 @@ virtio_pci_attach(struct device *parent, struct device *self, void *aux)
 	pcireg_t id;
 	char const *intrstr;
 	pci_intr_handle_t ih;
+	struct virtio_pci_attach_args vpa = { { 0 }, pa };
 
 	revision = PCI_REVISION(pa->pa_class);
 	switch (revision) {
@@ -594,6 +624,13 @@ virtio_pci_attach(struct device *parent, struct device *self, void *aux)
 	virtio_pci_dump_caps(sc);
 #endif
 
+	sc->sc_nintr = min(MAX_MSIX_VECS, pci_intr_msix_count(pa));
+	sc->sc_nintr = max(sc->sc_nintr, 1);
+	vpa.vpa_va.va_nintr = sc->sc_nintr;
+
+	sc->sc_intr = mallocarray(sc->sc_nintr, sizeof(*sc->sc_intr),
+	    M_DEVBUF, M_WAITOK | M_ZERO);
+
 	vsc->sc_ops = &virtio_pci_ops;
 	if ((vsc->sc_dev.dv_cfdata->cf_flags & VIRTIO_CF_NO_VERSION_1) == 0 &&
 	    (revision == 1 ||
@@ -606,22 +643,22 @@ virtio_pci_attach(struct device *parent, struct device *self, void *aux)
 	}
 	if (ret != 0) {
 		printf(": Cannot attach (%d)\n", ret);
-		return;
+		goto fail_0;
 	}
 
 	sc->sc_devcfg_offset = VIRTIO_CONFIG_DEVICE_CONFIG_NOMSI;
 	sc->sc_irq_type = IRQ_NO_MSIX;
 	if (virtio_pci_adjust_config_region(sc) != 0)
-		return;
+		goto fail_0;
 
 	virtio_device_reset(vsc);
 	virtio_set_status(vsc, VIRTIO_CONFIG_DEVICE_STATUS_ACK);
 	virtio_set_status(vsc, VIRTIO_CONFIG_DEVICE_STATUS_DRIVER);
 
 	printf("\n");
-	vsc->sc_childdevid = id;
+	vpa.vpa_va.va_devid = id;
 	vsc->sc_child = NULL;
-	config_found(self, sc, NULL);
+	config_found(self, &vpa, NULL);
 	if (vsc->sc_child == NULL) {
 		printf("%s: no matching child driver; not configured\n",
 		    vsc->sc_dev.dv_xname);
@@ -633,10 +670,10 @@ virtio_pci_attach(struct device *parent, struct device *self, void *aux)
 		goto fail_1;
 	}
 
-	if (virtio_pci_setup_msix(sc, pa, 0) == 0) {
+	if (virtio_pci_setup_msix(sc, &vpa, 0) == 0) {
 		sc->sc_irq_type = IRQ_MSIX_PER_VQ;
 		intrstr = "msix per-VQ";
-	} else if (virtio_pci_setup_msix(sc, pa, 1) == 0) {
+	} else if (virtio_pci_setup_msix(sc, &vpa, 1) == 0) {
 		sc->sc_irq_type = IRQ_MSIX_SHARED;
 		intrstr = "msix shared";
 	} else {
@@ -653,9 +690,10 @@ virtio_pci_attach(struct device *parent, struct device *self, void *aux)
 		 */
 		if (vsc->sc_ipl & IPL_MPSAFE)
 			ih_func = virtio_pci_legacy_intr_mpsafe;
-		sc->sc_ih[0] = pci_intr_establish(pc, ih, vsc->sc_ipl | IPL_MPSAFE,
-		    ih_func, sc, vsc->sc_dev.dv_xname);
-		if (sc->sc_ih[0] == NULL) {
+		sc->sc_intr[0].ih = pci_intr_establish(pc, ih,
+		    vsc->sc_ipl | IPL_MPSAFE, ih_func, sc,
+		    vsc->sc_child->dv_xname);
+		if (sc->sc_intr[0].ih == NULL) {
 			printf("%s: couldn't establish interrupt", vsc->sc_dev.dv_xname);
 			if (intrstr != NULL)
 				printf(" at %s", intrstr);
@@ -663,6 +701,7 @@ virtio_pci_attach(struct device *parent, struct device *self, void *aux)
 			goto fail_2;
 		}
 	}
+	virtio_pci_setup_intrs(vsc);
 	printf("%s: %s\n", vsc->sc_dev.dv_xname, intrstr);
 
 	return;
@@ -672,6 +711,8 @@ fail_2:
 fail_1:
 	/* no pci_mapreg_unmap() or pci_intr_unmap() */
 	virtio_set_status(vsc, VIRTIO_CONFIG_DEVICE_STATUS_FAILED);
+fail_0:
+	free(sc->sc_intr, M_DEVBUF, sc->sc_nintr * sizeof(*sc->sc_intr));
 }
 
 int
@@ -896,21 +937,26 @@ virtio_pci_write_device_config_8(struct virtio_softc *vsc,
 
 int
 virtio_pci_msix_establish(struct virtio_pci_softc *sc,
-    struct pci_attach_args *pa, int idx, int (*handler)(void *), void *ih_arg)
+    struct virtio_pci_attach_args *vpa, int idx,
+    int (*handler)(void *), void *ih_arg)
 {
 	struct virtio_softc *vsc = &sc->sc_sc;
 	pci_intr_handle_t ih;
 
-	if (pci_intr_map_msix(pa, idx, &ih) != 0) {
+	KASSERT(idx < sc->sc_nintr);
+
+	if (pci_intr_map_msix(vpa->vpa_pa, idx, &ih) != 0) {
 #if VIRTIO_DEBUG
 		printf("%s[%d]: pci_intr_map_msix failed\n",
 		    vsc->sc_dev.dv_xname, idx);
 #endif
 		return 1;
 	}
-	sc->sc_ih[idx] = pci_intr_establish(sc->sc_pc, ih, vsc->sc_ipl,
-	    handler, ih_arg, vsc->sc_dev.dv_xname);
-	if (sc->sc_ih[idx] == NULL) {
+	snprintf(sc->sc_intr[idx].name, sizeof(sc->sc_intr[idx].name), "%s:%d",
+	    vsc->sc_child->dv_xname, idx);
+	sc->sc_intr[idx].ih = pci_intr_establish(sc->sc_pc, ih, vsc->sc_ipl,
+	    handler, ih_arg, sc->sc_intr[idx].name);
+	if (sc->sc_intr[idx].ih == NULL) {
 		printf("%s[%d]: couldn't establish msix interrupt\n",
 		    vsc->sc_dev.dv_xname, idx);
 		return 1;
@@ -957,10 +1003,10 @@ virtio_pci_free_irqs(struct virtio_pci_softc *sc)
 		}
 	}
 
-	for (i = 0; i < MAX_MSIX_VECS; i++) {
-		if (sc->sc_ih[i]) {
-			pci_intr_disestablish(sc->sc_pc, sc->sc_ih[i]);
-			sc->sc_ih[i] = NULL;
+	for (i = 0; i < sc->sc_nintr; i++) {
+		if (sc->sc_intr[i].ih) {
+			pci_intr_disestablish(sc->sc_pc, sc->sc_intr[i].ih);
+			sc->sc_intr[i].ih = NULL;
 		}
 	}
 
@@ -969,40 +1015,39 @@ virtio_pci_free_irqs(struct virtio_pci_softc *sc)
 }
 
 int
-virtio_pci_setup_msix(struct virtio_pci_softc *sc, struct pci_attach_args *pa,
-    int shared)
+virtio_pci_setup_msix(struct virtio_pci_softc *sc,
+    struct virtio_pci_attach_args *vpa, int shared)
 {
 	struct virtio_softc *vsc = &sc->sc_sc;
 	int i;
 
 	/* Shared needs config + queue */
-	if (shared && pci_intr_msix_count(pa) < 1 + 1)
+	if (shared && vpa->vpa_va.va_nintr < 1 + 1)
 		return 1;
 	/* Per VQ needs config + N * queue */
-	if (!shared && pci_intr_msix_count(pa) < 1 + vsc->sc_nvqs)
+	if (!shared && vpa->vpa_va.va_nintr < 1 + vsc->sc_nvqs)
 		return 1;
 
-	if (virtio_pci_msix_establish(sc, pa, 0, virtio_pci_config_intr, vsc))
+	if (virtio_pci_msix_establish(sc, vpa, 0, virtio_pci_config_intr, vsc))
 		return 1;
 	sc->sc_devcfg_offset = VIRTIO_CONFIG_DEVICE_CONFIG_MSI;
 	virtio_pci_adjust_config_region(sc);
-	virtio_pci_set_msix_config_vector(sc, 0);
 
 	if (shared) {
-		if (virtio_pci_msix_establish(sc, pa, 1,
+		if (virtio_pci_msix_establish(sc, vpa, 1,
 		    virtio_pci_shared_queue_intr, vsc)) {
 			goto fail;
 		}
 
 		for (i = 0; i < vsc->sc_nvqs; i++)
-			virtio_pci_set_msix_queue_vector(sc, i, 1);
+			vsc->sc_vqs[i].vq_intr_vec = 1;
 	} else {
 		for (i = 0; i < vsc->sc_nvqs; i++) {
-			if (virtio_pci_msix_establish(sc, pa, i + 1,
+			if (virtio_pci_msix_establish(sc, vpa, i + 1,
 			    virtio_pci_queue_intr, &vsc->sc_vqs[i])) {
 				goto fail;
 			}
-			virtio_pci_set_msix_queue_vector(sc, i, i + 1);
+			vsc->sc_vqs[i].vq_intr_vec = i + 1;
 		}
 	}
 

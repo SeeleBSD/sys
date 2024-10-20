@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec_elf.h,v 1.103 2024/01/17 22:22:25 kurt Exp $	*/
+/*	$OpenBSD: exec_elf.h,v 1.105 2024/07/14 09:48:49 jca Exp $	*/
 /*
  * Copyright (c) 1995, 1996 Erik Theisen.  All rights reserved.
  *
@@ -675,9 +675,9 @@ typedef struct {
 
 struct elfcore_procinfo {
 	/* Version 1 fields start here. */
-	uint32_t	cpi_version;	/* netbsd_elfcore_procinfo version */
+	uint32_t	cpi_version;	/* elfcore_procinfo version */
 #define ELFCORE_PROCINFO_VERSION	1
-	uint32_t	cpi_cpisize;	/* sizeof(netbsd_elfcore_procinfo) */
+	uint32_t	cpi_cpisize;	/* sizeof(elfcore_procinfo) */
 	uint32_t	cpi_signo;	/* killing signal */
 	uint32_t	cpi_sigcode;	/* signal code */
 	uint32_t	cpi_sigpend;	/* pending signals */
@@ -727,6 +727,8 @@ enum AuxID {
 	AUX_base = 7,			/* base addr for ld.so or static PIE */
 	AUX_flags = 8,			/* processor flags */
 	AUX_entry = 9,			/* a.out entry */
+	AUX_hwcap = 25,			/* processor flags */
+	AUX_hwcap2 = 26,		/* processor flags (continued) */
 	AUX_sun_uid = 2000,		/* euid */
 	AUX_sun_ruid = 2001,		/* ruid */
 	AUX_sun_gid = 2002,		/* egid */
@@ -820,7 +822,7 @@ extern Elf_Dyn		_DYNAMIC[];
 /*
  * How many entries are in the AuxInfo array we pass to the process?
  */
-#define	ELF_AUX_ENTRIES	9
+#define	ELF_AUX_ENTRIES	11
 #define	ELF_AUX_WORDS	(sizeof(AuxInfo) * ELF_AUX_ENTRIES / sizeof(char *))
 
 struct exec_package;

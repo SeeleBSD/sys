@@ -1,4 +1,4 @@
-/*	$OpenBSD: bpf.c,v 1.222 2024/01/26 21:14:08 jan Exp $	*/
+/*	$OpenBSD: bpf.c,v 1.225 2024/08/15 12:20:20 dlg Exp $	*/
 /*	$NetBSD: bpf.c,v 1.33 1997/02/21 23:59:35 thorpej Exp $	*/
 
 /*
@@ -84,10 +84,15 @@
 #define PRINET  26			/* interruptible */
 
 /*
+ * Locks used to protect data:
+ *	a	atomic
+ */
+
+/*
  * The default read buffer size is patchable.
  */
-int bpf_bufsize = BPF_BUFSIZE;
-int bpf_maxbufsize = BPF_MAXBUFSIZE;
+int bpf_bufsize = BPF_BUFSIZE;		/* [a] */
+int bpf_maxbufsize = BPF_MAXBUFSIZE;	/* [a] */
 
 /*
  *  bpf_iflist is the list of interfaces; each corresponds to an ifnet
@@ -117,8 +122,6 @@ int	filt_bpfread(struct knote *, long);
 int	filt_bpfreadmodify(struct kevent *, struct knote *);
 int	filt_bpfreadprocess(struct knote *, struct kevent *);
 
-int	bpf_sysctl_locked(int *, u_int, void *, size_t *, void *, size_t);
-
 struct bpf_d *bpfilter_lookup(int);
 
 /*
@@ -136,9 +139,6 @@ void	bpf_d_smr(void *);
  */
 void	bpf_get(struct bpf_d *);
 void	bpf_put(struct bpf_d *);
-
-
-struct rwlock bpf_sysctl_lk = RWLOCK_INITIALIZER("bpfsz");
 
 int
 bpf_movein(struct uio *uio, struct bpf_d *d, struct mbuf **mp,
@@ -393,7 +393,7 @@ bpfopen(dev_t dev, int flag, int mode, struct proc *p)
 
 	/* Mark "free" and do most initialization. */
 	bd->bd_unit = unit;
-	bd->bd_bufsize = bpf_bufsize;
+	bd->bd_bufsize = atomic_load_int(&bpf_bufsize);
 	bd->bd_sig = SIGIO;
 	mtx_init(&bd->bd_mtx, IPL_NET);
 	task_set(&bd->bd_wake_task, bpf_wakeup_cb, bd);
@@ -731,6 +731,8 @@ bpf_set_wtimeout(struct bpf_d *d, const struct timeval *tv)
 		return (EINVAL);
 
 	nsec = TIMEVAL_TO_NSEC(tv);
+	if (nsec > SEC_TO_NSEC(300))
+		return (EINVAL);
 	if (nsec > MAXTSLP)
 		return (EOVERFLOW);
 
@@ -758,7 +760,8 @@ bpf_get_wtimeout(struct bpf_d *d, struct timeval *tv)
 /*
  *  FIONREAD		Check for read packet available.
  *  BIOCGBLEN		Get buffer len [for read()].
- *  BIOCSETF		Set ethernet read filter.
+ *  BIOCSETF		Set read filter.
+ *  BIOCSETFNR          Set read filter without resetting descriptor.
  *  BIOCFLUSH		Flush read packet buffer.
  *  BIOCPROMISC		Put interface into promiscuous mode.
  *  BIOCGDLTLIST	Get supported link layer types.
@@ -851,9 +854,11 @@ bpfioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct proc *p)
 			error = EINVAL;
 		else {
 			u_int size = *(u_int *)addr;
+			int bpf_maxbufsize_local =
+			    atomic_load_int(&bpf_maxbufsize);
 
-			if (size > bpf_maxbufsize)
-				*(u_int *)addr = size = bpf_maxbufsize;
+			if (size > bpf_maxbufsize_local)
+				*(u_int *)addr = size = bpf_maxbufsize_local;
 			else if (size < BPF_MINBUFSIZE)
 				*(u_int *)addr = size = BPF_MINBUFSIZE;
 			mtx_enter(&d->bd_mtx);
@@ -863,17 +868,12 @@ bpfioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct proc *p)
 		break;
 
 	/*
-	 * Set link layer read filter.
+	 * Set link layer read/write filter.
 	 */
 	case BIOCSETF:
-		error = bpf_setf(d, (struct bpf_program *)addr, 0);
-		break;
-
-	/*
-	 * Set link layer write filter.
-	 */
+	case BIOCSETFNR:
 	case BIOCSETWF:
-		error = bpf_setf(d, (struct bpf_program *)addr, 1);
+		error = bpf_setf(d, (struct bpf_program *)addr, cmd);
 		break;
 
 	/*
@@ -1118,7 +1118,7 @@ bpfioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct proc *p)
  * free it and replace it.  Returns EINVAL for bogus requests.
  */
 int
-bpf_setf(struct bpf_d *d, struct bpf_program *fp, int wf)
+bpf_setf(struct bpf_d *d, struct bpf_program *fp, u_long cmd)
 {
 	struct bpf_program_smr *bps, *old_bps;
 	struct bpf_insn *fcode;
@@ -1153,7 +1153,7 @@ bpf_setf(struct bpf_d *d, struct bpf_program *fp, int wf)
 		bps->bps_bf.bf_insns = fcode;
 	}
 
-	if (wf == 0) {
+	if (cmd != BIOCSETWF) {
 		old_bps = SMR_PTR_GET_LOCKED(&d->bd_rfilter);
 		SMR_PTR_SET_LOCKED(&d->bd_rfilter, bps);
 	} else {
@@ -1161,9 +1161,12 @@ bpf_setf(struct bpf_d *d, struct bpf_program *fp, int wf)
 		SMR_PTR_SET_LOCKED(&d->bd_wfilter, bps);
 	}
 
-	mtx_enter(&d->bd_mtx);
-	bpf_resetd(d);
-	mtx_leave(&d->bd_mtx);
+	if (cmd == BIOCSETF) {
+		mtx_enter(&d->bd_mtx);
+		bpf_resetd(d);
+		mtx_leave(&d->bd_mtx);
+	}
+
 	if (old_bps != NULL)
 		smr_call(&old_bps->bps_smr, bpf_prog_smr, old_bps);
 
@@ -1813,42 +1816,25 @@ bpfsdetach(void *p)
 }
 
 int
-bpf_sysctl_locked(int *name, u_int namelen, void *oldp, size_t *oldlenp,
-    void *newp, size_t newlen)
+bpf_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp,
+    size_t newlen)
 {
+	if (namelen != 1)
+		return (ENOTDIR);
+
 	switch (name[0]) {
 	case NET_BPF_BUFSIZE:
 		return sysctl_int_bounded(oldp, oldlenp, newp, newlen,
-		    &bpf_bufsize, BPF_MINBUFSIZE, bpf_maxbufsize);
+		    &bpf_bufsize, BPF_MINBUFSIZE,
+		    atomic_load_int(&bpf_maxbufsize));
 	case NET_BPF_MAXBUFSIZE:
 		return sysctl_int_bounded(oldp, oldlenp, newp, newlen,
 		    &bpf_maxbufsize, BPF_MINBUFSIZE, INT_MAX);
 	default:
 		return (EOPNOTSUPP);
 	}
-}
 
-int
-bpf_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp,
-    size_t newlen)
-{
-	int flags = RW_INTR;
-	int error;
-
-	if (namelen != 1)
-		return (ENOTDIR);
-
-	flags |= (newp == NULL) ? RW_READ : RW_WRITE;
-
-	error = rw_enter(&bpf_sysctl_lk, flags);
-	if (error != 0)
-		return (error);
-
-	error = bpf_sysctl_locked(name, namelen, oldp, oldlenp, newp, newlen);
-
-	rw_exit(&bpf_sysctl_lk);
-
-	return (error);
+	/* NOTREACHED */
 }
 
 struct bpf_d *

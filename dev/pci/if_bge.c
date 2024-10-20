@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_bge.c,v 1.403 2024/02/11 06:40:46 jmc Exp $	*/
+/*	$OpenBSD: if_bge.c,v 1.407 2024/09/04 07:54:52 mglocker Exp $	*/
 
 /*
  * Copyright (c) 2001 Wind River Systems
@@ -81,10 +81,8 @@
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
-#include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/timeout.h>
-#include <sys/socket.h>
 #include <sys/atomic.h>
 #include <sys/kstat.h>
 
@@ -108,7 +106,6 @@
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
-#include <dev/mii/miidevs.h>
 #include <dev/mii/brgphyreg.h>
 
 #include <dev/pci/if_bgereg.h>
@@ -1367,7 +1364,7 @@ bge_fill_rx_ring_std(struct bge_softc *sc)
 		bge_writembx(sc, BGE_MBX_RX_STD_PROD_LO, sc->bge_std);
 
 	/*
-	 * bge always needs more than 8 packets on the ring. if we cant do
+	 * bge always needs more than 8 packets on the ring. if we can't do
 	 * that now, then try again later.
 	 */
 	if (if_rxr_inuse(&sc->bge_std_ring) <= 8)
@@ -1471,7 +1468,7 @@ bge_fill_rx_ring_jumbo(struct bge_softc *sc)
 		bge_writembx(sc, BGE_MBX_RX_JUMBO_PROD_LO, sc->bge_jumbo);
 
 	/*
-	 * bge always needs more than 8 packets on the ring. if we cant do
+	 * bge always needs more than 8 packets on the ring. if we can't do
 	 * that now, then try again later.
 	 */
 	if (if_rxr_inuse(&sc->bge_jumbo_ring) <= 8)
@@ -3254,11 +3251,9 @@ bge_activate(struct device *self, int act)
 {
 	struct bge_softc *sc = (struct bge_softc *)self;
 	struct ifnet *ifp = &sc->arpcom.ac_if;
-	int rv = 0;
 
 	switch (act) {
 	case DVACT_SUSPEND:
-		rv = config_activate_children(self, act);
 		if (ifp->if_flags & IFF_RUNNING)
 			bge_stop(sc, 0);
 		break;
@@ -3266,11 +3261,8 @@ bge_activate(struct device *self, int act)
 		if (ifp->if_flags & IFF_UP)
 			bge_init(sc);
 		break;
-	default:
-		rv = config_activate_children(self, act);
-		break;
 	}
-	return (rv);
+	return (0);
 }
 
 void
@@ -4079,7 +4071,8 @@ bge_cksum_pad(struct mbuf *m)
 		 * Walk packet chain to find last mbuf. We will either
 		 * pad there, or append a new mbuf and pad it.
 		 */
-		for (last = m; last->m_next != NULL; last = last->m_next);
+		for (last = m; last->m_next != NULL; last = last->m_next)
+			;
 		if (m_trailingspace(last) < padlen) {
 			/* Allocate new empty mbuf, pad it. Compact later. */
 			struct mbuf *n;

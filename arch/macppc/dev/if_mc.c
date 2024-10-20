@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_mc.c,v 1.33 2022/04/06 18:59:26 naddy Exp $	*/
+/*	$OpenBSD: if_mc.c,v 1.35 2024/09/06 10:54:08 jsg Exp $	*/
 /*	$NetBSD: if_mc.c,v 1.9.16.1 2006/06/21 14:53:13 yamt Exp $	*/
 
 /*-
@@ -96,7 +96,7 @@
 #define	MACE_FIFOCC		12  /* FIFO Configuration Control (read/write) */
 #define	MACE_MACCC		13  /* MAC Configuration Control (read/write) */
 #define	MACE_PLSCC		14  /* PLS Configuration Control (read/write) */
-#define	MACE_PHYCC		15  /* PHY Confiuration Control (read/write) */
+#define	MACE_PHYCC		15  /* PHY Configuration Control (read/write) */
 #define	MACE_CHIPIDL		16  /* Chip ID Register [07-00] (read only) */
 #define	MACE_CHIPIDH		17  /* Chip ID Register [15-08] (read only) */
 #define	MACE_IAC		18  /* Internal Address Configuration (read/write) */
@@ -307,7 +307,6 @@ struct cfdriver mc_cd = {
 };
 
 void	mc_init(struct mc_softc *sc);
-void	mc_put(struct mc_softc *sc, u_int len);
 int	mc_dmaintr(void *arg);
 void	mc_reset_rxdma(struct mc_softc *sc);
 void	mc_reset_txdma(struct mc_softc *sc);

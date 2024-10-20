@@ -1,4 +1,4 @@
-/*	$OpenBSD: i82365_pci.c,v 1.14 2022/03/11 18:00:45 mpi Exp $ */
+/*	$OpenBSD: i82365_pci.c,v 1.17 2024/09/04 07:54:52 mglocker Exp $ */
 /*	$NetBSD: i82365_pci.c,v 1.11 2000/02/24 03:42:44 itohy Exp $	*/
 
 /*
@@ -36,7 +36,6 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/kernel.h>
 #include <sys/device.h>
 
 #include <dev/ic/i82365reg.h>
@@ -47,7 +46,6 @@
 #include <dev/pci/pcidevs.h>
 #include <dev/pci/i82365_pcivar.h>
 
-#include <dev/isa/isavar.h>
 #include <dev/isa/i82365_isavar.h>
 
 /*
@@ -93,8 +91,6 @@ pcic_pci_match(struct device *parent, void *match, void *aux)
 		return (1);
 	return (0);
 }
-
-void pcic_isa_config_interrupts(struct device *);
 
 void
 pcic_pci_attach(struct device *parent, struct device *self, void *aux)
@@ -174,7 +170,8 @@ pcic_pci_attach(struct device *parent, struct device *self, void *aux)
 	if (irq) {
 		sc->ih = pcic_pci_machdep_pcic_intr_establish(sc, pcic_intr);
 		if (sc->ih == NULL) {
-			printf("%s: couldnt map interrupt\n", sc->dev.dv_xname);
+			printf("%s: couldn't map interrupt\n",
+			    sc->dev.dv_xname);
 			bus_space_unmap(memt, memh, 0x10000);
 			bus_space_unmap(sc->iot, sc->ioh, size);
 			return;

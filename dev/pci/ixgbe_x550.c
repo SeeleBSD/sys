@@ -1,4 +1,4 @@
-/*	$OpenBSD: ixgbe_x550.c,v 1.8 2022/01/09 05:42:56 jsg Exp $	*/
+/*	$OpenBSD: ixgbe_x550.c,v 1.10 2024/09/01 03:09:00 jsg Exp $	*/
 
 /******************************************************************************
 
@@ -109,9 +109,7 @@ int32_t ixgbe_read_phy_reg_x550a(struct ixgbe_hw *hw, uint32_t reg_addr,
 			       uint32_t device_type, uint16_t *phy_data);
 int32_t ixgbe_write_phy_reg_x550a(struct ixgbe_hw *hw, uint32_t reg_addr,
 				uint32_t device_type, uint16_t phy_data);
-int32_t ixgbe_setup_fc_fiber_x550em_a(struct ixgbe_hw *hw);
 int32_t ixgbe_setup_fc_backplane_x550em_a(struct ixgbe_hw *hw);
-int32_t ixgbe_setup_fc_sgmii_x550em_a(struct ixgbe_hw *hw);
 void ixgbe_fc_autoneg_fiber_x550em_a(struct ixgbe_hw *hw);
 void ixgbe_fc_autoneg_backplane_x550em_a(struct ixgbe_hw *hw);
 void ixgbe_fc_autoneg_sgmii_x550em_a(struct ixgbe_hw *hw);
@@ -1766,12 +1764,12 @@ int32_t ixgbe_get_link_capabilities_X550em(struct ixgbe_hw *hw,
 }
 
 /**
- * ixgbe_get_lasi_ext_t_x550em - Determime external Base T PHY interrupt cause
+ * ixgbe_get_lasi_ext_t_x550em - Determine external Base T PHY interrupt cause
  * @hw: pointer to hardware structure
  * @lsc: pointer to boolean flag which indicates whether external Base T
  *       PHY interrupt is lsc
  *
- * Determime if external Base T PHY interrupt cause is high temperature
+ * Determine if external Base T PHY interrupt cause is high temperature
  * failure alarm or link status change.
  *
  * Return IXGBE_ERR_OVERTEMP if interrupt is high temperature

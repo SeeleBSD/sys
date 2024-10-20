@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_re_pci.c,v 1.57 2024/01/19 03:46:15 dlg Exp $	*/
+/*	$OpenBSD: if_re_pci.c,v 1.59 2024/08/31 16:23:09 deraadt Exp $	*/
 
 /*
  * Copyright (c) 2005 Peter Valchev <pvalchev@openbsd.org>
@@ -21,15 +21,9 @@
  */
 
 #include <sys/param.h>
-#include <sys/endian.h>
 #include <sys/systm.h>
-#include <sys/sockio.h>
-#include <sys/mbuf.h>
-#include <sys/malloc.h>
-#include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/timeout.h>
-#include <sys/socket.h>
 
 #include <net/if.h>
 #include <net/if_media.h>
@@ -253,6 +247,5 @@ re_pci_activate(struct device *self, int act)
 			re_init(ifp);
 		break;
 	}
-
 	return (0);
 }

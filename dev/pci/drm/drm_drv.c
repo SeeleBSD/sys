@@ -47,6 +47,7 @@
 #include <linux/pseudo_fs.h>
 #include <linux/slab.h>
 #include <linux/srcu.h>
+#include <linux/suspend.h>
 
 #include <drm/drm_accel.h>
 #include <drm/drm_cache.h>
@@ -1406,6 +1407,7 @@ drm_attach(struct device *parent, struct device *self, void *aux)
 		dev->pdev->pc = pa->pa_pc;
 		dev->pdev->tag = pa->pa_tag;
 		dev->pdev->pci = (struct pci_softc *)parent->dv_parent;
+		dev->pdev->_dev = parent;
 
 #ifdef CONFIG_ACPI
 		dev->pdev->dev.node = acpi_find_pci(pa->pa_pc, pa->pa_tag);
@@ -1548,10 +1550,25 @@ drm_activate(struct device *self, int act)
 
 	switch (act) {
 	case DVACT_QUIESCE:
+#ifdef CONFIG_ACPI
+		if (acpi_softc) {
+			switch (acpi_softc->sc_state) {
+			case ACPI_STATE_S0:
+				pm_suspend_target_state = PM_SUSPEND_TO_IDLE;
+				break;
+			case ACPI_STATE_S3:
+				pm_suspend_target_state = PM_SUSPEND_MEM;
+				break;
+			}
+		}
+#else
+		pm_suspend_target_state = PM_SUSPEND_TO_IDLE;
+#endif
 		drm_quiesce(dev);
 		break;
 	case DVACT_WAKEUP:
 		drm_wakeup(dev);
+		pm_suspend_target_state = PM_SUSPEND_ON;
 		break;
 	}
 

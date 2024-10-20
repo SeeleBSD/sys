@@ -1,4 +1,4 @@
-/* $OpenBSD: acpibat.c,v 1.70 2022/04/06 18:59:27 naddy Exp $ */
+/* $OpenBSD: acpibat.c,v 1.72 2024/08/05 18:37:29 kettenis Exp $ */
 /*
  * Copyright (c) 2005 Marco Peereboom <marco@openbsd.org>
  *
@@ -279,13 +279,11 @@ acpibat_refresh(void *arg)
 	else if (sc->sc_bst.bst_state & BST_CHARGE)
 		strlcpy(sc->sc_sens[4].desc, "battery charging",
 		    sizeof(sc->sc_sens[4].desc));
-	else if (sc->sc_bst.bst_state & BST_CRITICAL) {
-		strlcpy(sc->sc_sens[4].desc, "battery critical",
-		    sizeof(sc->sc_sens[4].desc));
-		sc->sc_sens[4].status = SENSOR_S_CRIT;
-	} else
+	else
 		strlcpy(sc->sc_sens[4].desc, "battery idle",
 		    sizeof(sc->sc_sens[4].desc));
+	if (sc->sc_bst.bst_state & BST_CRITICAL)
+		sc->sc_sens[4].status = SENSOR_S_CRIT;
 	sc->sc_sens[4].value = sc->sc_bst.bst_state;
 
 	if (sc->sc_bst.bst_rate == BST_UNKNOWN) {
@@ -525,6 +523,12 @@ acpibat_notify(struct aml_node *node, int notify_type, void *arg)
 	case 0x00:	/* Poll sensors */
 	case 0x80:	/* _BST changed */
 		acpibat_getbst(sc);
+		/*
+		 * On some machines the Power Source Device doesn't get
+		 * notified when the AC adapter is plugged or unplugged,
+		 * but the battery does get notified.
+		 */
+		aml_notify_dev(ACPI_DEV_AC, 0x80);
 		break;
 	case 0x81:	/* _BIF/_BIX changed */
 		acpibat_getbix(sc);

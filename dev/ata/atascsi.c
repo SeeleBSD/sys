@@ -1,4 +1,4 @@
-/*	$OpenBSD: atascsi.c,v 1.153 2022/04/16 19:19:58 naddy Exp $ */
+/*	$OpenBSD: atascsi.c,v 1.156 2024/09/04 07:54:52 mglocker Exp $ */
 
 /*
  * Copyright (c) 2007 David Gwynne <dlg@openbsd.org>
@@ -20,11 +20,8 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/buf.h>
-#include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/device.h>
-#include <sys/queue.h>
 #include <sys/pool.h>
 
 #include <scsi/scsi_all.h>
@@ -128,7 +125,6 @@ void		atascsi_atapi_cmd(struct scsi_xfer *);
 void		atascsi_atapi_cmd_done(struct ata_xfer *);
 
 void		atascsi_pmp_cmd(struct scsi_xfer *);
-void		atascsi_pmp_cmd_done(struct ata_xfer *);
 void		atascsi_pmp_sense(struct scsi_xfer *xs);
 void		atascsi_pmp_inq(struct scsi_xfer *xs);
 
@@ -422,7 +418,7 @@ atascsi_probe(struct scsi_link *link)
 	xa->pmp_port = ap->ap_pmp_port;
 	xa->atascsi_private = &ahp->ahp_iopool;
 	ata_exec(as, xa);
-	ata_polled(xa); /* we dont care if it doesnt work */
+	ata_polled(xa); /* we don't care if it doesn't work */
 
 	return (0);
 error:
@@ -1801,7 +1797,7 @@ ata_polled(struct ata_xfer *xa)
 	int			rv;
 
 	if (!ISSET(xa->flags, ATA_F_DONE))
-		panic("ata_polled: xa isnt complete");
+		panic("ata_polled: xa isn't complete");
 
 	switch (xa->state) {
 	case ATA_S_COMPLETE:

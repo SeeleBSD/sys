@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_addr.c,v 1.32 2022/11/04 09:36:44 mpi Exp $	*/
+/*	$OpenBSD: uvm_addr.c,v 1.37 2024/09/04 07:54:53 mglocker Exp $	*/
 
 /*
  * Copyright (c) 2011 Ariane van der Steldt <ariane@stack.nl>
@@ -24,8 +24,6 @@
 #include <uvm/uvm_addr.h>
 #include <sys/pool.h>
 
-/* Max gap between hint allocations. */
-#define UADDR_HINT_MAXGAP	(4 * PAGE_SIZE)
 /* Number of pivots in pivot allocator. */
 #define NUM_PIVOTS		16
 /*
@@ -98,12 +96,6 @@ struct uvm_addr_state uaddr_kbootstrap;
 struct vm_map_entry	*uvm_addr_entrybyspace(struct uaddr_free_rbtree*,
 			    vsize_t);
 #endif /* !SMALL_KERNEL */
-void			 uaddr_kinsert(struct vm_map *,
-			    struct uvm_addr_state *, struct vm_map_entry *);
-void			 uaddr_kremove(struct vm_map *,
-			    struct uvm_addr_state *, struct vm_map_entry *);
-void			 uaddr_kbootstrapdestroy(struct uvm_addr_state *);
-
 void			 uaddr_destroy(struct uvm_addr_state *);
 void			 uaddr_kbootstrap_destroy(struct uvm_addr_state *);
 void			 uaddr_rnd_destroy(struct uvm_addr_state *);
@@ -296,30 +288,6 @@ uvm_addr_destroy(struct uvm_addr_state *uaddr)
 {
 	if (uaddr)
 		(*uaddr->uaddr_functions->uaddr_destroy)(uaddr);
-}
-
-/*
- * Move address forward to satisfy align, offset.
- */
-vaddr_t
-uvm_addr_align(vaddr_t addr, vaddr_t align, vaddr_t offset)
-{
-	vaddr_t result = (addr & ~(align - 1)) + offset;
-	if (result < addr)
-		result += align;
-	return result;
-}
-
-/*
- * Move address backwards to satisfy align, offset.
- */
-vaddr_t
-uvm_addr_align_back(vaddr_t addr, vaddr_t align, vaddr_t offset)
-{
-	vaddr_t result = (addr & ~(align - 1)) + offset;
-	if (result > addr)
-		result -= align;
-	return result;
 }
 
 /*
@@ -1108,7 +1076,7 @@ uaddr_pivot_newpivot(struct vm_map *map, struct uaddr_pivot_state *uaddr,
  *
  * Characteristics of the allocator:
  * - best case, an allocation is O(log N)
- *   (it would be O(1), if it werent for the need to check if the memory is
+ *   (it would be O(1), if it weren't for the need to check if the memory is
  *   free; although that can be avoided...)
  * - worst case, an allocation is O(log N)
  *   (the uaddr_pivot_newpivot() function has that complexity)
@@ -1406,7 +1374,7 @@ uaddr_stack_brk_select(struct vm_map *map, struct uvm_addr_state *uaddr,
 		if (uvm_addr_linsearch(map, uaddr, entry_out, addr_out,
 		    0, sz, align, offset, dir, start, end - sz,
 		    before_gap, after_gap) == 0)
-		return 0;
+			return 0;
 	}
 
 	return ENOMEM;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vioscsi.c,v 1.32 2023/05/29 08:13:35 sf Exp $	*/
+/*	$OpenBSD: vioscsi.c,v 1.34 2024/08/27 18:44:12 sf Exp $	*/
 /*
  * Copyright (c) 2013 Google Inc.
  *
@@ -93,9 +93,9 @@ const char *const vioscsi_vq_names[] = {
 int
 vioscsi_match(struct device *parent, void *self, void *aux)
 {
-	struct virtio_softc *va = (struct virtio_softc *)aux;
+	struct virtio_attach_args *va = aux;
 
-	if (va->sc_childdevid == PCI_PRODUCT_VIRTIO_SCSI)
+	if (va->va_devid == PCI_PRODUCT_VIRTIO_SCSI)
 		return (1);
 	return (0);
 }
@@ -134,8 +134,8 @@ vioscsi_attach(struct device *parent, struct device *self, void *aux)
 	}
 
 	for (i = 0; i < nitems(sc->sc_vqs); i++) {
-		rv = virtio_alloc_vq(vsc, &sc->sc_vqs[i], i, MAXPHYS,
-		    ALLOC_SEGS, vioscsi_vq_names[i]);
+		rv = virtio_alloc_vq(vsc, &sc->sc_vqs[i], i, ALLOC_SEGS,
+		    vioscsi_vq_names[i]);
 		if (rv) {
 			printf(": failed to allocate virtqueue %d\n", i);
 			goto err;

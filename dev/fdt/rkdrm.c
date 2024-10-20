@@ -1,4 +1,4 @@
-/* $OpenBSD: rkdrm.c,v 1.21 2024/02/15 09:48:03 jsg Exp $ */
+/* $OpenBSD: rkdrm.c,v 1.23 2024/08/21 11:24:12 jsg Exp $ */
 /* $NetBSD: rk_drm.c,v 1.3 2019/12/15 01:00:58 mrg Exp $ */
 /*-
  * Copyright (c) 2019 Jared D. McNeill <jmcneill@invisible.ca>
@@ -51,11 +51,6 @@ int	rkdrm_match(struct device *, void *, void *);
 void	rkdrm_attach(struct device *, struct device *, void *);
 void	rkdrm_attachhook(struct device *);
 
-#ifdef notyet
-vmem_t	*rkdrm_alloc_cma_pool(struct drm_device *, size_t);
-#endif
-
-int	rkdrm_load(struct drm_device *, unsigned long);
 int	rkdrm_unload(struct drm_device *);
 
 struct drm_driver rkdrm_driver = {
@@ -212,8 +207,6 @@ int rkdrm_show_screen(void *, void *, int,
     void (*)(void *, int, int), void *);
 void rkdrm_doswitch(void *);
 void rkdrm_enter_ddb(void *, void *);
-int rkdrm_get_param(struct wsdisplay_param *);
-int rkdrm_set_param(struct wsdisplay_param *);
 
 struct wsscreen_descr rkdrm_stdscreen = {
 	"std",
@@ -252,7 +245,6 @@ int
 rkdrm_wsioctl(void *v, u_long cmd, caddr_t data, int flag, struct proc *p)
 {
 	struct rasops_info *ri = v;
-	struct rkdrm_softc *sc = ri->ri_hw;
 	struct wsdisplay_param *dp = (struct wsdisplay_param *)data;
 	struct wsdisplay_fbinfo *wdf;
 
@@ -375,7 +367,6 @@ rkdrm_attachhook(struct device *dev)
 	struct drm_fb_helper *helper = &sc->helper;
 	struct rasops_info *ri = &sc->ro;
 	struct rkdrm_framebuffer *sfb;
-	struct drm_device *ddev;
 	uint32_t *ports;
 	int i, portslen, nports;
 	int console = 0;
@@ -485,14 +476,10 @@ rkdrm_attachhook(struct device *dev)
 int
 rkdrm_fb_probe(struct drm_fb_helper *helper, struct drm_fb_helper_surface_size *sizes)
 {
-	struct rkdrm_softc *sc = rkdrm_private(helper->dev);
 	struct drm_device *ddev = helper->dev;
 	struct rkdrm_framebuffer *sfb = to_rkdrm_framebuffer(helper->fb);
 	struct drm_mode_fb_cmd2 mode_cmd = { 0 };
 	struct drm_framebuffer *fb = helper->fb;
-	struct wsemuldisplaydev_attach_args aa;
-	struct rasops_info *ri = &sc->ro;
-	struct rkdrmfb_attach_args sfa;
 	unsigned int bytes_per_pixel;
 	struct fb_info *info;
 	size_t size;

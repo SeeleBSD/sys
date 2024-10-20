@@ -1,4 +1,4 @@
-/*	$OpenBSD: ahci.c,v 1.39 2023/02/03 18:31:16 miod Exp $ */
+/*	$OpenBSD: ahci.c,v 1.42 2024/09/04 07:54:52 mglocker Exp $ */
 
 /*
  * Copyright (c) 2006 David Gwynne <dlg@openbsd.org>
@@ -267,8 +267,8 @@ noccc:
 	 */
 	sc->sc_ncmds = max(2, sc->sc_ncmds);
 	for (i = 0; i < AHCI_MAX_PORTS; i++) {
-		if (!ISSET(pi, 1 << i)) {
-			/* dont allocate stuff if the port isnt implemented */
+		if (!ISSET(pi, 1U << i)) {
+			/* don't allocate stuff if the port isn't implemented */
 			continue;
 		}
 
@@ -2350,9 +2350,9 @@ failall:
 			       sizeof(struct ata_fis_d2h));
 		}
 
-		ccb->ccb_done(ccb);
-
 		processed |= 1 << ccb->ccb_slot;
+
+		ccb->ccb_done(ccb);
 	}
 
 	if (need_restart) {

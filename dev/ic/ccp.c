@@ -1,4 +1,4 @@
-/*	$OpenBSD: ccp.c,v 1.3 2020/05/29 04:42:25 deraadt Exp $ */
+/*	$OpenBSD: ccp.c,v 1.11 2024/09/04 07:45:08 jsg Exp $ */
 
 /*
  * Copyright (c) 2018 David Gwynne <dlg@openbsd.org>
@@ -18,10 +18,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/buf.h>
 #include <sys/device.h>
-#include <sys/malloc.h>
-#include <sys/kernel.h>
 #include <sys/timeout.h>
 
 #include <machine/bus.h>

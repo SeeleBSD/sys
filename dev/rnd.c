@@ -1,4 +1,4 @@
-/*	$OpenBSD: rnd.c,v 1.226 2023/03/08 04:43:08 guenther Exp $	*/
+/*	$OpenBSD: rnd.c,v 1.229 2024/08/02 01:53:21 guenther Exp $	*/
 
 /*
  * Copyright (c) 2011,2020 Theo de Raadt.
@@ -75,6 +75,7 @@
 #include <sys/msgbuf.h>
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
+#include <sys/syslimits.h>
 
 #include <crypto/sha2.h>
 
@@ -172,8 +173,8 @@ const struct filterops randomwrite_filtops = {
 /*
  * This function mixes entropy and timing into the entropy input ring.
  */
-void
-enqueue_randomness(u_int val)
+static void
+add_event_data(u_int val)
 {
 	struct rand_event *rep;
 	int e;
@@ -182,6 +183,12 @@ enqueue_randomness(u_int val)
 	rep = &rnd_event_space[e];
 	rep->re_time += cpu_rnd_messybits();
 	rep->re_val += val;
+}
+
+void
+enqueue_randomness(u_int val)
+{
+	add_event_data(val);
 
 	if (rnd_cold) {
 		dequeue_randomness(NULL);
@@ -248,9 +255,6 @@ dequeue_randomness(void *v)
 	u_int32_t buf[2];
 	u_int startp, startc, i;
 
-	if (!rnd_cold)
-		timeout_del(&rnd_timeout);
-
 	/* Some very new damage */
 	startp = rnd_event_prod - QEVCONSUME;
 	for (i = 0; i < QEVCONSUME; i++) {
@@ -261,7 +265,7 @@ dequeue_randomness(void *v)
 		add_entropy_words(buf, 2);
 	}
 	/* and some probably more damaged */
-	startc = rnd_event_cons;
+	startc = atomic_add_int_nv(&rnd_event_cons, QEVCONSUME) - QEVCONSUME;
 	for (i = 0; i < QEVCONSUME; i++) {
 		u_int e = (startc + i) & (QEVLEN-1);
 
@@ -269,7 +273,6 @@ dequeue_randomness(void *v)
 		buf[1] = rnd_event_space[e].re_val;
 		add_entropy_words(buf, 2);
 	}
-	rnd_event_cons = startp + QEVCONSUME;
 }
 
 /*
@@ -305,10 +308,8 @@ extract_entropy(u_int8_t *buf)
 
 	/*
 	 * Modify pool so next hash will produce different results.
-	 * During boot-time enqueue/dequeue stage, avoid recursion.
-	*/
-	if (!rnd_cold)
-		enqueue_randomness(extract_pool[0]);
+	 */
+	add_event_data(extract_pool[0]);
 	dequeue_randomness(NULL);
 
 	/* Wipe data from memory */
@@ -814,11 +815,11 @@ sys_getentropy(struct proc *p, void *v, register_t *retval)
 		syscallarg(void *) buf;
 		syscallarg(size_t) nbyte;
 	} */ *uap = v;
-	char buf[256];
+	char buf[GETENTROPY_MAX];
 	int error;
 
 	if (SCARG(uap, nbyte) > sizeof(buf))
-		return (EIO);
+		return (EINVAL);
 	arc4random_buf(buf, SCARG(uap, nbyte));
 	if ((error = copyout(buf, SCARG(uap, buf), SCARG(uap, nbyte))) != 0)
 		return (error);

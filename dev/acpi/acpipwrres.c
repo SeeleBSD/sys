@@ -1,4 +1,4 @@
-/* $OpenBSD: acpipwrres.c,v 1.13 2023/02/18 14:32:02 dv Exp $ */
+/* $OpenBSD: acpipwrres.c,v 1.16 2024/08/12 17:24:58 kettenis Exp $ */
 
 /*
  * Copyright (c) 2013 Martin Pieuchot <mpi@openbsd.org>
@@ -149,9 +149,11 @@ acpipwrres_ref_incr(struct acpipwrres_softc *sc, struct aml_node *node)
 	DPRINTF(("%s: dev %s ON %d\n", DEVNAME(sc), node->name,
 	    sc->sc_cons_ref));
 
-	if (sc->sc_cons_ref++ == 0)
+	if (sc->sc_cons_ref++ == 0) {
 		aml_evalname(sc->sc_acpi, sc->sc_devnode, "_ON", 0,
 		    NULL, NULL);
+		sc->sc_state = ACPIPWRRES_ON;
+	}
 
 	return (0);
 }
@@ -165,9 +167,11 @@ acpipwrres_ref_decr(struct acpipwrres_softc *sc, struct aml_node *node)
 	DPRINTF(("%s: dev %s OFF %d\n", DEVNAME(sc), node->name,
 	    sc->sc_cons_ref));
 
-	if (--sc->sc_cons_ref == 0)
+	if (--sc->sc_cons_ref == 0) {
 		aml_evalname(sc->sc_acpi, sc->sc_devnode, "_OFF", 0,
 		    NULL, NULL);
+		sc->sc_state = ACPIPWRRES_OFF;
+	}
 
 	return (0);
 }

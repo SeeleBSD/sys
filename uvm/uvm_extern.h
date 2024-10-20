@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_extern.h,v 1.173 2024/01/19 21:20:35 deraadt Exp $	*/
+/*	$OpenBSD: uvm_extern.h,v 1.177 2024/08/24 10:46:43 mpi Exp $	*/
 /*	$NetBSD: uvm_extern.h,v 1.57 2001/03/09 01:02:12 chs Exp $	*/
 
 /*
@@ -111,7 +111,6 @@ typedef int		vm_prot_t;
 #define UVM_FLAG_STACK   0x2000000 /* page may contain a stack */
 #define UVM_FLAG_WC      0x4000000 /* write combining */
 #define UVM_FLAG_CONCEAL 0x8000000 /* omit from dumps */
-#define UVM_FLAG_SYSCALL 0x10000000 /* system calls allowed */
 #define UVM_FLAG_SIGALTSTACK 0x20000000 /* sigaltstack validation required */
 
 /* macros to extract info */
@@ -196,11 +195,12 @@ struct pmap;
  *  Locks used to protect struct members in this file:
  *	K	kernel lock
  *	I	immutable after creation
+ *	a	atomic operations
  *	v	vm_map's lock
  */
 struct vmspace {
 	struct	vm_map vm_map;	/* VM address map */
-	int	vm_refcnt;	/* [K] number of references */
+	int	vm_refcnt;	/* [a] number of references */
 	caddr_t	vm_shm;		/* SYS5 shared memory private data XXX */
 /* we copy from vm_startcopy to the end of the structure on fork */
 #define vm_startcopy vm_rssize
@@ -256,10 +256,6 @@ extern struct vm_map *phys_map;
 /* base of kernel virtual memory */
 extern vaddr_t vm_min_kernel_address;
 
-/* zalloc zeros memory, alloc does not */
-#define uvm_km_zalloc(MAP,SIZE) uvm_km_alloc1(MAP,SIZE,0,TRUE)
-#define uvm_km_alloc(MAP,SIZE)  uvm_km_alloc1(MAP,SIZE,0,FALSE)
-
 #define vm_resident_count(vm) (pmap_resident_count((vm)->vm_map.pmap))
 
 struct plimit;
@@ -291,7 +287,9 @@ int			uvm_io(vm_map_t, struct uio *, int);
 
 #define	UVM_IO_FIXPROT	0x01
 
-vaddr_t			uvm_km_alloc1(vm_map_t, vsize_t, vsize_t, boolean_t);
+#ifdef __i386__
+vaddr_t			uvm_km_zalloc(vm_map_t, vsize_t);
+#endif
 void			uvm_km_free(vm_map_t, vaddr_t, vsize_t);
 vaddr_t			uvm_km_kmemalloc_pla(struct vm_map *,
 			    struct uvm_object *, vsize_t, vsize_t, int,

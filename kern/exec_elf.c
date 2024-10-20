@@ -89,6 +89,7 @@
 
 #include <machine/reg.h>
 #include <machine/exec.h>
+#include <machine/elf.h>
 
 int	elf_load_file(struct proc *, char *, struct exec_package *,
 	    struct elf_args *);
@@ -494,10 +495,15 @@ elf_load_file(struct proc *p, char *path, struct exec_package *epp,
 				addr = ph[i].p_vaddr - base_ph->p_vaddr;
 			}
 			elf_load_psection(&epp->ep_vmcmds, nd.ni_vp,
-			    &ph[i], &addr, &size, &prot, flags | VMCMD_SYSCALL);
+			    &ph[i], &addr, &size, &prot, flags);
 			/* If entry is within this section it must be text */
 			if (eh.e_entry >= ph[i].p_vaddr &&
 			    eh.e_entry < (ph[i].p_vaddr + size)) {
+				/* LOAD containing e_entry may not be writable */
+				if (prot & PROT_WRITE) {
+					error = ENOEXEC;
+					goto bad1;
+				}
  				epp->ep_entry = addr + eh.e_entry -
 				    ELF_TRUNC(ph[i].p_vaddr,ph[i].p_align);
 				if (flags == VMCMD_RELATIVE)
@@ -563,8 +569,10 @@ elf_load_file(struct proc *p, char *path, struct exec_package *epp,
 			pr->ps_pin.pn_end = base + len;
 			pr->ps_pin.pn_pins = pins;
 			pr->ps_pin.pn_npins = npins;
-			pr->ps_flags |= PS_PIN;
 		}
+	} else {
+		error = EINVAL;	/* no pin table */
+		goto bad1;
 	}
 
 	vn_marktext(nd.ni_vp);
@@ -715,7 +723,7 @@ exec_elf_makecmds(struct proc *p, struct exec_package *epp)
 	 */
 	for (i = 0, pp = ph; i < eh->e_phnum; i++, pp++) {
 		Elf_Addr addr, size = 0;
-		int prot = 0, syscall = 0;
+		int prot = 0;
 		int flags = 0;
 
 		switch (pp->p_type) {
@@ -731,16 +739,9 @@ exec_elf_makecmds(struct proc *p, struct exec_package *epp)
 			} else
 				addr = ELF_NO_ADDR;
 
-			/*
-			 * Permit system calls in main-text static binaries.
-			 * static binaries may not call msyscall() or
-			 * pinsyscalls()
-			 */
-			if (interp == NULL) {
-				syscall = VMCMD_SYSCALL;
-				p->p_vmspace->vm_map.flags |= VM_MAP_SYSCALL_ONCE;
+			/* Static binaries may not call pinsyscalls() */
+			if (interp == NULL)
 				p->p_vmspace->vm_map.flags |= VM_MAP_PINSYSCALL_ONCE;
-			}
 
 			/*
 			 * Calculates size of text and data segments
@@ -750,7 +751,7 @@ exec_elf_makecmds(struct proc *p, struct exec_package *epp)
 			 * for DATA_PLT, is fine for TEXT_PLT.
 			 */
 			elf_load_psection(&epp->ep_vmcmds, epp->ep_vp,
-			    pp, &addr, &size, &prot, flags | textrel | syscall);
+			    pp, &addr, &size, &prot, flags | textrel);
 
 			/*
 			 * Update exe_base in case alignment was off.
@@ -868,7 +869,6 @@ exec_elf_makecmds(struct proc *p, struct exec_package *epp)
 			epp->ep_pinend = base + len;
 			epp->ep_pins = pins;
 			epp->ep_npins = npins;
-			p->p_p->ps_flags |= PS_PIN;
 		}
 	}
 
@@ -924,6 +924,14 @@ bad:
 		return (ENOEXEC);
 	return (error);
 }
+
+#ifdef __HAVE_CPU_HWCAP
+unsigned long hwcap;
+#endif /* __HAVE_CPU_HWCAP */
+
+#ifdef __HAVE_CPU_HWCAP2
+unsigned long hwcap2;
+#endif /* __HAVE_CPU_HWCAP2 */
 
 /*
  * Phase II of load. It is now safe to load the interpreter. Info collected
@@ -996,6 +1004,18 @@ exec_elf_fixup(struct proc *p, struct exec_package *epp)
 		a->au_id = AUX_entry;
 		a->au_v = ap->arg_entry;
 		a++;
+
+#ifdef __HAVE_CPU_HWCAP
+		a->au_id = AUX_hwcap;
+		a->au_v = hwcap;
+		a++;
+#endif /* __HAVE_CPU_HWCAP */
+
+#ifdef __HAVE_CPU_HWCAP2
+		a->au_id = AUX_hwcap2;
+		a->au_v = hwcap2;
+		a++;
+#endif /* __HAVE_CPU_HWCAP2 */
 
 		a->au_id = AUX_openbsd_timekeep;
 		a->au_v = p->p_p->ps_timekeep;

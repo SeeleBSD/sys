@@ -1,4 +1,4 @@
-/*	$OpenBSD: dc.c,v 1.156 2023/11/10 15:51:20 bluhm Exp $	*/
+/*	$OpenBSD: dc.c,v 1.158 2024/08/31 16:23:09 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -134,7 +134,6 @@
 #endif
 
 int dc_intr(void *);
-struct dc_type *dc_devtype(void *);
 int dc_newbuf(struct dc_softc *, int, struct mbuf *);
 int dc_encap(struct dc_softc *, bus_dmamap_t, struct mbuf *, u_int32_t *);
 
@@ -3062,23 +3061,18 @@ dc_activate(struct device *self, int act)
 {
 	struct dc_softc *sc = (struct dc_softc *)self;
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
-	int rv = 0;
 
 	switch (act) {
 	case DVACT_SUSPEND:
 		if (ifp->if_flags & IFF_RUNNING)
 			dc_stop(sc, 0);
-		rv = config_activate_children(self, act);
 		break;
 	case DVACT_RESUME:
 		if (ifp->if_flags & IFF_UP)
 			dc_init(sc);
 		break;
-	default:
-		rv = config_activate_children(self, act);
-		break;
 	}
-	return (rv);
+	return (0);
 }
 
 int

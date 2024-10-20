@@ -646,16 +646,6 @@ fusefs_link(void *v)
 		error = ENOSYS;
 		goto out2;
 	}
-	if (vp->v_type == VDIR) {
-		VOP_ABORTOP(dvp, cnp);
-		error = EPERM;
-		goto out2;
-	}
-	if (dvp->v_mount != vp->v_mount) {
-		VOP_ABORTOP(dvp, cnp);
-		error = EXDEV;
-		goto out2;
-	}
 	if (dvp != vp && (error = vn_lock(vp, LK_EXCLUSIVE))) {
 		VOP_ABORTOP(dvp, cnp);
 		goto out2;
@@ -1522,11 +1512,6 @@ fusefs_remove(void *v)
 	fb_delete(fbuf);
 out:
 	pool_put(&namei_pool, cnp->cn_pnbuf);
-	if (dvp == vp)
-		vrele(vp);
-	else
-		vput(vp);
-	vput(dvp);
 	return (error);
 }
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_synch.c,v 1.200 2023/09/13 14:25:49 claudio Exp $	*/
+/*	$OpenBSD: kern_synch.c,v 1.206 2024/07/23 08:38:02 claudio Exp $	*/
 /*	$NetBSD: kern_synch.c,v 1.37 1996/04/22 01:38:37 christos Exp $	*/
 
 /*
@@ -62,7 +62,7 @@
 #include <sys/ktrace.h>
 #endif
 
-int	sleep_signal_check(void);
+int	sleep_signal_check(struct proc *);
 int	thrsleep(struct proc *, struct sys___thrsleep_args *);
 int	thrsleep_unlock(void *);
 
@@ -332,7 +332,6 @@ void
 sleep_setup(const volatile void *ident, int prio, const char *wmesg)
 {
 	struct proc *p = curproc;
-	int s;
 
 #ifdef DIAGNOSTIC
 	if (p->p_flag & P_CANTSLEEP)
@@ -342,8 +341,11 @@ sleep_setup(const volatile void *ident, int prio, const char *wmesg)
 	if (p->p_stat != SONPROC)
 		panic("tsleep: not SONPROC");
 #endif
+	/* exiting processes are not allowed to catch signals */
+	if (p->p_flag & P_WEXIT)
+		CLR(prio, PCATCH);
 
-	SCHED_LOCK(s);
+	SCHED_LOCK();
 
 	TRACEPOINT(sched, sleep, NULL);
 
@@ -357,14 +359,14 @@ sleep_setup(const volatile void *ident, int prio, const char *wmesg)
 		atomic_setbits_int(&p->p_flag, P_SINTR);
 	p->p_stat = SSLEEP;
 
-	SCHED_UNLOCK(s);
+	SCHED_UNLOCK();
 }
 
 int
 sleep_finish(int timo, int do_sleep)
 {
 	struct proc *p = curproc;
-	int s, catch, error = 0, error1 = 0;
+	int catch, error = 0, error1 = 0;
 
 	catch = p->p_flag & P_SINTR;
 
@@ -383,13 +385,13 @@ sleep_finish(int timo, int do_sleep)
 		 * we must be ready for sleep when sleep_signal_check() is
 		 * called.
 		 */
-		if ((error = sleep_signal_check()) != 0) {
+		if ((error = sleep_signal_check(p)) != 0) {
 			catch = 0;
 			do_sleep = 0;
 		}
 	}
 
-	SCHED_LOCK(s);
+	SCHED_LOCK();
 	/*
 	 * If the wakeup happens while going to sleep, p->p_wchan
 	 * will be NULL. In that case unwind immediately but still
@@ -416,7 +418,7 @@ sleep_finish(int timo, int do_sleep)
 #endif
 
 	p->p_cpu->ci_schedstate.spc_curpriority = p->p_usrpri;
-	SCHED_UNLOCK(s);
+	SCHED_UNLOCK();
 
 	/*
 	 * Even though this belongs to the signal handling part of sleep,
@@ -436,7 +438,7 @@ sleep_finish(int timo, int do_sleep)
 
 	/* Check if thread was woken up because of a unwind or signal */
 	if (catch != 0)
-		error = sleep_signal_check();
+		error = sleep_signal_check(p);
 
 	/* Signal errors are higher priority than timeouts. */
 	if (error == 0 && error1 != 0)
@@ -449,9 +451,8 @@ sleep_finish(int timo, int do_sleep)
  * Check and handle signals and suspensions around a sleep cycle.
  */
 int
-sleep_signal_check(void)
+sleep_signal_check(struct proc *p)
 {
-	struct proc *p = curproc;
 	struct sigctx ctx;
 	int err, sig;
 
@@ -467,25 +468,23 @@ sleep_signal_check(void)
 }
 
 int
-wakeup_proc(struct proc *p, const volatile void *chan, int flags)
+wakeup_proc(struct proc *p, int flags)
 {
 	int awakened = 0;
 
 	SCHED_ASSERT_LOCKED();
 
-	if (p->p_wchan != NULL &&
-	   ((chan == NULL) || (p->p_wchan == chan))) {
+	if (p->p_wchan != NULL) {
 		awakened = 1;
 		if (flags)
 			atomic_setbits_int(&p->p_flag, flags);
+#ifdef DIAGNOSTIC
+		if (p->p_stat != SSLEEP && p->p_stat != SSTOP)
+			panic("thread %d p_stat is %d", p->p_tid, p->p_stat);
+#endif
+		unsleep(p);
 		if (p->p_stat == SSLEEP)
 			setrunnable(p);
-		else if (p->p_stat == SSTOP)
-			unsleep(p);
-#ifdef DIAGNOSTIC
-		else
-			panic("wakeup: p_stat is %d", (int)p->p_stat);
-#endif
 	}
 
 	return awakened;
@@ -502,11 +501,10 @@ void
 endtsleep(void *arg)
 {
 	struct proc *p = arg;
-	int s;
 
-	SCHED_LOCK(s);
-	wakeup_proc(p, NULL, P_TIMEOUT);
-	SCHED_UNLOCK(s);
+	SCHED_LOCK();
+	wakeup_proc(p, P_TIMEOUT);
+	SCHED_UNLOCK();
 }
 
 /*
@@ -520,6 +518,7 @@ unsleep(struct proc *p)
 	if (p->p_wchan != NULL) {
 		TAILQ_REMOVE(&slpque[LOOKUP(p->p_wchan)], p, p_runq);
 		p->p_wchan = NULL;
+		p->p_wmesg = NULL;
 		TRACEPOINT(sched, unsleep, p->p_tid + THREAD_PID_OFFSET,
 		    p->p_p->ps_pid);
 	}
@@ -531,23 +530,37 @@ unsleep(struct proc *p)
 void
 wakeup_n(const volatile void *ident, int n)
 {
-	struct slpque *qp;
+	struct slpque *qp, wakeq;
 	struct proc *p;
 	struct proc *pnext;
-	int s;
 
-	SCHED_LOCK(s);
+	TAILQ_INIT(&wakeq);
+
+	SCHED_LOCK();
 	qp = &slpque[LOOKUP(ident)];
 	for (p = TAILQ_FIRST(qp); p != NULL && n != 0; p = pnext) {
 		pnext = TAILQ_NEXT(p, p_runq);
 #ifdef DIAGNOSTIC
 		if (p->p_stat != SSLEEP && p->p_stat != SSTOP)
-			panic("wakeup: p_stat is %d", (int)p->p_stat);
+			panic("thread %d p_stat is %d", p->p_tid, p->p_stat);
 #endif
-		if (wakeup_proc(p, ident, 0))
+		KASSERT(p->p_wchan != NULL);
+		if (p->p_wchan == ident) {
+			TAILQ_REMOVE(qp, p, p_runq);
+			p->p_wchan = NULL;
+			p->p_wmesg = NULL;
+			TAILQ_INSERT_TAIL(&wakeq, p, p_runq);
 			--n;
+		}
 	}
-	SCHED_UNLOCK(s);
+	while ((p = TAILQ_FIRST(&wakeq))) {
+		TAILQ_REMOVE(&wakeq, p, p_runq);
+		TRACEPOINT(sched, unsleep, p->p_tid + THREAD_PID_OFFSET,
+		    p->p_p->ps_pid);
+		if (p->p_stat == SSLEEP)
+			setrunnable(p);
+	}
+	SCHED_UNLOCK();
 }
 
 /*
@@ -564,21 +577,23 @@ sys_sched_yield(struct proc *p, void *v, register_t *retval)
 {
 	struct proc *q;
 	uint8_t newprio;
-	int s;
 
-	SCHED_LOCK(s);
 	/*
 	 * If one of the threads of a multi-threaded process called
 	 * sched_yield(2), drop its priority to ensure its siblings
 	 * can make some progress.
 	 */
+	mtx_enter(&p->p_p->ps_mtx);
 	newprio = p->p_usrpri;
 	TAILQ_FOREACH(q, &p->p_p->ps_threads, p_thr_link)
 		newprio = max(newprio, q->p_runpri);
+	mtx_leave(&p->p_p->ps_mtx);
+
+	SCHED_LOCK();
 	setrunqueue(p->p_cpu, p, newprio);
 	p->p_ru.ru_nvcsw++;
 	mi_switch();
-	SCHED_UNLOCK(s);
+	SCHED_UNLOCK();
 
 	return (0);
 }

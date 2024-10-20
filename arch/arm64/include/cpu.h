@@ -1,4 +1,4 @@
-/* $OpenBSD: cpu.h,v 1.43 2024/02/25 19:15:50 cheloha Exp $ */
+/* $OpenBSD: cpu.h,v 1.50 2024/07/24 21:24:18 kettenis Exp $ */
 /*
  * Copyright (c) 2016 Dale Rahn <drahn@dalerahn.com>
  *
@@ -63,8 +63,14 @@
 
 extern uint64_t cpu_id_aa64isar0;
 extern uint64_t cpu_id_aa64isar1;
+extern uint64_t cpu_id_aa64isar2;
+extern uint64_t cpu_id_aa64mmfr0;
+extern uint64_t cpu_id_aa64mmfr1;
+extern uint64_t cpu_id_aa64mmfr2;
 extern uint64_t cpu_id_aa64pfr0;
 extern uint64_t cpu_id_aa64pfr1;
+
+void cpu_identify_cleanup(void);
 
 #include <machine/intr.h>
 #include <machine/frame.h>
@@ -96,10 +102,6 @@ extern uint64_t cpu_id_aa64pfr1;
 #define PROC_PC(p)	((p)->p_addr->u_pcb.pcb_tf->tf_elr)
 #define PROC_STACK(p)	((p)->p_addr->u_pcb.pcb_tf->tf_sp)
 
-/* The address of the vector page. */
-extern vaddr_t vector_page;
-void	arm32_vector_init(vaddr_t, int);
-
 /*
  * Per-CPU information.  For now we assume one CPU.
  */
@@ -108,6 +110,7 @@ void	arm32_vector_init(vaddr_t, int);
 #include <sys/device.h>
 #include <sys/sched.h>
 #include <sys/srp.h>
+#include <uvm/uvm_percpu.h>
 
 struct cpu_info {
 	struct device		*ci_dev; /* Device corresponding to this CPU */
@@ -149,6 +152,8 @@ struct cpu_info {
 	uint64_t		ci_ttbr1;
 	vaddr_t			ci_el1_stkend;
 
+	uint32_t		ci_psci_idle_latency;
+	uint32_t		ci_psci_idle_param;
 	uint32_t		ci_psci_suspend_param;
 
 	struct opp_table	*ci_opp_table;
@@ -161,6 +166,8 @@ struct cpu_info {
 
 #ifdef MULTIPROCESSOR
 	struct srp_hazard	ci_srp_hazards[SRP_HAZARD_NUM];
+#define __HAVE_UVM_PERCPU
+	struct uvm_pmr_cache	ci_uvm;
 	volatile int		ci_flags;
 
 	volatile int		ci_ddb_paused;
@@ -276,28 +283,14 @@ void need_resched(struct cpu_info *);
 
 // asm code to start new kernel contexts.
 void	proc_trampoline(void);
-void	child_trampoline(void);
 
 /*
  * Random cruft
  */
 void	dumpconf(void);
 
-// cpuswitch.S
-struct pcb;
-void	savectx		(struct pcb *pcb);
-
-// machdep.h
-void bootsync		(int);
-
-// fault.c
-int badaddr_read	(void *, size_t, void *);
-
 // syscall.c
 void svc_handler	(trapframe_t *);
-
-/* machine_machdep.c */
-void board_startup(void);
 
 // functions to manipulate interrupt state
 static __inline void

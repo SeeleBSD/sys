@@ -1,4 +1,4 @@
-/*	$OpenBSD: ichiic.c,v 1.54 2024/03/06 00:11:25 jsg Exp $	*/
+/*	$OpenBSD: ichiic.c,v 1.56 2024/07/16 01:14:23 jsg Exp $	*/
 
 /*
  * Copyright (c) 2005, 2006 Alexander Yurchenko <grange@openbsd.org>
@@ -23,7 +23,6 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
-#include <sys/kernel.h>
 #include <sys/rwlock.h>
 
 #include <machine/bus.h>
@@ -109,6 +108,7 @@ const struct pci_matchid ichiic_ids[] = {
 	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_82801JI_SMB },
 	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_APOLLOLAKE_SMB },
 	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_ATOMC2000_PCU_SMB },
+	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_C3000_SMB_2 },
 	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_BAYTRAIL_SMB },
 	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_BRASWELL_SMB },
 	{ PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_C600_SMB },

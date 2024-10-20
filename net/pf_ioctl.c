@@ -1,4 +1,4 @@
-/*	$OpenBSD: pf_ioctl.c,v 1.415 2023/07/06 04:55:05 dlg Exp $ */
+/*	$OpenBSD: pf_ioctl.c,v 1.418 2024/07/18 14:46:28 bluhm Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -89,7 +89,6 @@
 struct pool		 pf_tag_pl;
 
 void			 pfattach(int);
-void			 pf_thread_create(void *);
 int			 pfopen(dev_t, int, int, struct proc *);
 int			 pfclose(dev_t, int, int, struct proc *);
 int			 pfioctl(dev_t, u_long, caddr_t, int, struct proc *);
@@ -288,7 +287,7 @@ pfattach(int num)
 	 */
 	pf_anchor_stack = cpumem_malloc(
 	    sizeof(struct pf_anchor_stackframe) * (PF_ANCHOR_STACK_MAX + 2),
-	    M_WAITOK|M_ZERO);
+	    M_PF);
 	CPUMEM_FOREACH(sf, &cmi, pf_anchor_stack)
 		sf[PF_ANCHOR_STACK_MAX].sf_stack_top = &sf[0];
 }
@@ -1955,7 +1954,9 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		struct pf_status *s = (struct pf_status *)addr;
 		NET_LOCK();
 		PF_LOCK();
+		PF_FRAG_LOCK();
 		memcpy(s, &pf_status, sizeof(struct pf_status));
+		PF_FRAG_UNLOCK();
 		pfi_update_status(s->ifname, s);
 		PF_UNLOCK();
 		NET_UNLOCK();
@@ -1996,6 +1997,9 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		memset(pf_status.counters, 0, sizeof(pf_status.counters));
 		memset(pf_status.fcounters, 0, sizeof(pf_status.fcounters));
 		memset(pf_status.scounters, 0, sizeof(pf_status.scounters));
+		PF_FRAG_LOCK();
+		memset(pf_status.ncounters, 0, sizeof(pf_status.ncounters));
+		PF_FRAG_UNLOCK();
 		pf_status.since = getuptime();
 
 		PF_UNLOCK();
@@ -3271,7 +3275,9 @@ pf_sysctl(void *oldp, size_t *oldlenp, void *newp, size_t newlen)
 
 	NET_LOCK_SHARED();
 	PF_LOCK();
+	PF_FRAG_LOCK();
 	memcpy(&pfs, &pf_status, sizeof(struct pf_status));
+	PF_FRAG_UNLOCK();
 	pfi_update_status(pfs.ifname, &pfs);
 	PF_UNLOCK();
 	NET_UNLOCK_SHARED();

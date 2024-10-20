@@ -1,4 +1,4 @@
-/*	$OpenBSD: param.c,v 1.49 2023/07/04 09:47:51 jsg Exp $	*/
+/*	$OpenBSD: param.c,v 1.52 2024/08/20 13:29:25 mvs Exp $	*/
 /*	$NetBSD: param.c,v 1.16 1996/03/12 03:08:40 mrg Exp $	*/
 
 /*
@@ -39,13 +39,6 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/socket.h>
-#include <sys/proc.h>
-#include <sys/vnode.h>
-#include <sys/file.h>
-#include <sys/timeout.h>
-#include <sys/mbuf.h>
-#include <ufs/ufs/quota.h>
 #include <sys/kernel.h>
 #include <sys/utsname.h>
 #ifdef SYSVSHM
@@ -55,9 +48,11 @@
 #ifdef SYSVSEM
 #include <sys/sem.h>
 #endif
-#ifdef SYSVMSG
-#include <sys/msg.h>
-#endif
+
+/*
+ * Locks used to protect data:
+ *	a	atomic
+ */
 
 /*
  * System parameter formulae.
@@ -77,9 +72,9 @@ int	utc_offset = 0;
 #define	NTEXT (80 + NPROCESS / 8)		/* actually the object cache */
 #define	NVNODE (NPROCESS * 2 + NTEXT + 100)
 int	initialvnodes = NVNODE;
-int	maxprocess = NPROCESS;
-int	maxthread = 2 * NPROCESS;
-int	maxfiles = 5 * (NPROCESS + MAXUSERS) + 80;
+int	maxprocess = NPROCESS;				/* [a] */
+int	maxthread = 2 * NPROCESS;			/* [a] */
+int	maxfiles = 5 * (NPROCESS + MAXUSERS) + 80;	/* [a] */
 long	nmbclust = NMBCLUSTERS;
 
 #ifndef BUFCACHEPERCENT

@@ -1,4 +1,4 @@
-/*	$OpenBSD: in_pcb.h,v 1.152 2024/02/13 12:22:09 bluhm Exp $	*/
+/*	$OpenBSD: in_pcb.h,v 1.158 2024/07/12 19:50:35 bluhm Exp $	*/
 /*	$NetBSD: in_pcb.h,v 1.14 1996/02/13 23:42:00 christos Exp $	*/
 
 /*
@@ -80,7 +80,6 @@
  *	N	net lock
  *	t	inpt_mtx		pcb table mutex
  *	y	inpt_notify		pcb table rwlock for notify
- *	p	inpcb_mtx		pcb mutex
  *	L	pf_inp_mtx		link pf to inp mutex
  *	s	so_lock			socket rwlock
  */
@@ -94,8 +93,8 @@
  * needed, so that socket layer input have a consistent view at these
  * values.
  *
- * In soconnect() and sosend() pcb mutex cannot be used.  They eventually
- * can call IP output which takes pf lock which is a sleeping lock.
+ * In soconnect() and sosend() a per pcb mutex cannot be used.  They
+ * eventually call IP output which takes pf lock which is a sleeping lock.
  * Also connect(2) does a route lookup for source selection.  There
  * route resolve happens, which creates a route, which sends a route
  * message, which needs route lock, which is a rw-lock.
@@ -106,25 +105,16 @@
  *
  * So there are three locks.  Table mutex is for writing inp_[lf]addr/port
  * and lookup, socket rw-lock to separate sockets in system calls, and
- * pcb mutex to protect socket receive buffer.  Changing inp_[lf]addr/port
- * takes both per socket rw-lock and global table mutex.  Protocol
- * input only reads inp_[lf]addr/port during lookup and is safe.  System
- * call only reads when holding socket rw-lock and is safe.  The socket
- * layer needs pcb mutex only in soreceive().
- *
- * Function pru_lock() grabs the pcb mutex and its existence indicates
- * that a protocol is MP safe.  Otherwise the exclusive net lock is
- * used.
+ * socket buffer mutex to protect socket receive buffer.  Changing
+ * inp_[lf]addr/port takes both per socket rw-lock and global table mutex.
+ * Protocol input only reads inp_[lf]addr/port during lookup and is safe.
  */
 
 struct pf_state_key;
 
 union inpaddru {
+	struct in_addr iau_addr;
 	struct in6_addr iau_addr6;
-	struct {
-		uint8_t pad[12];
-		struct in_addr inaddr;	/* easier transition */
-	} iau_a4u;
 };
 
 /*
@@ -142,9 +132,9 @@ struct inpcb {
 	struct	  inpcbtable *inp_table;	/* [I] inet queue/hash table */
 	union	  inpaddru inp_faddru;		/* [t] Foreign address. */
 	union	  inpaddru inp_laddru;		/* [t] Local address. */
-#define	inp_faddr	inp_faddru.iau_a4u.inaddr
+#define	inp_faddr	inp_faddru.iau_addr
 #define	inp_faddr6	inp_faddru.iau_addr6
-#define	inp_laddr	inp_laddru.iau_a4u.inaddr
+#define	inp_laddr	inp_laddru.iau_addr
 #define	inp_laddr6	inp_laddru.iau_addr6
 	u_int16_t inp_fport;		/* [t] foreign port */
 	u_int16_t inp_lport;		/* [t] local port */
@@ -152,7 +142,6 @@ struct inpcb {
 	caddr_t	  inp_ppcb;		/* pointer to per-protocol pcb */
 	struct    route inp_route;	/* cached route */
 	struct    refcnt inp_refcnt;	/* refcount PCB, delay memory free */
-	struct	  mutex inp_mtx;	/* protect PCB and socket members */
 	int	  inp_flags;		/* generic IP/datagram flags */
 	union {				/* Header prototype. */
 		struct ip hu_ip;
@@ -160,8 +149,10 @@ struct inpcb {
 	} inp_hu;
 #define	inp_ip		inp_hu.hu_ip
 #define	inp_ipv6	inp_hu.hu_ipv6
-	struct	  mbuf *inp_options;	/* IP options */
-	struct ip6_pktopts *inp_outputopts6; /* IP6 options for outgoing packets */
+	union {
+		struct	mbuf *inp_options;		/* IPv4 options */
+		struct	ip6_pktopts *inp_outputopts6;	/* IPv6 options */
+	};
 	int inp_hops;
 	union {
 		struct ip_moptions *mou_mo;
@@ -169,19 +160,12 @@ struct inpcb {
 	} inp_mou;
 #define inp_moptions inp_mou.mou_mo	/* [N] IPv4 multicast options */
 #define inp_moptions6 inp_mou.mou_mo6	/* [N] IPv6 multicast options */
-	u_char	  inp_seclevel[4];	/* [N] IPsec level of socket */
-#define SL_AUTH           0             /* Authentication level */
-#define SL_ESP_TRANS      1             /* ESP transport level */
-#define SL_ESP_NETWORK    2             /* ESP network (encapsulation) level */
-#define SL_IPCOMP         3             /* Compression level */
+	struct	ipsec_level   inp_seclevel;	/* [N] IPsec level of socket */
 	u_char	inp_ip_minttl;		/* minimum TTL or drop */
 #define inp_ip6_minhlim inp_ip_minttl	/* minimum Hop Limit or drop */
 #define	inp_flowinfo	inp_hu.hu_ipv6.ip6_flow
 
 	int	inp_cksum6;
-#ifndef _KERNEL
-#define inp_csumoffset	inp_cksum6
-#endif
 	struct	icmp6_filter *inp_icmp6filt;
 	struct	pf_state_key *inp_pf_sk; /* [L] */
 	struct	mbuf *(*inp_upcall)(void *, struct mbuf *,
@@ -307,7 +291,8 @@ extern int in_pcbnotifymiss;
 void	 in_init(void);
 void	 in_losing(struct inpcb *);
 int	 in_pcballoc(struct socket *, struct inpcbtable *, int);
-int	 in_pcbbind_locked(struct inpcb *, struct mbuf *, struct proc *);
+int	 in_pcbbind_locked(struct inpcb *, struct mbuf *, const void *,
+	    struct proc *);
 int	 in_pcbbind(struct inpcb *, struct mbuf *, struct proc *);
 int	 in_pcbaddrisavail(const struct inpcb *, struct sockaddr_in *, int,
 	    struct proc *);

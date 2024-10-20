@@ -68,7 +68,7 @@ id=`basename "${d}"`
 #	and disable POOL_DEBUG in sys/conf/GENERIC
 
 ost="OpenBSD"
-osr="7.5"
+osr="7.6"
 
 cat >vers.c <<eof
 #define STATUS ""			/* release */

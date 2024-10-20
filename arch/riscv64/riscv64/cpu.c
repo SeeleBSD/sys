@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.c,v 1.18 2024/01/26 16:59:47 kettenis Exp $	*/
+/*	$OpenBSD: cpu.c,v 1.20 2024/07/14 09:48:49 jca Exp $	*/
 
 /*
  * Copyright (c) 2016 Dale Rahn <drahn@dalerahn.com>
@@ -28,6 +28,7 @@
 #include <uvm/uvm.h>
 
 #include <machine/cpufunc.h>
+#include <machine/elf.h>
 #include <machine/fdt.h>
 #include <machine/sbi.h>
 
@@ -235,6 +236,8 @@ cpu_attach(struct device *parent, struct device *dev, void *aux)
 	} else {
 #endif
 		cpu_identify(ci);
+
+		hwcap |= HWCAP_ISA_G | HWCAP_ISA_C;
 
 		if (OF_getproplen(ci->ci_node, "clocks") > 0) {
 			cpu_node = ci->ci_node;
@@ -674,6 +677,10 @@ cpu_opp_mountroot(struct device *self)
 			min = ot->ot_opp_hz_min;
 			max = ot->ot_opp_hz_max;
 			level_hz = clock_get_frequency(ci->ci_node, NULL);
+			if (level_hz < min)
+				level_hz = min;
+			if (level_hz > max)
+				level_hz = max;
 			level = howmany(100 * (level_hz - min), (max - min));
 		}
 

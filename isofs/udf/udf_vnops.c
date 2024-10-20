@@ -75,7 +75,24 @@ const struct vops udf_vops = {
 	.vop_unlock	= udf_unlock,
 	.vop_pathconf	= udf_pathconf,
 	.vop_islocked	= udf_islocked,
-	.vop_print	= udf_print
+	.vop_print	= udf_print,
+
+	.vop_abortop	= NULL,
+	.vop_advlock	= NULL,
+	.vop_bwrite	= NULL,
+	.vop_create	= NULL,
+	.vop_fsync	= NULL,
+	.vop_link	= NULL,
+	.vop_mknod	= NULL,
+	.vop_remove	= eopnotsupp,
+	.vop_rename	= NULL,
+	.vop_revoke	= NULL,
+	.vop_mkdir	= NULL,
+	.vop_rmdir	= NULL,
+	.vop_setattr	= NULL,
+	.vop_symlink	= NULL,
+	.vop_write	= NULL,
+	.vop_kqfilter	= NULL
 };
 
 #define UDF_INVALID_BMAP	-1
@@ -454,7 +471,7 @@ udf_read(void *v)
 		}
 		if (error)
 			break;
-	};
+	}
 
 	return (error);
 }

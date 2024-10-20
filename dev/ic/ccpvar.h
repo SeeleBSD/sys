@@ -1,4 +1,4 @@
-/*	$OpenBSD: ccpvar.h,v 1.1 2018/04/20 04:37:21 dlg Exp $ */
+/*	$OpenBSD: ccpvar.h,v 1.6 2024/09/04 07:45:08 jsg Exp $ */
 
 /*
  * Copyright (c) 2018 David Gwynne <dlg@openbsd.org>
@@ -24,6 +24,8 @@ struct ccp_softc {
 	bus_space_handle_t	sc_ioh;
 
 	struct timeout		sc_tick;
+	struct device		*sc_psp;
+	void			*sc_irqh;
 };
 
 void	ccp_attach(struct ccp_softc *);

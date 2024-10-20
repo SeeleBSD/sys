@@ -1,4 +1,4 @@
-/*	$OpenBSD: uaudio.c,v 1.174 2023/12/10 06:32:14 ratchov Exp $	*/
+/*	$OpenBSD: uaudio.c,v 1.176 2024/09/01 03:09:00 jsg Exp $	*/
 /*
  * Copyright (c) 2018 Alexandre Ratchov <alex@caoua.org>
  *
@@ -1999,7 +1999,7 @@ uaudio_process_header(struct uaudio_softc *sc, struct uaudio_blob *p)
 /*
  * Process AC interrupt endpoint descriptor, this is mainly to skip
  * the descriptor as we use neither of its properties. Our mixer
- * interface doesn't support unsolicitated state changes, so we've no
+ * interface doesn't support unsolicited state changes, so we've no
  * use of it yet.
  */
 int
@@ -2313,7 +2313,7 @@ uaudio_process_ac(struct uaudio_softc *sc, struct uaudio_blob *p, int ifnum)
  *			to adapt to software's desired rate
  *
  *
- * For usb1.1 ival is cardcoded to 1 for isochronous
+ * For usb1.1 ival is hardcoded to 1 for isochronous
  * transfers, which means one transfer every ms. I.e one
  * transfer every frame period.
  *
@@ -2702,6 +2702,22 @@ uaudio_fixup_params(struct uaudio_softc *sc)
 	}
 }
 
+int
+uaudio_iface_index(struct uaudio_softc *sc, int ifnum)
+{
+	int i, nifaces;
+
+	nifaces = sc->udev->cdesc->bNumInterfaces;
+
+	for (i = 0; i < nifaces; i++) {
+		if (sc->udev->ifaces[i].idesc->bInterfaceNumber == ifnum)
+			return i;
+	}
+
+	printf("%s: %d: invalid interface number\n", __func__, ifnum);
+	return -1;
+}
+
 /*
  * Parse all descriptors and build configuration of the device.
  */
@@ -2711,6 +2727,7 @@ uaudio_process_conf(struct uaudio_softc *sc, struct uaudio_blob *p)
 	struct uaudio_blob dp;
 	struct uaudio_alt *a;
 	unsigned int type, ifnum, altnum, nep, class, subclass;
+	int i;
 
 	while (p->rptr != p->wptr) {
 		if (!uaudio_getdesc(p, &dp))
@@ -2736,7 +2753,8 @@ uaudio_process_conf(struct uaudio_softc *sc, struct uaudio_blob *p)
 
 		switch (subclass) {
 		case UISUBCLASS_AUDIOCONTROL:
-			if (usbd_iface_claimed(sc->udev, ifnum)) {
+			i = uaudio_iface_index(sc, ifnum);
+			if (i != -1 && usbd_iface_claimed(sc->udev, i)) {
 				DPRINTF("%s: %d: AC already claimed\n", __func__, ifnum);
 				break;
 			}
@@ -2748,7 +2766,8 @@ uaudio_process_conf(struct uaudio_softc *sc, struct uaudio_blob *p)
 				return 0;
 			break;
 		case UISUBCLASS_AUDIOSTREAM:
-			if (usbd_iface_claimed(sc->udev, ifnum)) {
+			i = uaudio_iface_index(sc, ifnum);
+			if (i != -1 && usbd_iface_claimed(sc->udev, i)) {
 				DPRINTF("%s: %d: AS already claimed\n", __func__, ifnum);
 				break;
 			}
@@ -2768,10 +2787,19 @@ done:
 	 * Claim all interfaces we use. This prevents other uaudio(4)
 	 * devices from trying to use them.
 	 */
-	for (a = sc->alts; a != NULL; a = a->next)
-		usbd_claim_iface(sc->udev, a->ifnum);
+	for (a = sc->alts; a != NULL; a = a->next) {
+		i = uaudio_iface_index(sc, a->ifnum);
+		if (i != -1) {
+			DPRINTF("%s: claim: %d at %d\n", __func__, a->ifnum, i);
+			usbd_claim_iface(sc->udev, i);
+		}
+	}
 
-	usbd_claim_iface(sc->udev, sc->ctl_ifnum);
+	i = uaudio_iface_index(sc, sc->ctl_ifnum);
+	if (i != -1) {
+		DPRINTF("%s: claim: ac %d at %d\n", __func__, sc->ctl_ifnum, i);
+		usbd_claim_iface(sc->udev, i);
+	}
 
 	return 1;
 }

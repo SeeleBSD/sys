@@ -1,4 +1,4 @@
-/*	$OpenBSD: protosw.h,v 1.65 2024/02/03 22:50:09 mvs Exp $	*/
+/*	$OpenBSD: protosw.h,v 1.68 2024/08/16 09:20:35 mvs Exp $	*/
 /*	$NetBSD: protosw.h,v 1.10 1996/04/09 20:55:32 cgd Exp $	*/
 
 /*-
@@ -67,9 +67,6 @@ struct ifnet;
 struct pr_usrreqs {
 	int	(*pru_attach)(struct socket *, int, int);
 	int	(*pru_detach)(struct socket *);
-	void	(*pru_lock)(struct socket *);
-	void	(*pru_unlock)(struct socket *);
-	int	(*pru_locked)(struct socket *so);
 	int	(*pru_bind)(struct socket *, struct mbuf *, struct proc *);
 	int	(*pru_listen)(struct socket *);
 	int	(*pru_connect)(struct socket *, struct mbuf *);
@@ -132,6 +129,9 @@ struct protosw {
 #define PR_ABRTACPTDIS	0x0020		/* abort on accept(2) to disconnected
 					   socket */
 #define PR_SPLICE	0x0040		/* socket splicing is possible */
+#define PR_MPINPUT	0x0080		/* input runs with shared netlock */
+#define PR_MPSOCKET	0x0100		/* socket uses shared netlock */
+#define PR_MPSYSCTL	0x0200		/* mp-safe sysctl(2) handler */
 
 /*
  * The arguments to usrreq are:
@@ -281,28 +281,6 @@ static inline int
 pru_detach(struct socket *so)
 {
 	return (*so->so_proto->pr_usrreqs->pru_detach)(so);
-}
-
-static inline void
-pru_lock(struct socket *so)
-{
-	if (so->so_proto->pr_usrreqs->pru_lock)
-		(*so->so_proto->pr_usrreqs->pru_lock)(so);
-}
-
-static inline void
-pru_unlock(struct socket *so)
-{
-	if (so->so_proto->pr_usrreqs->pru_unlock)
-		(*so->so_proto->pr_usrreqs->pru_unlock)(so);
-}
-
-static inline int
-pru_locked(struct socket *so)
-{
-	if (so->so_proto->pr_usrreqs->pru_locked)
-		return (*so->so_proto->pr_usrreqs->pru_locked)(so);
-	return (0);
 }
 
 static inline int

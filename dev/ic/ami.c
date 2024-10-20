@@ -1,4 +1,4 @@
-/*	$OpenBSD: ami.c,v 1.262 2022/04/16 19:19:58 naddy Exp $	*/
+/*	$OpenBSD: ami.c,v 1.264 2024/09/20 02:00:46 jsg Exp $	*/
 
 /*
  * Copyright (c) 2001 Michael Shalayeff
@@ -1772,7 +1772,7 @@ ami_mgmt(struct ami_softc *sc, u_int8_t opcode, u_int8_t par1, u_int8_t par2,
 		cmd->acc_io.aio_param = par2;
 		cmd->acc_io.aio_pad[0] = par3;
 		break;
-	};
+	}
 
 	cmd->acc_io.aio_data = am ? htole32(AMIMEM_DVA(am)) : 0;
 
@@ -2277,7 +2277,8 @@ bail:
 	return (error);
 }
 
-int ami_ioctl_alarm(struct ami_softc *sc, struct bioc_alarm *ba)
+int
+ami_ioctl_alarm(struct ami_softc *sc, struct bioc_alarm *ba)
 {
 	int error = 0;
 	u_int8_t func, ret;

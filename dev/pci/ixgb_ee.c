@@ -31,16 +31,11 @@
 
 *******************************************************************************/
 
-/* $OpenBSD: ixgb_ee.c,v 1.8 2022/01/09 05:42:56 jsg Exp $ */
+/* $OpenBSD: ixgb_ee.c,v 1.10 2024/09/01 03:08:59 jsg Exp $ */
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/sockio.h>
-#include <sys/mbuf.h>
-#include <sys/malloc.h>
-#include <sys/kernel.h>
 #include <sys/device.h>
-#include <sys/socket.h>
 
 #include <net/if.h>
 #include <net/if_media.h>
@@ -224,7 +219,7 @@ ixgb_standby_eeprom(struct ixgb_hw *hw)
 
 	eecd_reg = IXGB_READ_REG(hw, EECD);
 
-	/* Deselct EEPROM */
+	/* Deselect EEPROM */
 	eecd_reg &= ~(IXGB_EECD_CS | IXGB_EECD_SK);
 	IXGB_WRITE_REG(hw, EECD, eecd_reg);
 	usec_delay(50);

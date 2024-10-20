@@ -1,4 +1,4 @@
-/*	$OpenBSD: rkclock.c,v 1.87 2024/03/06 14:55:22 kettenis Exp $	*/
+/*	$OpenBSD: rkclock.c,v 1.90 2024/07/15 09:54:38 patrick Exp $	*/
 /*
  * Copyright (c) 2017, 2018 Mark Kettenis <kettenis@openbsd.org>
  *
@@ -3918,6 +3918,21 @@ rk3568_pmu_reset(void *cookie, uint32_t *cells, int on)
 
 const struct rkclock rk3588_clocks[] = {
 	{
+		RK3588_CLK_PWM1, RK3588_CRU_CLKSEL_CON(59),
+		SEL(13, 12), 0,
+		{ RK3588_CLK_100M_SRC, RK3588_CLK_50M_SRC, RK3588_XIN24M },
+	},
+	{
+		RK3588_CLK_PWM2, RK3588_CRU_CLKSEL_CON(59),
+		SEL(15, 14), 0,
+		{ RK3588_CLK_100M_SRC, RK3588_CLK_50M_SRC, RK3588_XIN24M },
+	},
+	{
+		RK3588_CLK_PWM3, RK3588_CRU_CLKSEL_CON(60),
+		SEL(1, 0), 0,
+		{ RK3588_CLK_100M_SRC, RK3588_CLK_50M_SRC, RK3588_XIN24M },
+	},
+	{
 		RK3588_ACLK_BUS_ROOT, RK3588_CRU_CLKSEL_CON(38),
 		SEL(5, 5), DIV(4, 0),
 		{ RK3588_PLL_GPLL, RK3588_PLL_CPLL }
@@ -3986,6 +4001,11 @@ const struct rkclock rk3588_clocks[] = {
 		RK3588_CLK_SPI4, RK3588_CRU_CLKSEL_CON(59),
 		SEL(11, 10), 0,
 		{ RK3588_CLK_200M_SRC, RK3588_CLK_150M_SRC, RK3588_XIN24M },
+	},
+	{
+		RK3588_CLK_TSADC, RK3588_CRU_CLKSEL_CON(41),
+		SEL(8, 8), DIV(7, 0),
+		{ RK3588_PLL_GPLL, RK3588_XIN24M },
 	},
 	{
 		RK3588_CLK_UART1_SRC, RK3588_CRU_CLKSEL_CON(41),
@@ -4196,6 +4216,20 @@ const struct rkclock rk3588_clocks[] = {
 		RK3588_CLK_GPU, 0, 0, 0,
 		{ RK3588_CLK_GPU_SRC },
 		SET_PARENT
+	},
+	{
+		RK3588_CCLK_EMMC, RK3588_CRU_CLKSEL_CON(77),
+		SEL(15, 14), DIV(13, 8),
+		{ RK3588_PLL_GPLL, RK3588_PLL_CPLL, RK3588_XIN24M }
+	},
+	{
+		RK3588_BCLK_EMMC, RK3588_CRU_CLKSEL_CON(78),
+		SEL(5, 5), DIV(4, 0),
+		{ RK3588_PLL_GPLL, RK3588_PLL_CPLL }
+	},
+	{
+		RK3588_TMCLK_EMMC, 0, 0, 0,
+		{ RK3588_XIN24M }
 	},
 	{
 		RK3588_CLK_GMAC_125M, RK3588_CRU_CLKSEL_CON(83),
@@ -4539,6 +4573,34 @@ rk3588_reset(void *cookie, uint32_t *cells, int on)
 	uint32_t bit, mask, reg;
 
 	switch (idx) {
+	case RK3588_SRST_P_TSADC:
+		reg = RK3588_CRU_SOFTRST_CON(12);
+		bit = 0;
+		break;
+	case RK3588_SRST_TSADC:
+		reg = RK3588_CRU_SOFTRST_CON(12);
+		bit = 1;
+		break;
+	case RK3588_SRST_H_EMMC:
+		reg = RK3588_CRU_SOFTRST_CON(31);
+		bit = 4;
+		break;
+	case RK3588_SRST_A_EMMC:
+		reg = RK3588_CRU_SOFTRST_CON(31);
+		bit = 5;
+		break;
+	case RK3588_SRST_C_EMMC:
+		reg = RK3588_CRU_SOFTRST_CON(31);
+		bit = 6;
+		break;
+	case RK3588_SRST_B_EMMC:
+		reg = RK3588_CRU_SOFTRST_CON(31);
+		bit = 7;
+		break;
+	case RK3588_SRST_T_EMMC:
+		reg = RK3588_CRU_SOFTRST_CON(31);
+		bit = 8;
+		break;
 	case RK3588_SRST_A_GMAC0:
 		reg = RK3588_CRU_SOFTRST_CON(32);
 		bit = 10;

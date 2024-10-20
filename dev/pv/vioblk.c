@@ -1,4 +1,4 @@
-/*	$OpenBSD: vioblk.c,v 1.37 2023/07/28 16:54:48 dv Exp $	*/
+/*	$OpenBSD: vioblk.c,v 1.43 2024/08/27 18:44:12 sf Exp $	*/
 
 /*
  * Copyright (c) 2012 Stefan Fritsch.
@@ -48,12 +48,9 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/kernel.h>
 #include <machine/bus.h>
 
 #include <sys/device.h>
-#include <sys/stat.h>
-#include <sys/buf.h>
 #include <sys/mutex.h>
 #include <dev/pv/virtioreg.h>
 #include <dev/pv/virtiovar.h>
@@ -82,8 +79,11 @@ struct virtio_feature_name vioblk_feature_names[] = {
 	{ VIRTIO_BLK_F_FLUSH,		"Flush" },
 	{ VIRTIO_BLK_F_TOPOLOGY,	"Topology" },
 	{ VIRTIO_BLK_F_CONFIG_WCE,	"ConfigWCE" },
+	{ VIRTIO_BLK_F_MQ,		"MQ" },
 	{ VIRTIO_BLK_F_DISCARD,		"Discard" },
 	{ VIRTIO_BLK_F_WRITE_ZEROES,	"Write0s" },
+	{ VIRTIO_BLK_F_LIFETIME,	"Lifetime" },
+	{ VIRTIO_BLK_F_SECURE_ERASE,	"SecErase" },
 #endif
 	{ 0,				NULL }
 };
@@ -153,10 +153,11 @@ const struct scsi_adapter vioblk_switch = {
 	vioblk_scsi_cmd, NULL, NULL, NULL, NULL
 };
 
-int vioblk_match(struct device *parent, void *match, void *aux)
+int
+vioblk_match(struct device *parent, void *match, void *aux)
 {
-	struct virtio_softc *va = aux;
-	if (va->sc_childdevid == PCI_PRODUCT_VIRTIO_BLOCK)
+	struct virtio_attach_args *va = aux;
+	if (va->va_devid == PCI_PRODUCT_VIRTIO_BLOCK)
 		return 1;
 	return 0;
 }
@@ -207,8 +208,8 @@ vioblk_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_capacity = virtio_read_device_config_8(vsc,
 	    VIRTIO_BLK_CONFIG_CAPACITY);
 
-	if (virtio_alloc_vq(vsc, &sc->sc_vq[0], 0, MAXPHYS, ALLOC_SEGS,
-	    "I/O request") != 0) {
+	if (virtio_alloc_vq(vsc, &sc->sc_vq[0], 0, ALLOC_SEGS, "I/O request")
+	    != 0) {
 		printf("\nCan't alloc virtqueue\n");
 		goto err;
 	}
@@ -374,7 +375,7 @@ vioblk_reset(struct vioblk_softc *sc)
 	virtio_reset(sc->sc_virtio);
 
 	/* finish requests that have been completed */
-	vioblk_vq_done(&sc->sc_vq[0]);
+	virtio_check_vq(sc->sc_virtio, &sc->sc_vq[0]);
 
 	/* abort all remaining requests */
 	for (i = 0; i < sc->sc_nreqs; i++) {
@@ -534,7 +535,7 @@ vioblk_scsi_cmd(struct scsi_xfer *xs)
 	if (!ISSET(xs->flags, SCSI_POLL)) {
 		/* check if some xfers are done: */
 		if (sc->sc_queued > 1)
-			vioblk_vq_done(vq);
+			virtio_check_vq(sc->sc_virtio, vq);
 		splx(s);
 		return;
 	}

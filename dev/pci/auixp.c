@@ -1,4 +1,4 @@
-/* $OpenBSD: auixp.c,v 1.52 2023/09/11 08:41:26 mvs Exp $ */
+/* $OpenBSD: auixp.c,v 1.56 2024/09/20 02:20:44 jsg Exp $ */
 /* $NetBSD: auixp.c,v 1.9 2005/06/27 21:13:09 thorpej Exp $ */
 
 /*
@@ -48,8 +48,6 @@
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/device.h>
-#include <sys/conf.h>
-#include <sys/exec.h>
 #include <sys/audioio.h>
 #include <sys/queue.h>
 
@@ -147,7 +145,7 @@ void	auixp_dma_update(struct auixp_softc *, struct auixp_dma *);
 void	auixp_update_busbusy(struct auixp_softc *);
 
 #ifdef DEBUG_AUIXP
-#define DPRINTF(x)	printf x;
+#define DPRINTF(x)	printf x
 #else
 #define DPRINTF(x)
 #endif
@@ -372,7 +370,7 @@ auixp_malloc(void *hdl, int direction, size_t size, int pool, int flags)
 	}
 	SLIST_INSERT_HEAD(&sc->sc_dma_list, dma, dma_chain);
 
-	DPRINTF(("auixp_malloc: returning kern %p,   hw 0x%08x for %d bytes "
+	DPRINTF(("auixp_malloc: returning kern %p,   hw 0x%08x for %zu bytes "
 	    "in %d segs\n", KERNADDR(dma), (u_int32_t) DMAADDR(dma), dma->size,
 	    dma->nsegs)
 	);
@@ -913,6 +911,7 @@ auixp_activate(struct device *self, int act)
 
 	switch (act) {
 	case DVACT_SUSPEND:
+		rv = config_activate_children(self, act);
 		auixp_disable_interrupts(sc);
 		break;
 	case DVACT_RESUME:
@@ -1384,7 +1383,7 @@ auixp_reset_aclink(struct auixp_softc *sc)
 
 		/* have to wait at least 10 usec for it to initialise */
 		DELAY(20);
-	};
+	}
 
 	printf("%s: soft resetting aclink\n", sc->sc_dev.dv_xname);
 
@@ -1428,15 +1427,15 @@ auixp_reset_aclink(struct auixp_softc *sc)
 
 		timeout--;
 		if (timeout == 0) break;
-	};
+	}
 
 	if (timeout == 0) {
 		printf("%s: giving up aclink reset\n", sc->sc_dev.dv_xname);
-	};
+	}
 	if (timeout != 10) {
 		printf("%s: aclink hardware reset successful\n",
 			sc->sc_dev.dv_xname);
-	};
+	}
 
 	/* assert reset and sync for safety */
 	value  = bus_space_read_4(iot, ioh, ATI_REG_CMD);

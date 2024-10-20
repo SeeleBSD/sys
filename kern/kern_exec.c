@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_exec.c,v 1.254 2024/01/17 18:56:13 deraadt Exp $	*/
+/*	$OpenBSD: kern_exec.c,v 1.258 2024/08/21 03:07:45 deraadt Exp $	*/
 /*	$NetBSD: kern_exec.c,v 1.75 1996/02/09 18:59:28 christos Exp $	*/
 
 /*-
@@ -514,12 +514,10 @@ sys_execve(struct proc *p, void *v, register_t *retval)
 		pr->ps_pin.pn_pins = pack.ep_pins;
 		pack.ep_pins = NULL;
 		pr->ps_pin.pn_npins = pack.ep_npins;
-		pr->ps_flags |= PS_PIN;
 	} else {
 		pr->ps_pin.pn_start = pr->ps_pin.pn_end = 0;
 		pr->ps_pin.pn_pins = NULL;
 		pr->ps_pin.pn_npins = 0;
-		pr->ps_flags &= ~PS_PIN;
 	}
 	if (pr->ps_libcpin.pn_pins) {
 		free(pr->ps_libcpin.pn_pins, M_PINSYSCALL,
@@ -527,7 +525,6 @@ sys_execve(struct proc *p, void *v, register_t *retval)
 		pr->ps_libcpin.pn_start = pr->ps_libcpin.pn_end = 0;
 		pr->ps_libcpin.pn_pins = NULL;
 		pr->ps_libcpin.pn_npins = 0;
-		pr->ps_flags &= ~PS_LIBCPIN;
 	}
 
 	stopprofclock(pr);	/* stop profiling */
@@ -699,6 +696,7 @@ sys_execve(struct proc *p, void *v, register_t *retval)
 	/* reset CPU time usage for the thread, but not the process */
 	timespecclear(&p->p_tu.tu_runtime);
 	p->p_tu.tu_uticks = p->p_tu.tu_sticks = p->p_tu.tu_iticks = 0;
+	p->p_tu.tu_gen = 0;
 
 	memset(p->p_name, 0, sizeof p->p_name);
 
@@ -710,7 +708,7 @@ sys_execve(struct proc *p, void *v, register_t *retval)
 	/*
 	 * notify others that we exec'd
 	 */
-	knote_locked(&pr->ps_klist, NOTE_EXEC);
+	knote(&pr->ps_klist, NOTE_EXEC);
 
 	/* map the process's timekeep page, needs to be before exec_elf_fixup */
 	if (exec_timekeep_map(pr))
@@ -905,7 +903,7 @@ exec_sigcode_map(struct process *pr)
 	if (uvm_map(&pr->ps_vmspace->vm_map, &pr->ps_sigcode, round_page(sz),
 	    sigobject, 0, 0, UVM_MAPFLAG(PROT_EXEC,
 	    PROT_READ | PROT_WRITE | PROT_EXEC, MAP_INHERIT_COPY,
-	    MADV_RANDOM, UVM_FLAG_COPYONW | UVM_FLAG_SYSCALL))) {
+	    MADV_RANDOM, UVM_FLAG_COPYONW))) {
 		uao_detach(sigobject);
 		return (ENOMEM);
 	}

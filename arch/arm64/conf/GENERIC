@@ -1,4 +1,4 @@
-# $OpenBSD: GENERIC,v 1.284 2024/03/02 19:53:17 kettenis Exp $
+# $OpenBSD: GENERIC,v 1.289 2024/08/14 14:40:46 patrick Exp $
 #
 # GENERIC machine description file
 #
@@ -46,6 +46,7 @@ acpiec*		at acpi?
 acpige*		at acpi?
 acpimcfg*	at acpi?
 acpiiort*	at acpi?
+acpisectwo*	at acpi?
 smmu*		at acpiiort?
 acpipci*	at acpi?
 pci*		at acpipci?
@@ -95,6 +96,7 @@ smmu*		at fdt?
 xhci*		at fdt?
 ccp*		at fdt?		# AMD Cryptographic Co-processor
 ipmi*		at fdt?
+ufshci*		at fdt?
 
 # NS16550 compatible serial ports
 com*		at fdt?
@@ -247,6 +249,7 @@ bse*		at fdt?
 bse*		at acpi?
 dwctwo*		at fdt?
 usb*		at dwctwo?
+rpigpio*	at fdt? early 1
 
 # Amlogic SoCs
 amlclock*	at fdt? early 1
@@ -375,6 +378,7 @@ iic*		at sxitwi?	# I2C bus
 dwxe*		at fdt?
 
 # Xilinx Zynq UltraScale+ SoCs
+cad*		at fdt?			# Ethernet controller
 cduart*		at fdt?
 
 # PCI
@@ -403,6 +407,7 @@ iwn*		at pci?			# Intel WiFi Link 4965/5000/1000/6000
 iwm*		at pci?			# Intel WiFi Link 7xxx
 iwx*		at pci?			# Intel WiFi Link 22xxx
 qwx*		at pci?			# Qualcomm 802.11ax
+#qwz*		at pci?			# Qualcomm 802.11be
 
 # PCI SCSI
 ahci*		at pci? flags 0x0000	# AHCI SATA controllers

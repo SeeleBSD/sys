@@ -1,4 +1,4 @@
-/*	$OpenBSD: viogpu.c,v 1.3 2023/05/29 08:13:35 sf Exp $ */
+/*	$OpenBSD: viogpu.c,v 1.9 2024/08/27 18:44:12 sf Exp $ */
 
 /*
  * Copyright (c) 2021-2023 joshua stein <jcs@openbsd.org>
@@ -18,7 +18,6 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/timeout.h>
 
@@ -43,7 +42,7 @@ struct viogpu_softc;
 int	viogpu_match(struct device *, void *, void *);
 void	viogpu_attach(struct device *, struct device *, void *);
 int	viogpu_send_cmd(struct viogpu_softc *, void *, size_t, void *, size_t);
-int	viogpu_vq_wait(struct virtqueue *vq);
+int	viogpu_vq_done(struct virtqueue *vq);
 void	viogpu_rx_soft(void *arg);
 
 int	viogpu_get_display_info(struct viogpu_softc *);
@@ -60,10 +59,6 @@ int	viogpu_wsioctl(void *, u_long, caddr_t, int, struct proc *);
 paddr_t	viogpu_wsmmap(void *, off_t, int);
 int	viogpu_alloc_screen(void *, const struct wsscreen_descr *, void **,
 	    int *, int *, uint32_t *);
-int	viogpu_show_screen(void *, void *, int, void (*)(void *, int, int),
-	    void *);
-void	viogpu_enter_ddb(void *, void *);
-void	viogpu_doswitch(void *);
 
 #define VIOGPU_HEIGHT		160
 #define VIOGPU_WIDTH		160
@@ -142,9 +137,9 @@ struct cfdriver viogpu_cd = {
 int
 viogpu_match(struct device *parent, void *match, void *aux)
 {
-	struct virtio_softc *va = aux;
+	struct virtio_attach_args *va = aux;
 
-	if (va->sc_childdevid == PCI_PRODUCT_VIRTIO_GPU)
+	if (va->va_devid == PCI_PRODUCT_VIRTIO_GPU)
 		return 1;
 
 	return 0;
@@ -178,15 +173,13 @@ viogpu_attach(struct device *parent, struct device *self, void *aux)
 
 	/* allocate command and cursor virtqueues */
 	vsc->sc_vqs = sc->sc_vqs;
-	if (virtio_alloc_vq(vsc, &sc->sc_vqs[VQCTRL], VQCTRL, NBPG, 1,
-	    "control")) {
+	if (virtio_alloc_vq(vsc, &sc->sc_vqs[VQCTRL], VQCTRL, 1, "control")) {
 		printf(": alloc_vq failed\n");
 		return;
 	}
-	sc->sc_vqs[VQCTRL].vq_done = viogpu_vq_wait;
+	sc->sc_vqs[VQCTRL].vq_done = viogpu_vq_done;
 
-	if (virtio_alloc_vq(vsc, &sc->sc_vqs[VQCURS], VQCURS, NBPG, 1,
-	    "cursor")) {
+	if (virtio_alloc_vq(vsc, &sc->sc_vqs[VQCURS], VQCURS, 1, "cursor")) {
 		printf(": alloc_vq failed\n");
 		return;
 	}
@@ -216,6 +209,8 @@ viogpu_attach(struct device *parent, struct device *self, void *aux)
 		goto unmap;
 	}
 
+	virtio_set_status(vsc, VIRTIO_CONFIG_DEVICE_STATUS_DRIVER_OK);
+
 	if (viogpu_get_display_info(sc) != 0)
 		goto unmap;
 
@@ -234,8 +229,6 @@ viogpu_attach(struct device *parent, struct device *self, void *aux)
 	if (bus_dmamap_load(vsc->sc_dmat, sc->sc_fb_dma_map,
 	    sc->sc_fb_dma_kva, sc->sc_fb_dma_size, NULL, BUS_DMA_NOWAIT) != 0)
 		goto fb_unmap;
-
-	virtio_set_status(vsc, VIRTIO_CONFIG_DEVICE_STATUS_DRIVER_OK);
 
 	if (viogpu_create_2d(sc, 1, sc->sc_fb_width, sc->sc_fb_height) != 0)
 		goto fb_unmap;
@@ -330,14 +323,14 @@ viogpu_repaint(void *arg)
 }
 
 int
-viogpu_vq_wait(struct virtqueue *vq)
+viogpu_vq_done(struct virtqueue *vq)
 {
 	struct virtio_softc *vsc = vq->vq_owner;
 	struct viogpu_softc *sc = (struct viogpu_softc *)vsc->sc_child;
 	int slot, len;
 
-	while (virtio_dequeue(vsc, vq, &slot, &len) != 0)
-		;
+	if (virtio_dequeue(vsc, vq, &slot, &len) != 0)
+		return 0;
 
 	bus_dmamap_sync(vsc->sc_dmat, sc->sc_dma_map, 0, sc->sc_dma_size,
 	    BUS_DMASYNC_POSTREAD);
@@ -407,7 +400,8 @@ viogpu_send_cmd(struct viogpu_softc *sc, void *cmd, size_t cmd_size, void *ret,
 	virtio_enqueue_p(vq, slot, sc->sc_dma_map, cmd_size, ret_size, 0);
 	virtio_enqueue_commit(vsc, vq, slot, 1);
 
-	viogpu_vq_wait(vq);
+	while (virtio_check_vq(vsc, vq) == 0)
+		;
 
 	bus_dmamap_sync(vsc->sc_dmat, sc->sc_dma_map, 0, cmd_size,
 	    BUS_DMASYNC_POSTWRITE);

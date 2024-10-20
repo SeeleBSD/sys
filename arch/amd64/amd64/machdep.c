@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.291 2024/02/25 22:33:09 guenther Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.297 2024/09/21 19:06:07 deraadt Exp $	*/
 /*	$NetBSD: machdep.c,v 1.3 2003/05/07 22:58:18 fvdl Exp $	*/
 
 /*-
@@ -116,6 +116,7 @@ extern int db_console;
 
 #include "acpi.h"
 #if NACPI > 0
+#include <dev/acpi/acpireg.h>
 #include <dev/acpi/acpivar.h>
 #endif
 
@@ -162,6 +163,7 @@ char machine[] = MACHINE;
  */
 void cpu_idle_cycle_hlt(void);
 void (*cpu_idle_cycle_fcn)(void) = &cpu_idle_cycle_hlt;
+void (*cpu_suspend_cycle_fcn)(void);
 
 /* the following is used externally for concurrent handlers */
 int setperf_prio = 0;
@@ -178,10 +180,7 @@ int biosbasemem = 0;		/* base memory reported by BIOS */
 u_int bootapiver = 0;		/* /boot API version */
 
 int	physmem;
-u_int64_t	dumpmem_low;
-u_int64_t	dumpmem_high;
 extern int	boothowto;
-int	cpu_class;
 
 paddr_t	dumpmem_paddr;
 vaddr_t	dumpmem_vaddr;
@@ -489,7 +488,7 @@ extern int amd64_has_xcrypt;
 extern int need_retpoline;
 
 const struct sysctl_bounded_args cpuctl_vars[] = {
-	{ CPU_LIDACTION, &lid_action, 0, 2 },
+	{ CPU_LIDACTION, &lid_action, -1, 2 },
 	{ CPU_PWRACTION, &pwr_action, 0, 2 },
 	{ CPU_CPUID, &cpu_id, SYSCTL_INT_READONLY },
 	{ CPU_CPUFEATURE, &cpu_feature, SYSCTL_INT_READONLY },
@@ -883,6 +882,11 @@ struct pcb dumppcb;
 __dead void
 boot(int howto)
 {
+#if NACPI > 0
+	if ((howto & RB_POWERDOWN) != 0 && acpi_softc)
+		acpi_softc->sc_state = ACPI_STATE_S5;
+#endif
+
 	if ((howto & RB_POWERDOWN) != 0)
 		lid_action = 0;
 
@@ -1296,7 +1300,8 @@ set_sys_segment(struct sys_segment_descriptor *sd, void *base, size_t limit,
 	sd->sd_hibase = (u_int64_t)base >> 24;
 }
 
-void cpu_init_idt(void)
+void
+cpu_init_idt(void)
 {
 	struct region_descriptor region;
 
@@ -1393,6 +1398,23 @@ map_tramps(void)
 #endif
 }
 
+void
+cpu_set_vendor(struct cpu_info *ci, int level, const char *vendor)
+{
+	ci->ci_cpuid_level = level;
+	cpuid_level = MIN(cpuid_level, level);
+
+	/* map the vendor string to an integer */
+	if (strcmp(vendor, "AuthenticAMD") == 0)
+		ci->ci_vendor = CPUV_AMD;
+	else if (strcmp(vendor, "GenuineIntel") == 0)
+		ci->ci_vendor = CPUV_INTEL;
+	else if (strcmp(vendor, "CentaurHauls") == 0)
+		ci->ci_vendor = CPUV_VIA;
+	else
+		ci->ci_vendor = CPUV_UNKNOWN;
+}
+
 #define	IDTVEC(name)	__CONCAT(X, name)
 typedef void (vector)(void);
 extern vector *IDTVEC(exceptions)[];
@@ -1416,6 +1438,7 @@ init_x86_64(paddr_t first_avail)
 	early_pte_pages = first_avail;
 	first_avail += 3 * NBPG;
 
+	cpu_set_vendor(&cpu_info_primary, cpuid_level, cpu_vendor);
 	cpu_init_msrs(&cpu_info_primary);
 
 	proc0.p_addr = proc0paddr;

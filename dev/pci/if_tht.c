@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_tht.c,v 1.147 2023/11/10 15:51:24 bluhm Exp $ */
+/*	$OpenBSD: if_tht.c,v 1.149 2024/09/04 07:54:52 mglocker Exp $ */
 
 /*
  * Copyright (c) 2007 David Gwynne <dlg@openbsd.org>
@@ -30,11 +30,9 @@
 #include <sys/systm.h>
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
-#include <sys/kernel.h>
 #include <sys/socket.h>
 #include <sys/malloc.h>
 #include <sys/device.h>
-#include <sys/timeout.h>
 #include <sys/queue.h>
 #include <sys/rwlock.h>
 #include <sys/time.h>
@@ -262,7 +260,7 @@ int thtdebug = THT_D_TX | THT_D_RX | THT_D_INTR;
 #define THT_FIFO_GAP		8 /* keep 8 bytes between ptrs */
 #define THT_FIFO_PTR_MASK	0x00007ff8 /* rptr/wptr mask */
 
-#define THT_FIFO_DESC_LEN	208 /* a descriptor cant be bigger than this */
+#define THT_FIFO_DESC_LEN	208 /* a descriptor can't be bigger than this */
 
 #define THT_IMR_DOWN(_p)	(THT_REG_IMR_LINKCHG(_p))
 #define THT_IMR_UP(_p)		(THT_REG_IMR_LINKCHG(_p) | \
@@ -1036,7 +1034,7 @@ tht_iff(struct tht_softc *sc)
 		}
 #endif
 
-		/* fill the imperfect multicast filter with whats left */
+		/* fill the imperfect multicast filter with what's left */
 		while (enm != NULL) {
 			hash = 0x00;
 			for (i = 0; i < ETHER_ADDR_LEN; i++)

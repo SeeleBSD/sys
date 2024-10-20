@@ -1,0 +1,6 @@
+@@ -1,4 +1,4 @@
+-/*	$OpenBSD: nfs_socket.c,v 1.145.2.1 2024/09/15 22:32:37 bluhm Exp $	*/
++/*	$OpenBSD: nfs_socket.c,v 1.154 2024/09/18 05:21:19 jsg Exp $	*/
+ /*	$NetBSD: nfs_socket.c,v 1.27 1996/04/15 20:20:00 thorpej Exp $	*/
+ 
+ /*

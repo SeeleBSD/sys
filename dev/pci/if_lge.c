@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_lge.c,v 1.80 2023/11/10 15:51:20 bluhm Exp $	*/
+/*	$OpenBSD: if_lge.c,v 1.82 2024/09/06 10:54:08 jsg Exp $	*/
 /*
  * Copyright (c) 2001 Wind River Systems
  * Copyright (c) 1997, 1998, 1999, 2000, 2001
@@ -80,10 +80,7 @@
 #include <sys/systm.h>
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
-#include <sys/malloc.h>
-#include <sys/kernel.h>
 #include <sys/device.h>
-#include <sys/socket.h>
 
 #include <net/if.h>
 #include <net/if_media.h>
@@ -102,7 +99,6 @@
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcidevs.h>
 
-#include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 
 #define LGE_USEIOSPACE
@@ -1067,7 +1063,7 @@ lge_init(void *xsc)
 	CSR_WRITE_4(sc, LGE_MODE1, LGE_MODE1_VLAN_RX|LGE_MODE1_VLAN_TX|
 	    LGE_MODE1_VLAN_STRIP|LGE_MODE1_VLAN_INSERT);
 
-	/* Workarond: FIFO overflow */
+	/* Workaround: FIFO overflow */
 	CSR_WRITE_2(sc, LGE_RXFIFO_HIWAT, 0x3FFF);
 	CSR_WRITE_4(sc, LGE_IMR, LGE_IMR_SETRST_CTL1|LGE_IMR_RXFIFO_WAT);
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_bridge.c,v 1.369 2024/02/13 12:22:09 bluhm Exp $	*/
+/*	$OpenBSD: if_bridge.c,v 1.372 2024/09/01 03:09:00 jsg Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Jason L. Wright (jason@thought.net)
@@ -70,7 +70,7 @@
 #if NPF > 0
 #include <net/pfvar.h>
 #define	BRIDGE_IN	PF_IN
-#define	BRIDGE_OUT	PF_OUT
+#define	BRIDGE_OUT	PF_FWD
 #else
 #define	BRIDGE_IN	0
 #define	BRIDGE_OUT	1
@@ -262,7 +262,7 @@ bridge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	/*
 	 * bridge(4) data structure aren't protected by the NET_LOCK().
-	 * Idealy it shouldn't be taken before calling `ifp->if_ioctl'
+	 * Ideally it shouldn't be taken before calling `ifp->if_ioctl'
 	 * but we aren't there yet.  Media ioctl run without netlock.
 	 */
 	switch (cmd) {
@@ -1600,7 +1600,7 @@ bridge_ipsec(struct ifnet *ifp, struct ether_header *eh, int hassnap,
 			    off);
 			tdb_unref(tdb);
 			if (prot != IPPROTO_DONE)
-				ip_deliver(&m, &hlen, prot, af);
+				ip_deliver(&m, &hlen, prot, af, 0);
 			return (1);
 		} else {
 			tdb_unref(tdb);

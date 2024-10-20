@@ -1,4 +1,4 @@
-/* $OpenBSD: locore.S,v 1.45 2023/12/12 07:37:20 deraadt Exp $ */
+/* $OpenBSD: locore.S,v 1.47 2024/07/27 13:31:26 kettenis Exp $ */
 /*-
  * Copyright (c) 2012-2014 Andrew Turner
  * All rights reserved.
@@ -57,6 +57,7 @@ drop_to_el1:
 
 	/* Configure the Hypervisor */
 	mov	x2, #(HCR_RW)
+	orr	x2, x2, #(HCR_API | HCR_APK)
 	msr	hcr_el2, x2
 
 	/* Load the Virtualization Process ID Register */
@@ -314,6 +315,9 @@ initstack:
 	.globl initstack_end
 initstack_end:
 
+/* The signal trampoline saves and restores the floating-point registers. */
+.arch_extension	fp
+
 	.text
 	.globl	sigcode
 	.type	sigcode,@function
@@ -385,6 +389,9 @@ esigfill:
 	.globl	sigfillsiz
 sigfillsiz:
 	.word	esigfill - sigfill
+
+/* Back to normal kernel code. */
+.arch_extension	nofp
 
 	.text
 

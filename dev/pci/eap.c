@@ -1,4 +1,4 @@
-/*      $OpenBSD: eap.c,v 1.64 2022/10/26 20:19:08 kn Exp $ */
+/*      $OpenBSD: eap.c,v 1.66 2024/09/01 03:08:56 jsg Exp $ */
 /*	$NetBSD: eap.c,v 1.46 2001/09/03 15:07:37 reinoud Exp $ */
 
 /*
@@ -51,7 +51,6 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/kernel.h>
 #include <sys/fcntl.h>
 #include <sys/device.h>
 
@@ -522,7 +521,7 @@ eap_attach(struct device *parent, struct device *self, void *aux)
 		 * or it locks up.
 		 *
 		 * We don't know how to program it (no documentation),
-		 * and the linux/oss magic receipe doesn't work (breaks
+		 * and the linux/oss magic recipe doesn't work (breaks
 		 * full-duplex, by selecting different play and record
 		 * rates). On the other hand, the sample rate converter
 		 * can't be disabled (disabling it would disable DMA),

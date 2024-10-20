@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_umb.c,v 1.56 2023/10/24 09:13:22 jmatthew Exp $ */
+/*	$OpenBSD: if_umb.c,v 1.59 2024/08/08 05:10:00 deraadt Exp $ */
 
 /*
  * Copyright (c) 2016 genua mbH
@@ -29,7 +29,6 @@
 
 #include <sys/param.h>
 #include <sys/mbuf.h>
-#include <sys/socket.h>
 #include <sys/systm.h>
 #include <sys/syslog.h>
 #include <sys/kstat.h>
@@ -44,12 +43,9 @@
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
-#include <netinet/ip.h>
 
 #ifdef INET6
-#include <netinet/ip6.h>
 #include <netinet6/in6_var.h>
-#include <netinet6/ip6_var.h>
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/nd6.h>
 #endif
@@ -245,7 +241,13 @@ struct umb_quirk {
 	int			 umb_match;
 };
 const struct umb_quirk umb_quirks[] = {
-	{ { USB_VENDOR_DELL, USB_PRODUCT_DELL_DW5821E },
+	{ { USB_VENDOR_DELL, USB_PRODUCT_DELL_DW5821E_1 },
+	  0,
+	  2,
+	  UMATCH_VENDOR_PRODUCT
+	},
+
+	{ { USB_VENDOR_DELL, USB_PRODUCT_DELL_DW5821E_2 },
 	  0,
 	  2,
 	  UMATCH_VENDOR_PRODUCT
@@ -3135,7 +3137,7 @@ umb_intr(struct usbd_xfer *xfer, void *priv, usbd_status status)
 	if (total_len < UCDC_NOTIFICATION_LENGTH) {
 		DPRINTF("%s: short notification (%d<%d)\n", DEVNAM(sc),
 		    total_len, UCDC_NOTIFICATION_LENGTH);
-		    return;
+		return;
 	}
 	if (sc->sc_intr_msg.bmRequestType != UCDC_NOTIFICATION) {
 		DPRINTF("%s: unexpected notification (type=0x%02x)\n",

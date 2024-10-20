@@ -296,6 +296,7 @@ int intel_gt_resume(struct intel_gt *gt)
 out_fw:
 	intel_uncore_forcewake_put(gt->uncore, FORCEWAKE_ALL);
 	intel_gt_pm_put(gt);
+	intel_gt_bind_context_set_ready(gt);
 	return err;
 
 err_wedged:
@@ -322,11 +323,11 @@ static void wait_for_suspend(struct intel_gt *gt)
 
 void intel_gt_suspend_prepare(struct intel_gt *gt)
 {
+	intel_gt_bind_context_set_unready(gt);
 	user_forcewake(gt, true);
 	wait_for_suspend(gt);
 }
 
-#ifdef notyet
 static suspend_state_t pm_suspend_target(void)
 {
 #if IS_ENABLED(CONFIG_SUSPEND) && IS_ENABLED(CONFIG_PM_SLEEP)
@@ -335,7 +336,6 @@ static suspend_state_t pm_suspend_target(void)
 	return PM_SUSPEND_TO_IDLE;
 #endif
 }
-#endif
 
 void intel_gt_suspend_late(struct intel_gt *gt)
 {
@@ -361,10 +361,8 @@ void intel_gt_suspend_late(struct intel_gt *gt)
 	 * powermanagement enabled, but we also retain system state and so
 	 * it remains safe to keep on using our allocated memory.
 	 */
-#ifdef notyet
 	if (pm_suspend_target() == PM_SUSPEND_TO_IDLE)
 		return;
-#endif
 
 	with_intel_runtime_pm(gt->uncore->rpm, wakeref) {
 		intel_rps_disable(&gt->rps);
@@ -379,6 +377,7 @@ void intel_gt_suspend_late(struct intel_gt *gt)
 
 void intel_gt_runtime_suspend(struct intel_gt *gt)
 {
+	intel_gt_bind_context_set_unready(gt);
 	intel_uc_runtime_suspend(&gt->uc);
 
 	GT_TRACE(gt, "\n");
@@ -396,6 +395,7 @@ int intel_gt_runtime_resume(struct intel_gt *gt)
 	if (ret)
 		return ret;
 
+	intel_gt_bind_context_set_ready(gt);
 	return 0;
 }
 

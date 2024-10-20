@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_lii.c,v 1.46 2022/03/11 18:00:45 mpi Exp $	*/
+/*	$OpenBSD: if_lii.c,v 1.48 2024/08/31 16:23:09 deraadt Exp $	*/
 
 /*
  *  Copyright (c) 2007 The NetBSD Foundation.
@@ -36,9 +36,7 @@
 #include <sys/systm.h>
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
-#include <sys/kernel.h>
 #include <sys/socket.h>
-#include <sys/malloc.h>
 #include <sys/device.h>
 #include <sys/timeout.h>
 
@@ -284,23 +282,18 @@ lii_activate(struct device *self, int act)
 {
 	struct lii_softc *sc = (struct lii_softc *)self;
 	struct ifnet *ifp = &sc->sc_ac.ac_if;
-	int rv = 0;
 
 	switch (act) {
 	case DVACT_SUSPEND:
 		if (ifp->if_flags & IFF_RUNNING)
 			lii_stop(ifp);
-		rv = config_activate_children(self, act);
 		break;
 	case DVACT_RESUME:
 		if (ifp->if_flags & IFF_UP)
 			lii_init(ifp);
 		break;
-	default:
-		rv = config_activate_children(self, act);
-		break;
 	}
-	return (rv);
+	return (0);
 }
 
 int

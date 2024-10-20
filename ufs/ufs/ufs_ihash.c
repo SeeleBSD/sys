@@ -1,4 +1,4 @@
-/*	$OpenBSD: ufs_ihash.c,v 1.26 2021/10/19 06:11:45 semarie Exp $	*/
+/*	$OpenBSD: ufs_ihash.c,v 1.30 2024/09/11 08:29:55 claudio Exp $	*/
 /*	$NetBSD: ufs_ihash.c,v 1.3 1996/02/09 22:36:04 christos Exp $	*/
 
 /*
@@ -36,10 +36,13 @@
 #include <sys/systm.h>
 #include <sys/vnode.h>
 #include <sys/malloc.h>
+#include <sys/mount.h>
 
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
 #include <ufs/ufs/ufs_extern.h>
+#include <ufs/ufs/ufsmount.h>
+#include <ufs/ext2fs/ext2fs_extern.h>
 
 #include <crypto/siphash.h>
 
@@ -77,30 +80,6 @@ ufs_ihashinit(void)
 
 /*
  * Use the device/inum pair to find the incore inode, and return a pointer
- * to it. If it is in core, return it, even if it is locked.
- */
-struct vnode *
-ufs_ihashlookup(dev_t dev, ufsino_t inum)
-{
-        struct inode *ip;
-	struct ihashhead *ipp;
-
-	/* XXXLOCKING lock hash list */
-	ipp = INOHASH(dev, inum);
-	LIST_FOREACH(ip, ipp, i_hash) {
-		if (inum == ip->i_number && dev == ip->i_dev)
-			break;
-	}
-	/* XXXLOCKING unlock hash list? */
-
-	if (ip)
-		return (ITOV(ip));
-
-	return (NULLVP);
-}
-
-/*
- * Use the device/inum pair to find the incore inode, and return a pointer
  * to it. If it is in core, but locked, wait for it.
  */
 struct vnode *
@@ -118,6 +97,52 @@ loop:
 			/* XXXLOCKING unlock hash list? */
 			if (vget(vp, LK_EXCLUSIVE))
 				goto loop;
+			/*
+			* Check if the inode is valid.
+			* The condition has been adapted from ufs_inactive().
+			*
+			* This is needed in case our vget above grabbed a vnode
+			* while ufs_inactive was reclaiming it.
+			*
+			* XXX this is a workaround and kind of a gross hack.
+			* realistically this should get fixed something like
+			* the previously committed vdoom() or this should be
+			* dealt with so this can't happen.
+			*/
+#ifdef FUSE
+			/*
+			 * XXX for whatever stupid reason fuse decided to
+			 * use ufs inodes and with this ufs_ihashget.
+			 * fuse needs to grow up and use its own inode
+			 * structure and hash.
+			 */
+			if (vp->v_tag == VT_FUSEFS)
+				return (vp);
+#endif
+			if (VTOI(vp) != ip ||
+			    ((
+#ifdef EXT2FS
+			    /*
+			     * XXX DIP does not cover ext2fs so hack
+			     * around this for now since this is using
+			     * ufs_ihashget as well.
+			     */
+			    IS_EXT2_VNODE(vp) ? ip->i_e2fs_nlink <= 0 :
+#endif
+			    DIP(ip, nlink) <= 0) &&
+			     (vp->v_mount->mnt_flag & MNT_RDONLY) == 0)) {
+				/*
+				 * This should recycle the inode immediately,
+				 * unless there are other threads that
+				 * try to access it.
+				 * Pause to give the threads a chance to finish
+				 * with the inode.
+				 */
+				vput(vp);
+				yield();
+				goto loop;
+			}
+
 			return (vp);
  		}
 	}

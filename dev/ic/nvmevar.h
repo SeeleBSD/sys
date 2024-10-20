@@ -1,4 +1,4 @@
-/*	$OpenBSD: nvmevar.h,v 1.28 2021/08/29 12:02:52 kettenis Exp $ */
+/*	$OpenBSD: nvmevar.h,v 1.31 2024/09/13 09:57:34 jmatthew Exp $ */
 
 /*
  * Copyright (c) 2014 David Gwynne <dlg@openbsd.org>
@@ -16,6 +16,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <sys/sensors.h>
+
 #define NVME_IO_Q	1
 #define NVME_HIB_Q	2
 #define NVME_MAXPHYS	(128 * 1024)
@@ -32,7 +34,6 @@ struct nvme_dmamem {
 #define NVME_DMA_KVA(_ndm)	((void *)(_ndm)->ndm_kva)
 
 struct nvme_softc;
-struct nvme_queue;
 
 struct nvme_ccb {
 	SIMPLEQ_ENTRY(nvme_ccb)	ccb_entry;
@@ -125,6 +126,13 @@ struct nvme_softc {
 	struct nvme_ccb_list	sc_ccb_list;
 	struct nvme_dmamem	*sc_ccb_prpls;
 	struct scsi_iopool	sc_iopool;
+	struct rwlock		sc_lock;
+	struct scsibus_softc	*sc_scsibus;
+
+	struct ksensordev	sc_sensordev;
+	struct ksensor		sc_temp_sensor;
+	struct ksensor		sc_spare_sensor;
+	struct ksensor		sc_usage_sensor;
 };
 
 #define DEVNAME(_sc) ((_sc)->sc_dev.dv_xname)

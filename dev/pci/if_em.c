@@ -31,13 +31,11 @@ POSSIBILITY OF SUCH DAMAGE.
 
 ***************************************************************************/
 
-/* $OpenBSD: if_em.c,v 1.374 2024/02/16 22:30:54 mglocker Exp $ */
+/* $OpenBSD: if_em.c,v 1.378 2024/08/31 16:23:09 deraadt Exp $ */
 /* $FreeBSD: if_em.c,v 1.46 2004/09/29 18:28:28 mlaier Exp $ */
 
 #include <dev/pci/if_em.h>
 #include <dev/pci/if_em_soc.h>
-
-#include <netinet/ip6.h>
 
 /*********************************************************************
  *  Driver version
@@ -277,7 +275,6 @@ void em_enable_intr(struct em_softc *);
 void em_disable_intr(struct em_softc *);
 void em_free_transmit_structures(struct em_softc *);
 void em_free_receive_structures(struct em_softc *);
-void em_update_stats_counters(struct em_softc *);
 void em_disable_aspm(struct em_softc *);
 void em_txeof(struct em_queue *);
 int  em_allocate_receive_structures(struct em_softc *);
@@ -2079,24 +2076,18 @@ em_activate(struct device *self, int act)
 {
 	struct em_softc *sc = (struct em_softc *)self;
 	struct ifnet *ifp = &sc->sc_ac.ac_if;
-	int rv = 0;
 
 	switch (act) {
 	case DVACT_SUSPEND:
 		if (ifp->if_flags & IFF_RUNNING)
 			em_stop(sc, 0);
-		/* We have no children atm, but we will soon */
-		rv = config_activate_children(self, act);
 		break;
 	case DVACT_RESUME:
 		if (ifp->if_flags & IFF_UP)
 			em_init(sc);
 		break;
-	default:
-		rv = config_activate_children(self, act);
-		break;
 	}
-	return (rv);
+	return (0);
 }
 
 /*********************************************************************
@@ -2452,7 +2443,7 @@ em_tso_setup(struct em_queue *que, struct mbuf *mp, u_int head,
 #endif
 
 	ether_extract_headers(mp, &ext);
-	if (ext.tcp == NULL)
+	if (ext.tcp == NULL || mp->m_pkthdr.ph_mss == 0)
 		goto out;
 
 	vlan_macip_lens |= (sizeof(*ext.eh) << E1000_ADVTXD_MACLEN_SHIFT);

@@ -1,4 +1,4 @@
-/* $OpenBSD: kstat.c,v 1.2 2022/01/31 05:09:17 dlg Exp $ */
+/* $OpenBSD: kstat.c,v 1.4 2024/09/04 07:54:52 mglocker Exp $ */
 
 /*
  * Copyright (c) 2020 David Gwynne <dlg@openbsd.org>
@@ -252,7 +252,7 @@ kstatioc_leave(struct kstat_req *ksreq, struct kstat *ks)
 
 			/* KSTAT_F_REALLOC */
 			KASSERTMSG(ks->ks_datalen == klen,
-			    "kstat doesnt support resized data yet");
+			    "kstat doesn't support resized data yet");
 
 			error = (*ks->ks_copy)(ks, buf);
 		}
@@ -593,7 +593,7 @@ kstat_cpu_enter(void *p)
 void
 kstat_cpu_leave(void *p)
 {
-	atomic_clearbits_int(&curproc->p_flag, P_CPUPEG);
+	sched_unpeg_curproc();
 }
 
 void

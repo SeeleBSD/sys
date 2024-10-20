@@ -1009,7 +1009,7 @@ radeondrm_attach_kms(struct device *parent, struct device *self, void *aux)
 	if (PCI_MAPREG_TYPE(type) != PCI_MAPREG_TYPE_MEM ||
 	    pci_mapreg_info(pa->pa_pc, pa->pa_tag, RADEON_PCI_MEM,
 	    type, &rdev->fb_aper_offset, &rdev->fb_aper_size, NULL)) {
-		printf(": can't get frambuffer info\n");
+		printf(": can't get framebuffer info\n");
 		return;
 	}
 	if (rdev->fb_aper_offset == 0) {
@@ -1273,10 +1273,11 @@ radeondrm_attachhook(struct device *self)
 
 	task_set(&rdev->switchtask, radeondrm_doswitch, ri);
 
-	/*
-	 * in linux via radeon_pci_probe -> drm_get_pci_dev -> drm_dev_register
-	 */
-	drm_dev_register(rdev->ddev, rdev->flags);
+	/* from linux radeon_pci_probe() */
+
+	pci_set_drvdata(dev->pdev, dev);
+
+	drm_dev_register(dev, rdev->flags);
 
 	radeon_fbdev_setup(rdev);
 

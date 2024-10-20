@@ -1,4 +1,4 @@
-$OpenBSD: usbdevs,v 1.760 2023/11/27 20:03:50 miod Exp $
+$OpenBSD: usbdevs,v 1.768 2024/08/27 12:31:18 sthen Exp $
 /* $NetBSD: usbdevs,v 1.322 2003/05/10 17:47:14 hamajima Exp $ */
 
 /*
@@ -365,6 +365,7 @@ vendor GARMIN		0x091e	Garmin International
 vendor GOHUBS		0x0921	GoHubs
 vendor BIOMETRIC	0x0929	American Biometric Company
 vendor TOSHIBA		0x0930	Toshiba Corp
+vendor PIXART		0x093a	PixArt
 vendor INTREPIDCS	0x093c	Intrepid
 vendor YANO		0x094f	Yano
 vendor KINGSTON		0x0951	Kingston Technology
@@ -1004,8 +1005,8 @@ product APPLE WELLSPRING9_JIS	0x0274	Keyboard/Trackpad
 product APPLE WELLSPRING8_ANSI	0x0290	Keyboard/Trackpad
 product APPLE WELLSPRING8_ISO	0x0291	Keyboard/Trackpad
 product APPLE WELLSPRING8_JIS	0x0292	Keyboard/Trackpad
-product APPLE WELLSPRINGM1_J293	0x0341	Keyboard/Trackpad	
 product APPLE OPTMOUSE		0x0302	Optical mouse
+product APPLE WELLSPRINGM1_J293	0x0341	Keyboard/Trackpad	
 product APPLE BLUETOOTH_HCI	0x1000	HID-proxy
 product APPLE SPEAKERS		0x1101	Speakers
 product APPLE IPHONE		0x1290	iPhone
@@ -1023,6 +1024,7 @@ product APPLE IPHONE_4S		0x12a0	iPhone 4S
 product APPLE IPHONE_6		0x12a8	iPhone 6
 product APPLE ETHERNET		0x1402	Ethernet A1277
 product APPLE BLUETOOTH2	0x8205	Bluetooth
+product APPLE BLUETOOTH3	0x8207	Bluetooth
 product APPLE BLUETOOTH		0x8300	Bluetooth
 product APPLE ISIGHT_1		0x8501	iSight
 product APPLE ISIGHT		0x8502	iSight
@@ -1346,6 +1348,7 @@ product CHIC CYPRESS		0x0003	Cypress
 
 /* Chicony products */
 product CHICONY KB8933		0x0001	KB-8933 keyboard
+product	CHICONY	OPTMOUSE	0x0939	Optical Mouse
 product	CHICONY	CAMERA		0x480c	Integrated Camera
 product CHICONY RTL8188CUS_1	0xaff7	RTL8188CUS
 product CHICONY RTL8188CUS_2	0xaff8	RTL8188CUS
@@ -1536,7 +1539,8 @@ product	DELL PRISM_GT_2		0x8104	PrismGT USB 2.0 WLAN
 product DELL W5500		0x8115	W5500 HSDPA 
 product DELL U740		0x8135	U740 CDMA
 product DELL EU870D		0x8138	EU870D HSDPA
-product DELL DW5821E		0x81d7	DW5821e LTE
+product DELL DW5821E_1		0x81d7	DW5821e LTE
+product DELL DW5821E_2		0x81e0	DW5821e LTE
 product DELL DW700		0x9500	DW700 GPS
 product DELL2 UPS		0xffff	UPS
 
@@ -2636,6 +2640,7 @@ product LENOVO RTL8153B_2	0x3098	RTL8153B
 product LENOVO RTL8153B_3	0x309b	RTL8153B
 product LENOVO RTL8153B_4	0x309c	RTL8153B
 product LENOVO RTL8153B_5	0x309d	RTL8153B
+product LENOVO OPTUSBMOUSE	0x600e	Optical Mouse
 product LENOVO ETHERNET		0x7203	USB 2.0 Ethernet
 product LENOVO RTL8153_1	0x7205	RTL8153
 product LENOVO ONELINK		0x720a	OneLink
@@ -2751,6 +2756,8 @@ product LOGITECH MBA47		0xc002	M-BA47 mouse
 product LOGITECH WMMOUSE	0xc004	WingMan Gaming Mouse
 product LOGITECH BD58		0xc00c	BD58 mouse
 product LOGITECH UN58A		0xc030	iFeel Mouse
+product LOGITECH B100_1		0xc05a	B100 mouse
+product LOGITECH B100_2		0xc077	B100 mouse
 product LOGITECH WMPAD		0xc208	WingMan GamePad Extreme
 product LOGITECH WMRPAD		0xc20a	WingMan RumblePad
 product LOGITECH WMJOY		0xc281	WingMan Force joystick
@@ -3137,6 +3144,7 @@ product MICROSOFT INETPRO	0x001c	Internet Keyboard Pro
 product MICROSOFT TBEXPLORER	0x0024	Trackball Explorer
 product MICROSOFT INTELLIEYE	0x0025	IntelliEye mouse
 product MICROSOFT INETPRO2	0x002b	Internet Keyboard Pro
+product MICROSOFT PIXARTMOUSE	0x00cb	Optical Mouse
 product MICROSOFT MN510		0x006e	MN510 Wireless
 product MICROSOFT 700WX		0x0079	Palm 700WX
 product MICROSOFT MN110		0x007a	10/100 Ethernet
@@ -3598,6 +3606,10 @@ product PILOTECH CRW600		0x0001	CRW-600 6-in-1
 product PIONEERDJ RTL8152B	0x0007	RTL8152B
 product PIONEERDJ RTL8153B	0x0031	RTL8153B
 
+/* PixArt products */
+
+product PIXART RPIMOUSE		0x2510	Raspberry Pi Mouse
+
 /* Planex Communications products */
 product PLANEX GW_US11H		0x14ea	GW-US11H WLAN
 product PLANEX2 RTL8188CUS	0x1201	RTL8188CUS
@@ -3726,6 +3738,7 @@ product QUECTEL EG91		0x0191	EG91
 product QUECTEL EG95		0x0195	EG95
 product QUECTEL BG96		0x0296	BG96
 product QUECTEL EG06		0x0306	EG06/EP06/EM06
+product QUECTEL EM060K		0x030b	EM060K
 product QUECTEL AG15		0x0415	AG15
 product QUECTEL AG35		0x0435	AG35
 product QUECTEL AG520R		0x0452	AG520R
@@ -3808,6 +3821,7 @@ product REALTEK RTL8187		0x8187	RTL8187
 product REALTEK RTL8187B_0	0x8189	RTL8187B
 product REALTEK RTL8188CUS	0x818a	RTL8188CUS
 product REALTEK RTL8192EU	0x818b	RTL8192EU
+product REALTEK RTL8192EU_2	0x818c	RTL8192EU
 product REALTEK RTL8188CU_3	0x8191	RTL8188CU
 product REALTEK RTL8192U	0x8192	RTL8192U
 product REALTEK RTL8187B_1	0x8197	RTL8187B
@@ -4652,6 +4666,8 @@ product WAVESENSE JAZZ		0xaaaa	Jazz blood glucose meter
 /* WCH/QinHeng Electronics */
 product WCH CH341		0x5523	CH341 serial/parallel
 product WCH2 CH341A		0x5523	CH341A serial/parallel
+product WCH2 CH343		0x55d3	CH343 serial/parallel
+product WCH2 CH9102		0x55d4	CH9102 serial/parallel
 product WCH2 CH340		0x7523	CH340 serial/parallel
 product	WCH2 TEMPER		0xe025	TEMPer sensor
 

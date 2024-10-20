@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_km.c,v 1.151 2022/08/01 14:15:46 mpi Exp $	*/
+/*	$OpenBSD: uvm_km.c,v 1.154 2024/08/24 10:46:43 mpi Exp $	*/
 /*	$NetBSD: uvm_km.c,v 1.42 2001/01/14 02:10:01 thorpej Exp $	*/
 
 /* 
@@ -117,10 +117,10 @@
  * address minus the vm_map_min(kernel_map).
  * example:
  *   suppose kernel_map starts at 0xf8000000 and the kernel does a
- *   uvm_km_alloc(kernel_map, PAGE_SIZE) [allocate 1 wired down page in the
- *   kernel map].    if uvm_km_alloc returns virtual address 0xf8235000,
- *   then that means that the page at offset 0x235000 in kernel_object is
- *   mapped at 0xf8235000.   
+ *   km_alloc(PAGE_SIZE, &kv_any, &kp_none, &kd_waitok)) [allocate 1 wired
+ *   down page in the kernel map].    if km_alloc() returns virtual address
+ *   0xf8235000, then that means that the page at offset 0x235000 in
+ *   kernel_object is mapped at 0xf8235000.
  *
  * kernel objects have one other special property: when the kernel virtual
  * memory mapping them is unmapped, the backing memory in the object is
@@ -183,6 +183,11 @@ uvm_km_init(vaddr_t base, vaddr_t start, vaddr_t end)
 		panic("uvm_km_init: could not reserve space for kernel");
 	
 	kernel_map = &kernel_map_store;
+
+#ifndef __HAVE_PMAP_DIRECT
+	/* allow km_alloc calls before uvm_km_thread starts */
+	mtx_init(&uvm_km_pages.mtx, IPL_VM);
+#endif
 }
 
 /*
@@ -428,13 +433,14 @@ uvm_km_free(struct vm_map *map, vaddr_t addr, vsize_t size)
 	uvm_unmap(map, trunc_page(addr), round_page(addr+size));
 }
 
+#ifdef __i386__
 /*
- * uvm_km_alloc1: allocate wired down memory in the kernel map.
+ * uvm_km_zalloc: allocate wired down memory in the kernel map.
  *
  * => we can sleep if needed
  */
 vaddr_t
-uvm_km_alloc1(struct vm_map *map, vsize_t size, vsize_t align, boolean_t zeroit)
+uvm_km_zalloc(struct vm_map *map, vsize_t size)
 {
 	vaddr_t kva, loopva;
 	voff_t offset;
@@ -447,7 +453,7 @@ uvm_km_alloc1(struct vm_map *map, vsize_t size, vsize_t align, boolean_t zeroit)
 
 	/* allocate some virtual space */
 	if (__predict_false(uvm_map(map, &kva, size, uvm.kernel_object,
-	    UVM_UNKNOWN_OFFSET, align,
+	    UVM_UNKNOWN_OFFSET, 0,
 	    UVM_MAPFLAG(PROT_READ | PROT_WRITE,
 	    PROT_READ | PROT_WRITE | PROT_EXEC,
 	    MAP_INHERIT_NONE, MADV_RANDOM, 0)) != 0)) {
@@ -478,7 +484,7 @@ uvm_km_alloc1(struct vm_map *map, vsize_t size, vsize_t align, boolean_t zeroit)
 				uvm_unmap(map, kva, loopva - kva);
 				return (0);
 			} else {
-				uvm_wait("km_alloc1w");	/* wait for memory */
+				uvm_wait("km_zallocw");	/* wait for memory */
 				continue;
 			}
 		}
@@ -496,16 +502,16 @@ uvm_km_alloc1(struct vm_map *map, vsize_t size, vsize_t align, boolean_t zeroit)
 		size -= PAGE_SIZE;
 	}
 	pmap_update(map->pmap);
-	
+
 	/*
 	 * zero on request (note that "size" is now zero due to the above loop
 	 * so we need to subtract kva from loopva to reconstruct the size).
 	 */
-	if (zeroit)
-		memset((caddr_t)kva, 0, loopva - kva);
+	memset((caddr_t)kva, 0, loopva - kva);
 
 	return kva;
 }
+#endif
 
 #if defined(__HAVE_PMAP_DIRECT)
 /*
@@ -558,7 +564,6 @@ uvm_km_page_init(void)
 	int	len, bulk;
 	vaddr_t	addr;
 
-	mtx_init(&uvm_km_pages.mtx, IPL_VM);
 	if (!uvm_km_pages.lowat) {
 		/* based on physmem, calculate a good value here */
 		uvm_km_pages.lowat = physmem / 256;

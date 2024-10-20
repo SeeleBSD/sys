@@ -1,4 +1,4 @@
-/*	$OpenBSD: pci.h,v 1.16 2024/01/16 23:38:13 jsg Exp $	*/
+/*	$OpenBSD: pci.h,v 1.18 2024/08/28 04:55:45 jsg Exp $	*/
 /*
  * Copyright (c) 2015 Mark Kettenis
  *
@@ -33,6 +33,7 @@
 #include <linux/kobject.h>
 #include <linux/dma-mapping.h>
 #include <linux/mod_devicetable.h>
+#include <linux/device.h>
 
 struct pci_dev;
 
@@ -70,6 +71,7 @@ struct pci_dev {
 	uint8_t		ltr_path;
 
 	struct pci_acpi dev;
+	struct device *_dev;
 };
 #define PCI_ANY_ID (uint16_t) (~0U)
 
@@ -457,6 +459,13 @@ pci_is_thunderbolt_attached(struct pci_dev *pdev)
 static inline void
 pci_set_drvdata(struct pci_dev *pdev, void *data)
 {
+	dev_set_drvdata(pdev->_dev, data);
+}
+
+static inline void *
+pci_get_drvdata(struct pci_dev *pdev)
+{
+	return dev_get_drvdata(pdev->_dev);
 }
 
 static inline int
@@ -523,5 +532,11 @@ pci_match_id(const struct pci_device_id *ids, struct pci_dev *pdev)
     ((PCI_CLASS_DISPLAY << 8) | PCI_SUBCLASS_DISPLAY_MISC)
 #define PCI_CLASS_ACCELERATOR_PROCESSING \
     (PCI_CLASS_ACCELERATOR << 8)
+
+static inline int
+pci_device_is_present(struct pci_dev *pdev)
+{
+	return 1;
+}
 
 #endif /* _LINUX_PCI_H_ */

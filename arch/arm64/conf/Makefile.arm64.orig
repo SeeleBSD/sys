@@ -1,0 +1,282 @@
+#	$OpenBSD: Makefile.arm64,v 1.47 2023/09/06 01:47:36 jsg Exp $
+
+# For instructions on building kernels consult the config(8) and options(4)
+# manual pages.
+#
+# N.B.: NO DEPENDENCIES ON FOLLOWING FLAGS ARE VISIBLE TO MAKEFILE
+#	IF YOU CHANGE THE DEFINITION OF ANY OF THESE RECOMPILE EVERYTHING
+# DEBUG is set to -g by config if debugging is requested (config -g).
+# PROF is set to -pg by config if profiling is requested (config -p).
+
+.include <bsd.own.mk>
+
+SIZE?=	size
+STRIP?=	ctfstrip
+
+# source tree is located via $S relative to the compilation directory
+.ifndef S
+S!=	cd ../../../..; pwd
+.endif
+
+_machdir?=	$S/arch/${_mach}
+_archdir?=	$S/arch/${_arch}
+
+INCLUDES=	-nostdinc -I$S -I${.OBJDIR} -I$S/arch \
+		-I$S/dev/pci/drm/include \
+		-I$S/dev/pci/drm/include/uapi \
+		-I$S/dev/pci/drm/amd/include/asic_reg \
+		-I$S/dev/pci/drm/amd/include \
+		-I$S/dev/pci/drm/amd/amdgpu \
+		-I$S/dev/pci/drm/amd/display \
+		-I$S/dev/pci/drm/amd/display/include \
+		-I$S/dev/pci/drm/amd/display/dc \
+		-I$S/dev/pci/drm/amd/display/amdgpu_dm \
+		-I$S/dev/pci/drm/amd/pm/inc \
+		-I$S/dev/pci/drm/amd/pm/legacy-dpm \
+		-I$S/dev/pci/drm/amd/pm/swsmu \
+		-I$S/dev/pci/drm/amd/pm/swsmu/inc \
+		-I$S/dev/pci/drm/amd/pm/swsmu/smu11 \
+		-I$S/dev/pci/drm/amd/pm/swsmu/smu12 \
+		-I$S/dev/pci/drm/amd/pm/swsmu/smu13 \
+		-I$S/dev/pci/drm/amd/pm/powerplay/inc \
+		-I$S/dev/pci/drm/amd/pm/powerplay/hwmgr \
+		-I$S/dev/pci/drm/amd/pm/powerplay/smumgr \
+		-I$S/dev/pci/drm/amd/pm/swsmu/inc \
+		-I$S/dev/pci/drm/amd/pm/swsmu/inc/pmfw_if \
+		-I$S/dev/pci/drm/amd/display/dc/inc \
+		-I$S/dev/pci/drm/amd/display/dc/inc/hw \
+		-I$S/dev/pci/drm/amd/display/dc/clk_mgr \
+		-I$S/dev/pci/drm/amd/display/modules/inc \
+		-I$S/dev/pci/drm/amd/display/modules/hdcp \
+		-I$S/dev/pci/drm/amd/display/dmub/inc \
+		-I$S/rust/include
+CPPFLAGS=	${INCLUDES} ${IDENT} ${PARAM} -D_KERNEL -D__${_mach}__ -MD -MP
+CWARNFLAGS=	-Werror -Wall -Wimplicit-function-declaration \
+		-Wno-pointer-sign \
+		-Wno-constant-conversion -Wno-address-of-packed-member \
+		-Wno-unused-but-set-variable -Wno-gnu-folding-constant \
+		-Wframe-larger-than=2047
+
+CMACHFLAGS=	-march=armv8-a+nofp+nosimd \
+		-fno-omit-frame-pointer -mno-omit-leaf-frame-pointer \
+		-ffixed-x18
+CMACHFLAGS+=	-ffreestanding ${NOPIE_FLAGS}
+SORTR=		sort -R
+.if ${IDENT:M-DNO_PROPOLICE}
+CMACHFLAGS+=	-fno-stack-protector
+.endif
+.if ${IDENT:M-DSMALL_KERNEL}
+SORTR=		cat
+COPTIMIZE?=	-Oz
+CMACHFLAGS+=	-mbranch-protection=none
+.else
+CMACHFLAGS+=	-mbranch-protection=bti
+.endif
+
+DEBUG?=		-g
+COPTIMIZE?=	-O2
+CFLAGS=		${DEBUG} ${CWARNFLAGS} ${CMACHFLAGS} ${COPTIMIZE} ${COPTS} ${PIPE}
+AFLAGS=		-D_LOCORE -x assembler-with-cpp ${CWARNFLAGS} ${CMACHFLAGS}
+LINKFLAGS=	-T ld.script -X --warn-common -nopie
+
+HOSTCC?=	${CC}
+HOSTED_CPPFLAGS=${CPPFLAGS:S/^-nostdinc$//}
+HOSTED_CFLAGS=	${CFLAGS}
+HOSTED_C=	${HOSTCC} ${HOSTED_CFLAGS} ${HOSTED_CPPFLAGS} -c $<
+
+NORMAL_C_NOP=	${CC} ${CFLAGS} ${CPPFLAGS} -fno-ret-protector -c $<
+NORMAL_C=	${CC} ${CFLAGS} ${CPPFLAGS} ${PROF} -c $<
+NORMAL_S=	${CC} ${AFLAGS} ${CPPFLAGS} ${PROF} -c $<
+
+RUSTC?=		RUSTC_BOOTSTRAP=1 rustc
+BINDGEN?=	LIBCLANG_PATH=/usr/local/llvm17/lib bindgen
+
+RUSTC_TARGET := aarch64-unknown-none
+BINDGEN_TARGET := aarch64-unknown-none
+
+%OBJS
+
+%CFILES
+
+%SFILES
+
+.include "$S/rust/Makefile.inc"
+
+# load lines for config "xxx" will be emitted as:
+# xxx: ${SYSTEM_DEP} swapxxx.o
+#	${SYSTEM_LD_HEAD}
+#	${SYSTEM_LD} swapxxx.o
+#	${SYSTEM_LD_TAIL}
+SYSTEM_HEAD=	locore0.o gap.o
+SYSTEM_OBJ=	${SYSTEM_HEAD} ${OBJS} param.o ioconf.o
+SYSTEM_DEP=	Makefile ${SYSTEM_OBJ} ld.script
+SYSTEM_LD_HEAD=	@rm -f $@
+SYSTEM_LD=	@echo ${LD} ${LINKFLAGS} -o $@ '$${SYSTEM_HEAD} vers.o $${OBJS}'; \
+		umask 007; \
+		echo ${OBJS} param.o ioconf.o vers.o | tr " " "\n" | ${SORTR} > lorder; \
+		${LD} ${LINKFLAGS} -o $@ ${SYSTEM_HEAD} `cat lorder`
+SYSTEM_LD_TAIL=	@${SIZE} $@
+
+.if ${DEBUG} == "-g"
+STRIPFLAGS=	-S
+SYSTEM_LD_TAIL+=; umask 007; \
+		echo mv $@ $@.gdb; rm -f $@.gdb; mv $@ $@.gdb; \
+		echo ${STRIP} ${STRIPFLAGS} -o $@ $@.gdb; \
+		${STRIP} ${STRIPFLAGS} -o $@ $@.gdb
+.else
+LINKFLAGS+=	-S
+.endif
+
+%LOAD
+
+bindgen_target_flags = \
+	--opaque-type kunit_try_catch \
+	--wrap-static-fns
+bindings/bindings_generated.rs: $S/rust/bindgen_parameters
+	@mkdir -p bindings
+	$(BINDGEN) $S/rust/bindings/bindings_helper.h $(bindgen_target_flags) \
+		--use-core --with-derive-default --ctypes-prefix core::ffi --no-layout-tests \
+		--no-debug '.*' \
+		-o $@ -- $(bindgen_c_flags) -DMODULE \
+		$(bindgen_target_cflags) $(bindgen_target_extra)
+.undef bindgen_target_flags
+
+bindgen_target_flags = \
+	--blocklist-type '.*' --allowlist-var '' \
+	--allowlist-function 'rust_helper_.*' \
+	--wrap-static-fns
+bindgen_target_cflags = -Wno-missing-prototypes -Wno-missing-declarations
+bindings/bindings_helpers_generated.rs:
+	@mkdir -p bindings
+	$(BINDGEN) $S/rust/helpers.c $(bindgen_target_flags) \
+		--use-core --with-derive-default --ctypes-prefix core::ffi --no-layout-tests \
+		--no-debug '.*' \
+		-o $@ -- $(bindgen_c_flags) -DMODULE \
+		$(bindgen_target_cflags) $(bindgen_target_extra)
+#@sed -Ei 's/pub fn rust_helper_([a-zA-Z0-9_]*)/#[link_name="rust_helper_\1"]	pub fn \1/g' $@
+.undef bindgen_target_flags
+.undef bindgen_target_cflags
+
+bindgen_target_flags = \
+	--opaque-type kunit_try_catch \
+	--experimental --wrap-static-fns-*
+uapi/uapi_generated.rs: $S/rust/bindgen_parameters
+	@mkdir -p uapi
+	$(BINDGEN) $S/rust/uapi/uapi_helper.h $(bindgen_target_flags) \
+		--use-core --with-derive-default --ctypes-prefix core::ffi --no-layout-tests \
+		--no-debug '.*' \
+		-o $@ -- $(bindgen_c_flags) -DMODULE \
+		$(bindgen_target_cflags) $(bindgen_target_extra)
+.undef bindgen_target_flags
+
+core.o:
+	$(rust_common_cmd) --cfg no_fp_fmt_parse --emit=obj=$@ --emit=metadata=libcore.rmeta --crate-name core $(RUST_LIB_SRC)/core/src/lib.rs
+
+compiler_builtins.o: core.o
+	$(rust_common_cmd) --emit=obj=$@ --emit=metadata=libcompiler_builtins.rmeta --crate-name compiler_builtins $S/rust/compiler_builtins.rs
+#	objcopy -w -W '__*' $@
+
+build_error.o: compiler_builtins.o
+	$(rust_common_cmd) --emit=obj=$@ --emit=metadata=libbuild_error.rmeta --crate-name build_error $S/rust/build_error.rs
+
+alloc.o: compiler_builtins.o
+	$(rust_common_cmd) --cfg no_rc --cfg no_sync --emit=obj=$@ --extern core --extern compiler_builtins --emit=metadata=liballoc.rmeta --crate-name alloc $(RUST_LIB_SRC)/alloc/src/lib.rs
+
+bindings.o: compiler_builtins.o \
+    bindings/bindings_generated.rs \
+    bindings/bindings_helpers_generated.rs
+	O=${.OBJDIR} $(rust_common_cmd) --extern core --extern alloc --extern compiler_builtins --emit=obj=$@ --emit=metadata=libbindings.rmeta --crate-name bindings $S/rust/bindings/lib.rs
+
+uapi.o: compiler_builtins.o \
+    uapi/uapi_generated.rs
+	O=${.OBJDIR} $(rust_common_cmd) --extern core --extern alloc --extern compiler_builtins --emit=obj=$@ --emit=metadata=libuapi.rmeta --crate-name uapi $S/rust/uapi/lib.rs
+
+kernel.o: alloc.o bindings.o libmacros.so build_error.o uapi.o
+	$(rust_common_cmd) --extern build_error --extern core --extern alloc --extern compiler_builtins --extern bindings --extern uapi --extern macros --emit=obj=$@ --emit=metadata=libkernel.rmeta --crate-name kernel $S/rust/kernel/lib.rs
+
+libmacros.so: core.o
+	$(RUSTC) $(rust_common_flags) --extern core --extern alloc --extern compiler_builtins --emit=link=$@ --extern proc_macro \
+	--crate-type proc-macro \
+	--crate-name macros $S/rust/macros/lib.rs
+
+.include "$S/dev/pci/drm/asahi/Makefile.inc"
+
+# cc's -MD puts the source and output paths in the dependency file;
+# since those are temp files here we need to fix it up.  It also
+# puts the file in /tmp, so we use -MF to put it in the current
+# directory as assym.P and then generate assym.d from it with a
+# good target name
+assym.h: $S/kern/genassym.sh Makefile \
+	 ${_archdir}/${_arch}/genassym.cf ${_machdir}/${_mach}/genassym.cf
+	cat ${_archdir}/${_arch}/genassym.cf ${_machdir}/${_mach}/genassym.cf | \
+	    sh $S/kern/genassym.sh ${CC} ${CFLAGS} ${CPPFLAGS} -no-integrated-as -MF assym.P > assym.h.tmp
+	sed '1s/.*/assym.h: \\/' assym.P > assym.d
+	sort -u assym.h.tmp > assym.h
+
+param.c: $S/conf/param.c
+	rm -f param.c
+	cp $S/conf/param.c .
+
+param.o: param.c Makefile
+	${NORMAL_C}
+
+mcount.o: $S/lib/libkern/mcount.c Makefile
+	${NORMAL_C_NOP}
+
+ioconf.o: ioconf.c
+	${NORMAL_C}
+
+ld.script: ${_archdir}/conf/kern.ldscript
+	cat ${_archdir}/conf/kern.ldscript | \
+	    sed -e 's/@KERNEL_BASE_PHYS@/${KERNEL_BASE_PHYS}/' \
+	    -e 's/@KERNEL_BASE_VIRT@/${KERNEL_BASE_VIRT}/' > ld.script
+gapdummy.o:
+	echo '__asm(".section .rodata,\"a\"");' > gapdummy.c
+	${CC} -c ${CFLAGS} ${CPPFLAGS} gapdummy.c -o $@
+
+makegap.sh:
+	cp $S/conf/makegap.sh $@
+
+MAKE_GAP = LD="${LD}" sh makegap.sh 0xd4d4d4d4 gapdummy.o
+
+gap.o:	Makefile makegap.sh gapdummy.o vers.o
+	${MAKE_GAP}
+
+vers.o: ${SYSTEM_DEP:Ngap.o}
+	sh $S/conf/newvers.sh
+	${CC} ${CFLAGS} ${CPPFLAGS} ${PROF} -c vers.c
+
+clean:
+	rm -f *bsd *bsd.gdb *.[dio] [a-z]*.s assym.* \
+	    gap.link gapdummy.c ld.script lorder makegap.sh param.c
+
+cleandir: clean
+	rm -f Makefile *.h ioconf.c options machine ${_mach} vers.c
+
+depend obj:
+
+locore0.o: ${_archdir}/${_arch}/locore0.S assym.h
+copy.o copystr.o: assym.h
+cpuswitch.o exception.o support.o: assym.h
+locore.o trampoline.o: assym.h
+
+hardlink-obsd:
+	[[ ! -f /bsd ]] || cmp -s bsd /bsd || ln -f /bsd /obsd
+
+newinstall:
+	install -F -m 700 bsd /bsd && sha256 -h /var/db/kernel.SHA256 /bsd
+
+install: update-link hardlink-obsd newinstall
+
+# pull in the dependency information
+.ifnmake clean
+. for o in ${SYSTEM_OBJ:Ngap.o} assym.h
+.  if exists(${o:R}.d)
+.   include "${o:R}.d"
+.  elif exists($o)
+    .PHONY: $o
+.  endif
+. endfor
+.endif
+
+%RULES

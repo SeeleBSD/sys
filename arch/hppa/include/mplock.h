@@ -1,4 +1,4 @@
-/*	$OpenBSD: mplock.h,v 1.5 2019/04/23 13:35:12 visa Exp $	*/
+/*	$OpenBSD: mplock.h,v 1.7 2024/09/04 07:54:51 mglocker Exp $	*/
 
 /*
  * Copyright (c) 2004 Niklas Hallqvist.  All rights reserved.
@@ -29,7 +29,7 @@
 
 /*
  * Really simple spinlock implementation with recursive capabilities.
- * Correctness is paramount, no fancyness allowed.
+ * Correctness is paramount, no fanciness allowed.
  */
 
 #define	MPL_LOCKED	0
@@ -50,7 +50,6 @@ void	___mp_lock_init(struct __mp_lock *);
 void	__mp_lock(struct __mp_lock *);
 void	__mp_unlock(struct __mp_lock *);
 int	__mp_release_all(struct __mp_lock *);
-int	__mp_release_all_but_one(struct __mp_lock *);
 void	__mp_acquire_count(struct __mp_lock *, int);
 int	__mp_lock_held(struct __mp_lock *, struct cpu_info *);
 

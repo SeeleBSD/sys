@@ -1,4 +1,4 @@
-/*	$OpenBSD: adw.c,v 1.69 2022/04/16 19:19:58 naddy Exp $ */
+/*	$OpenBSD: adw.c,v 1.71 2024/09/20 02:00:46 jsg Exp $ */
 /* $NetBSD: adw.c,v 1.23 2000/05/27 18:24:50 dante Exp $	 */
 
 /*
@@ -423,7 +423,7 @@ adw_attach(ADW_SOFTC *sc)
 	 */
 	error = adw_alloc_controls(sc);
 	if (error)
-		return; /* (error) */ ;
+		return; /* (error) */
 
 	/*
 	 * Create and initialize the Control Blocks.
@@ -444,12 +444,12 @@ adw_attach(ADW_SOFTC *sc)
 	 */
 	error = adw_alloc_carriers(sc);
 	if (error)
-		return; /* (error) */ ;
+		return; /* (error) */
 
 	/*
 	 * Zero's the freeze_device status
 	 */
-	 bzero(sc->sc_freeze_dev, sizeof(sc->sc_freeze_dev));
+	bzero(sc->sc_freeze_dev, sizeof(sc->sc_freeze_dev));
 
 	/*
 	 * Initialize the adapter

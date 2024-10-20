@@ -86,4 +86,9 @@ struct notifier_block;
 int register_acpi_notifier(struct notifier_block *);
 int unregister_acpi_notifier(struct notifier_block *);
 
+int acpi_target_system_state(void);
+
+extern struct acpi_fadt acpi_gbl_FADT;
+#define ACPI_FADT_LOW_POWER_S0		(1 << 21)
+
 #endif

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ubsa.c,v 1.69 2022/07/02 08:50:42 visa Exp $ 	*/
+/*	$OpenBSD: ubsa.c,v 1.71 2024/09/20 02:00:46 jsg Exp $ 	*/
 /*	$NetBSD: ubsa.c,v 1.5 2002/11/25 00:51:33 fvdl Exp $	*/
 /*-
  * Copyright (c) 2002, Alexander Kabaev <kan.FreeBSD.org>.
@@ -56,12 +56,8 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/device.h>
-#include <sys/ioccom.h>
-#include <sys/fcntl.h>
-#include <sys/conf.h>
 #include <sys/tty.h>
 
 #include <dev/usb/usb.h>
@@ -482,7 +478,7 @@ ubsa_baudrate(struct ubsa_softc *sc, speed_t speed)
 		    sc->sc_dev.dv_xname));
 		value = B230400 / B9600;
 		break;
-	};
+	}
 
 	if (speed == B0) {
 		ubsa_flow(sc, 0, 0);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_msk.c,v 1.143 2023/11/10 15:51:20 bluhm Exp $	*/
+/*	$OpenBSD: if_msk.c,v 1.145 2024/08/31 16:23:09 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999, 2000
@@ -94,8 +94,6 @@
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
-#include <sys/kernel.h>
-#include <sys/socket.h>
 #include <sys/timeout.h>
 #include <sys/device.h>
 #include <sys/queue.h>
@@ -115,7 +113,6 @@
 #include <sys/kstat.h>
 #endif
 
-#include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 
 #include <dev/pci/pcireg.h>
@@ -1176,7 +1173,6 @@ msk_activate(struct device *self, int act)
 {
 	struct sk_if_softc *sc_if = (void *)self;
 	struct ifnet *ifp = &sc_if->arpcom.ac_if;
-	int rv = 0;
 
 	switch (act) {
 	case DVACT_RESUME:
@@ -1184,11 +1180,8 @@ msk_activate(struct device *self, int act)
 		if (ifp->if_flags & IFF_RUNNING)
 			msk_init(sc_if);
 		break;
-	default:
-		rv = config_activate_children(self, act);
-		break;
 	}
-	return (rv);
+	return (0);
 }
 
 int

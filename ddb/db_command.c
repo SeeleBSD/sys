@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_command.c,v 1.100 2023/09/19 11:35:30 claudio Exp $	*/
+/*	$OpenBSD: db_command.c,v 1.102 2024/09/05 08:52:27 bluhm Exp $	*/
 /*	$NetBSD: db_command.c,v 1.20 1996/03/30 22:30:05 christos Exp $	*/
 
 /*
@@ -115,7 +115,6 @@ void	db_stack_trace_cmd(db_expr_t, int, db_expr_t, char *);
 void	db_dmesg_cmd(db_expr_t, int, db_expr_t, char *);
 void	db_show_panic_cmd(db_expr_t, int, db_expr_t, char *);
 void	db_bcstats_print_cmd(db_expr_t, int, db_expr_t, char *);
-void	db_struct_offset_cmd(db_expr_t, int, db_expr_t, char *);
 void	db_ctf_show_struct(db_expr_t, int, db_expr_t, char *);
 void	db_show_regs(db_expr_t, int, db_expr_t, char *);
 void	db_write_cmd(db_expr_t, int, db_expr_t, char *);
@@ -341,7 +340,15 @@ db_malloc_print_cmd(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
 void
 db_mbuf_print_cmd(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
 {
-	m_print((void *)addr, db_printf);
+	if ((modif[0] == 'c' && modif[1] == 'p') ||
+	    (modif[0] == 'p' && modif[1] == 'c'))
+		m_print_packet((void *)addr, 1, db_printf);
+	else if (modif[0] == 'c')
+		m_print_chain((void *)addr, 0, db_printf);
+	else if (modif[0] == 'p')
+		m_print_packet((void *)addr, 0, db_printf);
+	else
+		m_print((void *)addr, db_printf);
 }
 
 void

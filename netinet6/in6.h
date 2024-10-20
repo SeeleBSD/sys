@@ -1,4 +1,4 @@
-/*	$OpenBSD: in6.h,v 1.116 2024/02/13 12:22:09 bluhm Exp $	*/
+/*	$OpenBSD: in6.h,v 1.119 2024/09/01 03:09:00 jsg Exp $	*/
 /*	$KAME: in6.h,v 1.83 2001/03/29 02:55:07 jinmei Exp $	*/
 
 /*
@@ -404,6 +404,7 @@ struct sockaddr_in6;
 struct ifaddr;
 struct in6_ifaddr;
 struct ifnet;
+struct rtentry;
 
 void	ipv6_input(struct ifnet *, struct mbuf *);
 struct mbuf *
@@ -411,9 +412,9 @@ struct mbuf *
 
 int	in6_cksum(struct mbuf *, uint8_t, uint32_t, uint32_t);
 void	in6_proto_cksum_out(struct mbuf *, struct ifnet *);
-int	in6_localaddr(struct in6_addr *);
 int	in6_addrscope(struct in6_addr *);
-struct	in6_ifaddr *in6_ifawithscope(struct ifnet *, struct in6_addr *, u_int);
+struct	in6_ifaddr *in6_ifawithscope(struct ifnet *, struct in6_addr *, u_int,
+	    struct rtentry *);
 int	in6_mask2len(struct in6_addr *, u_char *);
 int	in6_nam2sin6(const struct mbuf *, struct sockaddr_in6 **);
 int	in6_sa2sin6(struct sockaddr *, struct sockaddr_in6 **);
@@ -575,7 +576,7 @@ ifatoia6(struct ifaddr *ifa)
 #define IPV6CTL_MRTPROTO	8	/* multicast routing protocol */
 #define IPV6CTL_MAXFRAGPACKETS	9	/* max packets reassembly queue */
 #define IPV6CTL_SOURCECHECK	10	/* verify source route and intf */
-#define IPV6CTL_SOURCECHECK_LOGINT 11	/* minimume logging interval */
+#define IPV6CTL_SOURCECHECK_LOGINT 11	/* minimum logging interval */
 #define IPV6CTL_ACCEPT_RTADV	12
 #define IPV6CTL_LOG_INTERVAL	14
 #define IPV6CTL_HDRNESTLIMIT	15

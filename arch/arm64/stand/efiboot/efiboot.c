@@ -1,4 +1,4 @@
-/*	$OpenBSD: efiboot.c,v 1.50 2024/02/23 21:52:12 kettenis Exp $	*/
+/*	$OpenBSD: efiboot.c,v 1.60 2024/09/23 00:10:04 jsg Exp $	*/
 
 /*
  * Copyright (c) 2015 YASUOKA Masahiko <yasuoka@yasuoka.net>
@@ -41,6 +41,7 @@
 
 #include "efidev.h"
 #include "efiboot.h"
+#include "efidt.h"
 #include "fdt.h"
 
 EFI_SYSTEM_TABLE	*ST;
@@ -67,6 +68,7 @@ static EFI_GUID		 gop_guid = EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID;
 static EFI_GUID		 fdt_guid = FDT_TABLE_GUID;
 static EFI_GUID		 smbios_guid = SMBIOS_TABLE_GUID;
 static EFI_GUID		 smbios3_guid = SMBIOS3_TABLE_GUID;
+static EFI_GUID		 dt_fixup_guid = EFI_DT_FIXUP_PROTOCOL_GUID;
 
 #define efi_guidcmp(_a, _b)	memcmp((_a), (_b), sizeof(EFI_GUID))
 
@@ -99,8 +101,7 @@ efi_main(EFI_HANDLE image, EFI_SYSTEM_TABLE *systab)
 	/* disable reset by watchdog after 5 minutes */
 	BS->SetWatchdogTimer(0, 0, 0, NULL);
 
-	status = BS->HandleProtocol(image, &imgp_guid,
-	    (void **)&imgp);
+	status = BS->HandleProtocol(image, &imgp_guid, (void **)&imgp);
 	if (status == EFI_SUCCESS)
 		status = BS->HandleProtocol(imgp->DeviceHandle, &devp_guid,
 		    (void **)&dp);
@@ -587,7 +588,8 @@ efi_dma_constraint(void)
 	    fdt_node_is_compatible(node, "rockchip,rk3588") ||
 	    fdt_node_is_compatible(node, "rockchip,rk3588s"))
 		dma_constraint[1] = htobe64(0xffffffff);
-	if (fdt_node_is_compatible(node, "lenovo,thinkpad-x13s"))
+	if (fdt_node_is_compatible(node, "qcom,sc8280xp") ||
+	    fdt_node_is_compatible(node, "qcom,x1e80100"))
 		dma_constraint[1] = htobe64(0xffffffff);
 
 	/* Pass DMA constraint. */
@@ -1108,10 +1110,36 @@ mdrandom(char *buf, size_t buflen)
 
 #define FW_PATH "/etc/firmware/dtb/"
 
+struct smbios_dtb {
+	const char *vendor;
+	const char *prod;
+	const char *dtb;
+} smbios_dtb[] = {
+	{ "ASUS", "ASUS Vivobook S 15 S5507",
+	  "qcom/x1e80100-asus-vivobook-s15.dtb" },
+	{ "LENOVO", "21BX",
+	  "qcom/sc8280xp-lenovo-thinkpad-x13s.dtb" },
+	{ "LENOVO", "21BY",
+	  "qcom/sc8280xp-lenovo-thinkpad-x13s.dtb" },
+	{ "LENOVO", "21N1",
+	  "qcom/x1e78100-lenovo-thinkpad-t14s.dtb" },
+	{ "LENOVO", "21N2",
+	  "qcom/x1e78100-lenovo-thinkpad-t14s.dtb" },
+	{ "LENOVO", "83ED",
+	  "qcom/x1e80100-lenovo-yoga-slim7x.dtb" },
+	{ "SAMSUNG", "Galaxy Book4 Edge",
+	  "qcom/x1e80100-samsung-galaxy-book4-edge.dtb" },
+	{ "HP", "HP Omnibook X Laptop 14-fe0xxx",
+	  "qcom/x1e80100-hp-omnibook-x14.dtb" },
+};
+
 void *
 efi_fdt(void)
 {
 	extern char *hw_vendor, *hw_prod;
+	size_t vendorlen, prodlen;
+	char dtb[256];
+	int i;
 
 	/* 'mach dtb' has precedence */
 	if (fdt_override != NULL)
@@ -1121,11 +1149,14 @@ efi_fdt(void)
 	if (hw_vendor == NULL || hw_prod == NULL)
 		return fdt_sys;
 
-	if (strcmp(hw_vendor, "LENOVO") == 0) {
-		if (strncmp(hw_prod, "21BX", 4) == 0 ||
-		    strncmp(hw_prod, "21BY", 4) == 0) {
-			fdt_load_override(FW_PATH
-			    "qcom/sc8280xp-lenovo-thinkpad-x13s.dtb");
+	for (i = 0; i < nitems(smbios_dtb); i++) {
+		vendorlen = strlen(smbios_dtb[i].vendor);
+		prodlen = strlen(smbios_dtb[i].prod);
+		if (strncmp(hw_vendor, smbios_dtb[i].vendor, vendorlen) == 0 &&
+		    strncmp(hw_prod, smbios_dtb[i].prod, prodlen) == 0) {
+			snprintf(dtb, sizeof(dtb), "%s%s", FW_PATH,
+			    smbios_dtb[i].dtb);
+			fdt_load_override(dtb);
 			/* TODO: find a better mechanism */
 			cnset(ttydev("fb0"));
 		}
@@ -1137,9 +1168,13 @@ efi_fdt(void)
 int
 fdt_load_override(char *file)
 {
+	EFI_DT_FIXUP_PROTOCOL *dt_fixup;
 	EFI_PHYSICAL_ADDRESS addr;
 	char path[MAXPATHLEN];
+	EFI_STATUS status;
 	struct stat sb;
+	size_t dt_size;
+	UINTN sz;
 	int fd;
 
 	if (file == NULL && fdt_override) {
@@ -1157,7 +1192,9 @@ fdt_load_override(char *file)
 		printf("cannot open %s\n", path);
 		return 0;
 	}
-	if (efi_memprobe_find(EFI_SIZE_TO_PAGES(sb.st_size),
+	dt_size = sb.st_size;
+retry:
+	if (efi_memprobe_find(EFI_SIZE_TO_PAGES(dt_size),
 	    PAGE_SIZE, EfiLoaderData, &addr) != EFI_SUCCESS) {
 		printf("cannot allocate memory for %s\n", path);
 		return 0;
@@ -1167,9 +1204,24 @@ fdt_load_override(char *file)
 		return 0;
 	}
 
+	status = BS->LocateProtocol(&dt_fixup_guid, NULL, (void **)&dt_fixup);
+	if (status == EFI_SUCCESS) {
+		sz = dt_size;
+		status = dt_fixup->Fixup(dt_fixup, (void *)addr, &sz,
+		    EFI_DT_APPLY_FIXUPS | EFI_DT_RESERVE_MEMORY);
+		if (status == EFI_BUFFER_TOO_SMALL) {
+			BS->FreePages(addr, EFI_SIZE_TO_PAGES(dt_size));
+			lseek(fd, 0, SEEK_SET);
+			dt_size = sz;
+			goto retry;
+		}
+		if (status != EFI_SUCCESS)
+			panic("DT fixup failed: 0x%lx", status);
+	}
+
 	if (!fdt_init((void *)addr)) {
 		printf("invalid device tree\n");
-		BS->FreePages(addr, EFI_SIZE_TO_PAGES(sb.st_size));
+		BS->FreePages(addr, EFI_SIZE_TO_PAGES(dt_size));
 		return 0;
 	}
 
@@ -1180,7 +1232,7 @@ fdt_load_override(char *file)
 	}
 
 	fdt_override = (void *)addr;
-	fdt_override_size = sb.st_size;
+	fdt_override_size = dt_size;
 	return 0;
 }
 

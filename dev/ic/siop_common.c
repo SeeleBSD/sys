@@ -1,4 +1,4 @@
-/*	$OpenBSD: siop_common.c,v 1.44 2022/01/09 05:42:42 jsg Exp $ */
+/*	$OpenBSD: siop_common.c,v 1.46 2024/09/01 03:08:56 jsg Exp $ */
 /*	$NetBSD: siop_common.c,v 1.37 2005/02/27 00:27:02 perry Exp $	*/
 
 /*
@@ -281,7 +281,7 @@ siop_setuptables(struct siop_common_cmd *siop_cmd)
 		if ((*targ_flags & TARF_DT) &&
 		    (sc->mode == STEST4_MODE_LVD)) {
 			sc->targets[target]->status = TARST_PPR_NEG;
-			 siop_ppr_msg(siop_cmd, msgoffset, sc->dt_minsync,
+			siop_ppr_msg(siop_cmd, msgoffset, sc->dt_minsync,
 			    sc->maxoff);
 		} else if (*targ_flags & TARF_WIDE) {
 			sc->targets[target]->status = TARST_WIDE_NEG;
@@ -784,7 +784,7 @@ siop_sdp(struct siop_common_cmd *siop_cmd, int offset)
 
 	/*
 	 * First let see if we have a resid from a phase mismatch. If so,
-	 * we have to adjst the table at offset to remove transferred data.
+	 * we have to adjust the table at offset to remove transferred data.
 	 */
 	if (siop_cmd->flags & CMDFL_RESID) {
 		siop_cmd->flags &= ~CMDFL_RESID;

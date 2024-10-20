@@ -1,4 +1,4 @@
-/*	$OpenBSD: raw_ip6.c,v 1.182 2024/02/13 12:22:09 bluhm Exp $	*/
+/*	$OpenBSD: raw_ip6.c,v 1.185 2024/07/12 19:50:35 bluhm Exp $	*/
 /*	$KAME: raw_ip6.c,v 1.69 2001/03/04 15:55:44 itojun Exp $	*/
 
 /*
@@ -108,9 +108,6 @@ struct cpumem *rip6counters;
 const struct pr_usrreqs rip6_usrreqs = {
 	.pru_attach	= rip6_attach,
 	.pru_detach	= rip6_detach,
-	.pru_lock	= rip6_lock,
-	.pru_unlock	= rip6_unlock,
-	.pru_locked	= rip6_locked,
 	.pru_bind	= rip6_bind,
 	.pru_connect	= rip6_connect,
 	.pru_disconnect	= rip6_disconnect,
@@ -155,9 +152,9 @@ rip6_input(struct mbuf **mp, int *offp, int proto, int af)
 	} else
 		rip6stat_inc(rip6s_ipackets);
 
-	bzero(&rip6src, sizeof(rip6src));
-	rip6src.sin6_len = sizeof(struct sockaddr_in6);
+	memset(&rip6src, 0, sizeof(rip6src));
 	rip6src.sin6_family = AF_INET6;
+	rip6src.sin6_len = sizeof(rip6src);
 	/* KAME hack: recover scopeid */
 	in6_recoverscope(&rip6src, &ip6->ip6_src);
 
@@ -186,7 +183,13 @@ rip6_input(struct mbuf **mp, int *offp, int proto, int af)
 	TAILQ_FOREACH(inp, &rawin6pcbtable.inpt_queue, inp_queue) {
 		KASSERT(ISSET(inp->inp_flags, INP_IPV6));
 
-		if (inp->inp_socket->so_rcv.sb_state & SS_CANTRCVMORE)
+		/*
+		 * Packet must not be inserted after disconnected wakeup
+		 * call.  To avoid race, check again when holding receive
+		 * buffer mutex.
+		 */
+		if (ISSET(READ_ONCE(inp->inp_socket->so_rcv.sb_state),
+		    SS_CANTRCVMORE))
 			continue;
 		if (rtable_l2(inp->inp_rtableid) !=
 		    rtable_l2(m->m_pkthdr.ph_rtableid))
@@ -264,7 +267,7 @@ rip6_input(struct mbuf **mp, int *offp, int proto, int af)
 			n = m_copym(m, 0, M_COPYALL, M_NOWAIT);
 		if (n != NULL) {
 			struct socket *so = inp->inp_socket;
-			int ret;
+			int ret = 0;
 
 			if (inp->inp_flags & IN6P_CONTROLOPTS)
 				ip6_savecontrol(inp, n, &opts);
@@ -272,12 +275,14 @@ rip6_input(struct mbuf **mp, int *offp, int proto, int af)
 			m_adj(n, *offp);
 
 			mtx_enter(&so->so_rcv.sb_mtx);
-			ret = sbappendaddr(so, &so->so_rcv,
-			    sin6tosa(&rip6src), n, opts);
+			if (!ISSET(inp->inp_socket->so_rcv.sb_state,
+			    SS_CANTRCVMORE)) {
+				ret = sbappendaddr(so, &so->so_rcv,
+				    sin6tosa(&rip6src), n, opts);
+			}
 			mtx_leave(&so->so_rcv.sb_mtx);
 
 			if (ret == 0) {
-				/* should notify about lost packet */
 				m_freem(n);
 				m_freem(opts);
 				rip6stat_inc(rip6s_fullsock);
@@ -513,7 +518,7 @@ rip6_output(struct mbuf *m, struct socket *so, struct sockaddr *dstaddr,
 #endif
 
 	error = ip6_output(m, optp, &inp->inp_route, flags,
-	    inp->inp_moptions6, inp->inp_seclevel);
+	    inp->inp_moptions6, &inp->inp_seclevel);
 	if (so->so_proto->pr_protocol == IPPROTO_ICMPV6) {
 		icmp6stat_inc(icp6s_outhist + type);
 	} else
@@ -636,32 +641,6 @@ rip6_detach(struct socket *so)
 	return (0);
 }
 
-void
-rip6_lock(struct socket *so)
-{
-	struct inpcb *inp = sotoinpcb(so);
-
-	NET_ASSERT_LOCKED();
-	mtx_enter(&inp->inp_mtx);
-}
-
-void
-rip6_unlock(struct socket *so)
-{
-	struct inpcb *inp = sotoinpcb(so);
-
-	NET_ASSERT_LOCKED();
-	mtx_leave(&inp->inp_mtx);
-}
-
-int
-rip6_locked(struct socket *so)
-{
-	struct inpcb *inp = sotoinpcb(so);
-
-	return mtx_owned(&inp->inp_mtx);
-}
-
 int
 rip6_bind(struct socket *so, struct mbuf *nam, struct proc *p)
 {
@@ -727,7 +706,7 @@ rip6_disconnect(struct socket *so)
 	if ((so->so_state & SS_ISCONNECTED) == 0)
 		return (ENOTCONN);
 
-	so->so_state &= ~SS_ISCONNECTED;	/* XXX */
+	soisdisconnected(so);
 	mtx_enter(&rawin6pcbtable.inpt_mtx);
 	inp->inp_faddr6 = in6addr_any;
 	mtx_leave(&rawin6pcbtable.inpt_mtx);

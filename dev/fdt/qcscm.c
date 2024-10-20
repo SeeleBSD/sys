@@ -1,4 +1,4 @@
-/* $OpenBSD: qcscm.c,v 1.5 2023/07/22 22:48:35 patrick Exp $ */
+/* $OpenBSD: qcscm.c,v 1.9 2024/08/04 15:30:08 kettenis Exp $ */
 /*
  * Copyright (c) 2022 Patrick Wildt <patrick@blueri.se>
  *
@@ -33,10 +33,13 @@
 #include <machine/fdt.h>
 
 #include <dev/efi/efi.h>
+#include <machine/efivar.h>
 
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_misc.h>
 #include <dev/ofw/fdt.h>
+
+#include "efi.h"
 
 /* #define QCSCM_DEBUG */
 
@@ -142,6 +145,12 @@ EFI_STATUS qcscm_uefi_set_variable(struct qcscm_softc *, CHAR16 *,
 EFI_STATUS qcscm_uefi_get_next_variable(struct qcscm_softc *,
 	    CHAR16 *, int *, EFI_GUID *);
 
+EFI_STATUS qcscm_efi_get_variable(CHAR16 *, EFI_GUID *, UINT32 *,
+	    UINTN *, VOID *);
+EFI_STATUS qcscm_efi_set_variable(CHAR16 *, EFI_GUID *, UINT32,
+	    UINTN, VOID *);
+EFI_STATUS qcscm_efi_get_next_variable_name(UINTN *, CHAR16 *, EFI_GUID *);
+
 #ifdef QCSCM_DEBUG
 void	qcscm_uefi_dump_variables(struct qcscm_softc *);
 void	qcscm_uefi_dump_variable(struct qcscm_softc *, CHAR16 *, int,
@@ -188,6 +197,12 @@ qcscm_attach(struct device *parent, struct device *self, void *aux)
 	printf("\n");
 	qcscm_sc = sc;
 
+#if NEFI > 0
+	efi_get_variable = qcscm_efi_get_variable;
+	efi_set_variable = qcscm_efi_set_variable;
+	efi_get_next_variable_name = qcscm_efi_get_next_variable_name;
+#endif
+
 #ifdef QCSCM_DEBUG
 	qcscm_uefi_dump_variables(sc);
 	qcscm_uefi_dump_variable(sc, u"RTCInfo", sizeof(u"RTCInfo"),
@@ -204,14 +219,25 @@ qcscm_smc_exec(uint64_t *in, uint64_t *out)
 	    "ldp x2, x3, [%0, #16]\n"
 	    "ldp x4, x5, [%0, #32]\n"
 	    "ldp x6, x7, [%0, #48]\n"
+	    "ldp x8, x9, [%0, #64]\n"
+	    "ldp x10, x11, [%0, #80]\n"
+	    "ldp x12, x13, [%0, #96]\n"
+	    "ldp x14, x15, [%0, #112]\n"
+	    "ldp x16, x17, [%0, #128]\n"
 	    "smc #0\n"
 	    "stp x0, x1, [%1, #0]\n"
 	    "stp x2, x3, [%1, #16]\n"
 	    "stp x4, x5, [%1, #32]\n"
-	    "stp x6, x7, [%1, #48]\n" ::
+	    "stp x6, x7, [%1, #48]\n"
+	    "stp x8, x9, [%1, #64]\n"
+	    "stp x10, x11, [%1, #80]\n"
+	    "stp x12, x13, [%1, #96]\n"
+	    "stp x14, x15, [%1, #112]\n"
+	    "stp x16, x17, [%1, #128]\n" ::
 	    "r" (in), "r" (out) :
-	    "x0", "x1", "x2", "x3",
-	    "x4", "x5", "x6", "x7",
+	    "x0", "x1", "x2", "x3", "x4", "x5",
+	    "x6", "x7", "x8", "x9", "x10", "x11",
+	    "x12", "x13", "x14", "x15", "x16", "x17",
 	    "memory");
 }
 
@@ -219,7 +245,7 @@ int
 qcscm_smc_call(struct qcscm_softc *sc, uint8_t owner, uint8_t svc, uint8_t cmd,
     uint32_t arginfo, uint64_t *args, int arglen, uint64_t *res)
 {
-	uint64_t smcreq[8] = { 0 }, smcres[8] = { 0 };
+	uint64_t smcreq[18] = { 0 }, smcres[18] = { 0 };
 	uint64_t *smcextreq;
 	int i;
 
@@ -407,7 +433,7 @@ qcscm_uefi_get_variable(struct qcscm_softc *sc,
 
 	resp = QCSCM_DMA_KVA(qdm) + respoff;
 	if (resp->command_id != QCTEE_UEFI_GET_VARIABLE ||
-	    resp->length < sizeof(*resp) || resp->length > respsize) {
+	    resp->length < sizeof(*resp)) {
 		qcscm_dmamem_free(sc, qdm);
 		return QCTEE_UEFI_DEVICE_ERROR;
 	}
@@ -422,7 +448,8 @@ qcscm_uefi_get_variable(struct qcscm_softc *sc,
 		return ret;
 	}
 
-	if (resp->data_offset + resp->data_size > resp->length) {
+	if (resp->length > respsize ||
+	    resp->data_offset + resp->data_size > resp->length) {
 		qcscm_dmamem_free(sc, qdm);
 		return QCTEE_UEFI_DEVICE_ERROR;
 	}
@@ -630,7 +657,71 @@ qcscm_uefi_get_next_variable(struct qcscm_softc *sc,
 	return QCTEE_UEFI_SUCCESS;
 }
 
+#if NEFI > 0
+
+EFI_STATUS
+qcscm_efi_get_variable(CHAR16 *name, EFI_GUID *guid, UINT32 *attributes,
+   UINTN *data_size, VOID *data)
+{
+	struct qcscm_softc *sc = qcscm_sc;
+	EFI_STATUS status;
+	int name_size;
+	int size;
+
+	name_size = 0;
+	while (name[name_size])
+		name_size++;
+	name_size++;
+
+	size = *data_size;
+	status = qcscm_uefi_get_variable(sc, name, name_size * 2, guid,
+	    attributes, data, &size);
+	*data_size = size;
+
+	/* Convert 32-bit status code to 64-bit. */
+	return ((status & 0xf0000000) << 32 | (status & 0x0fffffff));
+}
+
+EFI_STATUS
+qcscm_efi_set_variable(CHAR16 *name, EFI_GUID *guid, UINT32 attributes,
+    UINTN data_size, VOID *data)
+{
+	struct qcscm_softc *sc = qcscm_sc;
+	EFI_STATUS status;
+	int name_size;
+
+	name_size = 0;
+	while (name[name_size])
+		name_size++;
+	name_size++;
+
+	status = qcscm_uefi_set_variable(sc, name, name_size * 2, guid,
+	    attributes, data, data_size);
+
+	/* Convert 32-bit status code to 64-bit. */
+	return ((status & 0xf0000000) << 32 | (status & 0x0fffffff));
+}
+
+EFI_STATUS
+qcscm_efi_get_next_variable_name(UINTN *name_size, CHAR16 *name,
+    EFI_GUID *guid)
+{
+	struct qcscm_softc *sc = qcscm_sc;
+	EFI_STATUS status;
+	int size;
+
+	size = *name_size;
+	status = qcscm_uefi_get_next_variable(sc, name, &size, guid);
+	*name_size = size;
+
+	/* Convert 32-bit status code to 64-bit. */
+	return ((status & 0xf0000000) << 32 | (status & 0x0fffffff));
+}
+
+#endif
+
 #ifdef QCSCM_DEBUG
+
 void
 qcscm_uefi_dump_variables(struct qcscm_softc *sc)
 {
@@ -688,6 +779,7 @@ qcscm_uefi_dump_variable(struct qcscm_softc *sc, CHAR16 *name, int namesize,
 		printf("%02x", data[i]);
 	printf("\n");
 }
+
 #endif
 
 int
@@ -733,8 +825,6 @@ qcscm_uefi_rtc_set(uint32_t off)
 		return 0;
 
 	rtcinfo[0] = off;
-	rtcinfo[1] = 0x10000;
-	rtcinfo[2] = 0;
 
 	if (qcscm_uefi_set_variable(sc, u"RTCInfo", sizeof(u"RTCInfo"),
 	    &qcscm_uefi_rtcinfo_guid, EFI_VARIABLE_NON_VOLATILE |
@@ -824,6 +914,33 @@ qcscm_pas_auth_and_reset(uint32_t peripheral)
 	/* Make call into TEE */
 	ret = qcscm_smc_call(sc, ARM_SMCCC_OWNER_SIP, QCSCM_SVC_PIL,
 	    QCSCM_PIL_PAS_AUTH_AND_RESET, arginfo, args, nitems(args), res);
+
+	/* If the call succeeded, check the response status */
+	if (ret == 0)
+		ret = res[0];
+
+	return ret;
+}
+
+int
+qcscm_pas_shutdown(uint32_t peripheral)
+{
+	struct qcscm_softc *sc = qcscm_sc;
+	uint64_t res[3];
+	uint64_t args[1];
+	uint32_t arginfo;
+	int ret;
+
+	if (sc == NULL)
+		return ENXIO;
+
+	arginfo = QCSCM_ARGINFO_NUM(nitems(args));
+	arginfo |= QCSCM_ARGINFO_TYPE(0, QCSCM_ARGINFO_TYPE_VAL);
+	args[0] = peripheral;
+
+	/* Make call into TEE */
+	ret = qcscm_smc_call(sc, ARM_SMCCC_OWNER_SIP, QCSCM_SVC_PIL,
+	    QCSCM_PIL_PAS_SHUTDOWN, arginfo, args, nitems(args), res);
 
 	/* If the call succeeded, check the response status */
 	if (ret == 0)

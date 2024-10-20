@@ -1,4 +1,4 @@
-/*	$OpenBSD: arc.c,v 1.124 2022/09/06 15:22:11 kn Exp $ */
+/*	$OpenBSD: arc.c,v 1.127 2024/09/04 07:54:52 mglocker Exp $ */
 
 /*
  * Copyright (c) 2006 David Gwynne <dlg@openbsd.org>
@@ -23,8 +23,6 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/buf.h>
-#include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/device.h>
@@ -1409,18 +1407,18 @@ arc_enable_all_intr(struct arc_softc *sc)
 		int_mask &= ~(ARC_RA_INTRMASK_POSTQUEUE |
 			ARC_RA_INTRMASK_DOORBELL | ARC_RA_INTRMASK_MSG0);
 		arc_write(sc, ARC_RA_INTRMASK, int_mask);
-	    break;
+		break;
 	case ARC_HBA_TYPE_C:
 		int_mask = arc_read(sc, ARC_RC_INTR_MASK);
 		int_mask &= ~(ARC_RC_INTR_MASK_POSTQUEUE |
 			ARC_RC_INTR_MASK_DOORBELL | ARC_RC_INTR_MASK_UTILITY_A);
 		arc_write(sc, ARC_RC_INTR_MASK, int_mask);
-	    break;
+		break;
 	case ARC_HBA_TYPE_D:
 		int_mask = arc_read(sc, ARC_RD_INTR_ENABLE);
 		int_mask |= ARC_RD_INTR_ENABLE_ALL;
 		arc_write(sc, ARC_RD_INTR_ENABLE, int_mask);
-	    break;
+		break;
 	}
 }
 
@@ -2221,7 +2219,7 @@ arc_bio_disk(struct arc_softc *sc, struct bioc_disk *bd)
 	bd->bd_lun = diskinfo->scsi_attr.lun;
 #endif
 	/*
-	 * the firmware doesnt seem to fill scsi_attr in, so fake it with
+	 * the firmware doesn't seem to fill scsi_attr in, so fake it with
 	 * the diskid.
 	 */
 	bd->bd_channel = 0;

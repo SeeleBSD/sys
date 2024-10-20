@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_iwm.c,v 1.414 2024/02/16 11:44:52 stsp Exp $	*/
+/*	$OpenBSD: if_iwm.c,v 1.417 2024/09/01 03:08:59 jsg Exp $	*/
 
 /*
  * Copyright (c) 2014, 2016 genua gmbh <info@genua.de>
@@ -109,12 +109,8 @@
 #include "bpfilter.h"
 
 #include <sys/param.h>
-#include <sys/conf.h>
-#include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
-#include <sys/mutex.h>
-#include <sys/proc.h>
 #include <sys/rwlock.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
@@ -134,7 +130,6 @@
 #include <net/bpf.h>
 #endif
 #include <net/if.h>
-#include <net/if_dl.h>
 #include <net/if_media.h>
 
 #include <netinet/in.h>
@@ -8169,7 +8164,7 @@ iwm_rval2ridx(int rval)
 			break;
 	}
 
-       return ridx;
+	return ridx;
 }
 
 void
@@ -9243,7 +9238,7 @@ iwm_calib_timeout(void *arg)
 		ieee80211_amrr_choose(&sc->sc_amrr, &in->in_ni, &in->in_amn);
 		/* 
 		 * If AMRR has chosen a new TX rate we must update
-		 * the firwmare's LQ rate table.
+		 * the firmware's LQ rate table.
 		 * ni_txrate may change again before the task runs so
 		 * cache the chosen rate in the iwm_node structure.
 		 */

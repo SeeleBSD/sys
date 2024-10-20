@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_pppx.c,v 1.128 2023/12/23 10:52:54 bluhm Exp $ */
+/*	$OpenBSD: if_pppx.c,v 1.131 2024/09/20 02:00:46 jsg Exp $ */
 
 /*
  * Copyright (c) 2010 Claudio Jeker <claudio@openbsd.org>
@@ -786,10 +786,8 @@ pppx_set_session_descr(struct pppx_dev *pxd,
 	if (pxi == NULL)
 		return (EINVAL);
 
-	NET_LOCK();
 	(void)memset(pxi->pxi_if.if_description, 0, IFDESCRSIZE);
 	strlcpy(pxi->pxi_if.if_description, req->pdr_descr, IFDESCRSIZE);
-	NET_UNLOCK();
 
 	pppx_if_rele(pxi);
 
@@ -1071,7 +1069,7 @@ pppacopen(dev_t dev, int flags, int mode, struct proc *p)
 
 	ifp->if_softc = sc;
 	ifp->if_type = IFT_L3IPVLAN;
-	ifp->if_hdrlen = sizeof(uint32_t); /* for BPF */;
+	ifp->if_hdrlen = sizeof(uint32_t); /* for BPF */
 	ifp->if_mtu = MAXMCLBYTES - sizeof(uint32_t);
 	ifp->if_flags = IFF_SIMPLEX | IFF_BROADCAST;
 	ifp->if_xflags = IFXF_CLONED | IFXF_MPSAFE;
@@ -1417,9 +1415,11 @@ pppac_del_session(struct pppac_softc *sc, struct pipex_session_close_req *req)
 		return (EINVAL);
 	}
 	pipex_unlink_session_locked(session);
-	pipex_rele_session(session);
 
 	mtx_leave(&pipex_list_mtx);
+
+	pipex_export_session_stats(session, &req->psr_stat);
+	pipex_rele_session(session);
 
 	return (0);
 }

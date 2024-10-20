@@ -1,0 +1,6 @@
+@@ -1,4 +1,4 @@
+-/*	$OpenBSD: ufs_vnops.c,v 1.160.2.1 2024/09/15 22:44:29 bluhm Exp $	*/
++/*	$OpenBSD: ufs_vnops.c,v 1.163 2024/09/12 09:04:51 claudio Exp $	*/
+ /*	$NetBSD: ufs_vnops.c,v 1.18 1996/05/11 18:28:04 mycroft Exp $	*/
+ 
+ /*

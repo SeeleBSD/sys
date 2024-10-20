@@ -1,4 +1,4 @@
-/*	$OpenBSD: pipex.c,v 1.153 2024/01/23 17:57:21 mvs Exp $ */
+/*	$OpenBSD: pipex.c,v 1.155 2024/07/26 15:45:31 yasuoka Exp $ */
 
 /*-
  * Copyright (c) 2009 Internet Initiative Japan Inc.
@@ -103,9 +103,6 @@ int pipex_prune = 1;			/* [I] walk list every seconds */
 
 struct mbuf_queue pipexoutq = MBUF_QUEUE_INITIALIZER(
     IFQ_MAXLEN, IPL_SOFTNET);
-
-/* borrow an mbuf pkthdr field */
-#define ph_ppp_proto ether_vtag
 
 #ifdef PIPEX_DEBUG
 int pipex_debug = 0;		/* [A] systcl net.inet.ip.pipex_debug */
@@ -2034,7 +2031,13 @@ pipex_l2tp_input(struct mbuf *m0, int off0, struct pipex_session *session,
 	mtx_enter(&session->pxs_mtx);
 
 	l2tp_session = &session->proto.l2tp;
-	l2tp_session->ipsecflowinfo = ipsecflowinfo;
+	if (l2tp_session->ipsecflowinfo != ipsecflowinfo) {
+		pipex_session_log(session, LOG_DEBUG,
+		    "received message is %s",
+		    (ipsecflowinfo != 0)? "from invalid ipsec flow" :
+		    "without ipsec");
+		goto drop;
+	}
 
 	m_copydata(m0, off0, sizeof(flags), &flags);
 

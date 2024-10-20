@@ -1,4 +1,4 @@
-/*	$OpenBSD: msdosfs_vnops.c,v 1.140 2023/09/08 20:00:28 mvs Exp $	*/
+/*	$OpenBSD: msdosfs_vnops.c,v 1.142 2024/09/04 07:54:52 mglocker Exp $	*/
 /*	$NetBSD: msdosfs_vnops.c,v 1.63 1997/10/17 11:24:19 ws Exp $	*/
 
 /*-
@@ -717,7 +717,7 @@ msdosfs_write(void *v)
 		 * it.  Otherwise, if on a cluster boundary write it
 		 * asynchronously so we can move on to the next block
 		 * without delay.  Otherwise do a delayed write because we
-		 * may want to write somemore into the block later.
+		 * may want to write some more into the block later.
 		 */
 #if 0
 		if (ioflag & IO_NOCACHE)
@@ -810,12 +810,6 @@ msdosfs_remove(void *v)
 	printf("msdosfs_remove(), dep %p, v_usecount %d\n", dep,
 	    ap->a_vp->v_usecount);
 #endif
-	if (ddep == dep)
-		vrele(ap->a_vp);
-	else
-		vput(ap->a_vp);	/* causes msdosfs_inactive() to be called
-				 * via vrele() */
-	vput(ap->a_dvp);
 	return (error);
 }
 

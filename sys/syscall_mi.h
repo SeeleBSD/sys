@@ -1,4 +1,4 @@
-/*	$OpenBSD: syscall_mi.h,v 1.31 2024/01/22 04:38:32 deraadt Exp $	*/
+/*	$OpenBSD: syscall_mi.h,v 1.35 2024/09/01 03:09:01 jsg Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -71,7 +71,7 @@ pin_check(struct proc *p, register_t code)
 	 * by most common case:
 	 * 1) dynamic binary: syscalls in libc.so (in the ps_libcpin region)
 	 * 2a) static binary: syscalls in main program (in the ps_pin region)
-	 * 2b) dynamic binary: sysalls in ld.so (in the ps_pin region)
+	 * 2b) dynamic binary: syscalls in ld.so (in the ps_pin region)
 	 * 3) sigtramp, containing only sigreturn(2)
 	 */
 	if (plibcpin->pn_pins &&
@@ -84,6 +84,7 @@ pin_check(struct proc *p, register_t code)
 		if (code == SYS_sigreturn)
 			return (0);
 		error = EPERM;
+		goto die;
 	}
 	if (pin) {
 		if (code >= pin->pn_npins || pin->pn_pins[code] == 0)
@@ -94,17 +95,18 @@ pin_check(struct proc *p, register_t code)
 			; /* multiple locations, hopefully a boring operation */
 		else
 			error = ENOSYS;
-	}
+	} else
+		error = ENOSYS;
 	if (error == 0)
 		return (0);
+die:
 #ifdef KTRACE
 	if (KTRPOINT(p, KTR_PINSYSCALL))
 		ktrpinsyscall(p, error, code, addr);
 #endif
 	KERNEL_LOCK();
-	/* XXX remove or simplify this log() call after OpenBSD 7.5 release */
-	log(LOG_ERR,
-	    "%s[%d]: pinsyscalls addr %lx code %ld, pinoff 0x%x "
+	/* XXX remove or simplify this uprintf() call after OpenBSD 7.5 release */
+	uprintf("%s[%d]: pinsyscalls addr %lx code %ld, pinoff 0x%x "
 	    "(pin%s %d %lx-%lx %lx) (libcpin%s %d %lx-%lx %lx) error %d\n",
 	    p->p_p->ps_comm, p->p_p->ps_pid, addr, code,
 	    (pin && code < pin->pn_npins) ? pin->pn_pins[code] : -1,
@@ -160,12 +162,6 @@ mi_syscall(struct proc *p, register_t code, const struct sysent *callp,
 	if (!uvm_map_inentry(p, &p->p_spinentry, PROC_STACK(p),
 	    "[%s]%d/%d sp=%lx inside %lx-%lx: not MAP_STACK\n",
 	    uvm_map_inentry_sp, p->p_vmspace->vm_map.sserial))
-		return (EPERM);
-
-	/* PC must be in un-writeable permitted text (sigtramp, libc, ld.so) */
-	if (!uvm_map_inentry(p, &p->p_pcinentry, PROC_PC(p),
-	    "[%s]%d/%d pc=%lx inside %lx-%lx: bogus syscall\n",
-	    uvm_map_inentry_pc, p->p_vmspace->vm_map.wserial))
 		return (EPERM);
 
 	if ((error = pin_check(p, code)))

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmmci.c,v 1.10 2023/05/29 08:13:35 sf Exp $	*/
+/*	$OpenBSD: vmmci.c,v 1.12 2024/08/26 19:37:54 sf Exp $	*/
 
 /*
  * Copyright (c) 2017 Reyk Floeter <reyk@openbsd.org>
@@ -18,13 +18,8 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/kernel.h>
 #include <sys/timeout.h>
-#include <sys/signalvar.h>
-#include <sys/syslog.h>
 #include <sys/device.h>
-#include <sys/pool.h>
-#include <sys/proc.h>
 #include <sys/sensors.h>
 
 #include <machine/bus.h>
@@ -83,8 +78,8 @@ struct cfdriver vmmci_cd = {
 int
 vmmci_match(struct device *parent, void *match, void *aux)
 {
-	struct virtio_softc *va = aux;
-	if (va->sc_childdevid == PCI_PRODUCT_VIRTIO_VMMCI)
+	struct virtio_attach_args *va = aux;
+	if (va->va_devid == PCI_PRODUCT_VIRTIO_VMMCI)
 		return (1);
 	return (0);
 }

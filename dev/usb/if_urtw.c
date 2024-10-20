@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_urtw.c,v 1.72 2022/04/21 21:03:03 stsp Exp $	*/
+/*	$OpenBSD: if_urtw.c,v 1.74 2024/09/01 03:09:00 jsg Exp $	*/
 
 /*-
  * Copyright (c) 2009 Martynas Venckus <martynas@openbsd.org>
@@ -22,11 +22,8 @@
 #include <sys/param.h>
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
-#include <sys/kernel.h>
-#include <sys/socket.h>
 #include <sys/systm.h>
 #include <sys/timeout.h>
-#include <sys/conf.h>
 #include <sys/device.h>
 #include <sys/endian.h>
 
@@ -3501,7 +3498,7 @@ urtw_task(void *arg)
 
 fail:
 	if (error != 0)
-		DPRINTF(("%s: error duing processing RUN state.",
+		DPRINTF(("%s: error processing RUN state.",
 		    sc->sc_dev.dv_xname));
 }
 

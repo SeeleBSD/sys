@@ -1,4 +1,4 @@
-/*	$OpenBSD: frag6.c,v 1.87 2022/02/22 01:15:02 guenther Exp $	*/
+/*	$OpenBSD: frag6.c,v 1.89 2024/07/29 12:41:30 bluhm Exp $	*/
 /*	$KAME: frag6.c,v 1.40 2002/05/27 21:40:31 itojun Exp $	*/
 
 /*
@@ -130,7 +130,8 @@ frag6_input(struct mbuf **mp, int *offp, int proto, int af)
 
 	/* jumbo payload can't contain a fragment header */
 	if (ip6->ip6_plen == 0) {
-		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER, offset);
+		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
+		    offset);
 		return IPPROTO_DONE;
 	}
 
@@ -404,8 +405,17 @@ frag6_input(struct mbuf **mp, int *offp, int proto, int af)
 	/* adjust offset to point where the original next header starts */
 	offset = ip6af->ip6af_offset - sizeof(struct ip6_frag);
 	pool_put(&ip6af_pool, ip6af);
+	next += offset - sizeof(struct ip6_hdr);
+	if ((u_int)next > IPV6_MAXPACKET) {
+		TAILQ_REMOVE(&frag6_queue, q6, ip6q_queue);
+		frag6_nfrags -= q6->ip6q_nfrag;
+		frag6_nfragpackets--;
+		mtx_leave(&frag6_mutex);
+		pool_put(&ip6q_pool, q6);
+		goto dropfrag;
+	}
 	ip6 = mtod(m, struct ip6_hdr *);
-	ip6->ip6_plen = htons((u_short)next + offset - sizeof(struct ip6_hdr));
+	ip6->ip6_plen = htons(next);
 	ip6->ip6_src = q6->ip6q_src;
 	ip6->ip6_dst = q6->ip6q_dst;
 	if (q6->ip6q_ecn == IPTOS_ECN_CE)
@@ -535,10 +545,10 @@ frag6_freef(struct ip6q *q6)
 			ip6->ip6_src = q6->ip6q_src;
 			ip6->ip6_dst = q6->ip6q_dst;
 
-			NET_LOCK();
+			NET_LOCK_SHARED();
 			icmp6_error(m, ICMP6_TIME_EXCEEDED,
 				    ICMP6_TIME_EXCEED_REASSEMBLY, 0);
-			NET_UNLOCK();
+			NET_UNLOCK_SHARED();
 		} else
 			m_freem(m);
 		pool_put(&ip6af_pool, af6);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cs4281.c,v 1.45 2022/10/26 20:19:08 kn Exp $ */
+/*	$OpenBSD: cs4281.c,v 1.47 2024/08/18 14:42:56 deraadt Exp $ */
 /*	$Tera: cs4281.c,v 1.18 2000/12/27 14:24:45 tacha Exp $	*/
 
 /*
@@ -43,9 +43,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/kernel.h>
 #include <sys/malloc.h>
-#include <sys/fcntl.h>
 #include <sys/device.h>
 
 #include <dev/pci/pcidevs.h>
@@ -54,7 +52,6 @@
 
 #include <sys/audioio.h>
 #include <dev/audio_if.h>
-#include <dev/midi_if.h>
 
 #include <dev/ic/ac97.h>
 
@@ -963,6 +960,7 @@ cs4281_activate(struct device *self, int act)
 
 	switch (act) {
 	case DVACT_SUSPEND:
+		rv = config_activate_children(self, act);
 		/* should I powerdown here ? */
 		cs4281_write_codec(sc, AC97_REG_POWER, CS4281_POWER_DOWN_ALL);
 		break;

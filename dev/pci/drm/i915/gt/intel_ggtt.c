@@ -15,21 +15,24 @@
 #include "display/intel_display.h"
 #include "gem/i915_gem_lmem.h"
 
+#include "intel_context.h"
 #include "intel_ggtt_gmch.h"
+#include "intel_gpu_commands.h"
 #include "intel_gt.h"
 #include "intel_gt_regs.h"
 #include "intel_pci_config.h"
+#include "intel_ring.h"
 #include "i915_drv.h"
 #include "i915_pci.h"
+#include "i915_reg.h"
+#include "i915_request.h"
 #include "i915_scatterlist.h"
 #include "i915_utils.h"
 #include "i915_vgpu.h"
 
 #include "intel_gtt.h"
 #include "gen8_ppgtt.h"
-
-#include <dev/pci/pcivar.h>
-#include <dev/pci/agpvar.h>
+#include "intel_engine_pm.h"
 
 static void i915_ggtt_color_adjust(const struct drm_mm_node *node,
 				   unsigned long color,
@@ -53,7 +56,6 @@ static void i915_ggtt_color_adjust(const struct drm_mm_node *node,
 static int ggtt_init_hw(struct i915_ggtt *ggtt)
 {
 	struct drm_i915_private *i915 = ggtt->vm.i915;
-	int i;
 
 	i915_address_space_init(&ggtt->vm, VM_CLASS_GGTT);
 
@@ -77,6 +79,9 @@ static int ggtt_init_hw(struct i915_ggtt *ggtt)
 		ggtt->mtrr = arch_phys_wc_add(ggtt->gmadr.start,
 					      ggtt->mappable_end);
 #else
+		bus_space_handle_t bsh;
+		int i;
+
 		/* XXX would be a lot nicer to get agp info before now */
 		uvm_page_physload(atop(ggtt->gmadr.start),
 		    atop(ggtt->gmadr.start + ggtt->mappable_end),
@@ -94,11 +99,13 @@ static int ggtt_init_hw(struct i915_ggtt *ggtt)
 		for (i = 0; i < atop(ggtt->mappable_end); i++)
 			atomic_setbits_int(&(i915->pgs[i].pg_flags),
 			    PG_PMAP_WC);
-		if (agp_init_map(i915->bst, ggtt->gmadr.start,
+		if (bus_space_map(i915->bst, ggtt->gmadr.start,
 		    ggtt->mappable_end,
-		    BUS_SPACE_MAP_LINEAR | BUS_SPACE_MAP_PREFETCHABLE,
-		    &i915->agph))
+		    BUS_SPACE_MAP_LINEAR | BUS_SPACE_MAP_PREFETCHABLE, &bsh))
 			panic("can't map aperture");
+		ggtt->iomap.base = ggtt->gmadr.start;
+		ggtt->iomap.size = ggtt->mappable_end;
+		ggtt->iomap.iomem = bus_space_vaddr(i915->bst, bsh);
 #endif
 	}
 
@@ -300,6 +307,145 @@ u64 gen8_ggtt_pte_encode(dma_addr_t addr,
 	return pte;
 }
 
+static bool should_update_ggtt_with_bind(struct i915_ggtt *ggtt)
+{
+	struct intel_gt *gt = ggtt->vm.gt;
+
+	return intel_gt_is_bind_context_ready(gt);
+}
+
+static struct intel_context *gen8_ggtt_bind_get_ce(struct i915_ggtt *ggtt)
+{
+	struct intel_context *ce;
+	struct intel_gt *gt = ggtt->vm.gt;
+
+	if (intel_gt_is_wedged(gt))
+		return NULL;
+
+	ce = gt->engine[BCS0]->bind_context;
+	GEM_BUG_ON(!ce);
+
+	/*
+	 * If the GT is not awake already at this stage then fallback
+	 * to pci based GGTT update otherwise __intel_wakeref_get_first()
+	 * would conflict with fs_reclaim trying to allocate memory while
+	 * doing rpm_resume().
+	 */
+	if (!intel_gt_pm_get_if_awake(gt))
+		return NULL;
+
+	intel_engine_pm_get(ce->engine);
+
+	return ce;
+}
+
+static void gen8_ggtt_bind_put_ce(struct intel_context *ce)
+{
+	intel_engine_pm_put(ce->engine);
+	intel_gt_pm_put(ce->engine->gt);
+}
+
+static bool gen8_ggtt_bind_ptes(struct i915_ggtt *ggtt, u32 offset,
+				struct sg_table *pages, u32 num_entries,
+				const gen8_pte_t pte)
+{
+	struct i915_sched_attr attr = {};
+	struct intel_gt *gt = ggtt->vm.gt;
+	const gen8_pte_t scratch_pte = ggtt->vm.scratch[0]->encode;
+	struct sgt_iter iter;
+	struct i915_request *rq;
+	struct intel_context *ce;
+	u32 *cs;
+
+	if (!num_entries)
+		return true;
+
+	ce = gen8_ggtt_bind_get_ce(ggtt);
+	if (!ce)
+		return false;
+
+	if (pages)
+		iter = __sgt_iter(pages->sgl, true);
+
+	while (num_entries) {
+		int count = 0;
+		dma_addr_t addr;
+		/*
+		 * MI_UPDATE_GTT can update 512 entries in a single command but
+		 * that end up with engine reset, 511 works.
+		 */
+		u32 n_ptes = min_t(u32, 511, num_entries);
+
+		if (mutex_lock_interruptible(&ce->timeline->mutex))
+			goto put_ce;
+
+		intel_context_enter(ce);
+		rq = __i915_request_create(ce, GFP_NOWAIT | GFP_ATOMIC);
+		intel_context_exit(ce);
+		if (IS_ERR(rq)) {
+			GT_TRACE(gt, "Failed to get bind request\n");
+			mutex_unlock(&ce->timeline->mutex);
+			goto put_ce;
+		}
+
+		cs = intel_ring_begin(rq, 2 * n_ptes + 2);
+		if (IS_ERR(cs)) {
+			GT_TRACE(gt, "Failed to ring space for GGTT bind\n");
+			i915_request_set_error_once(rq, PTR_ERR(cs));
+			/* once a request is created, it must be queued */
+			goto queue_err_rq;
+		}
+
+		*cs++ = MI_UPDATE_GTT | (2 * n_ptes);
+		*cs++ = offset << 12;
+
+		if (pages) {
+			for_each_sgt_daddr_next(addr, iter) {
+				if (count == n_ptes)
+					break;
+				*cs++ = lower_32_bits(pte | addr);
+				*cs++ = upper_32_bits(pte | addr);
+				count++;
+			}
+			/* fill remaining with scratch pte, if any */
+			if (count < n_ptes) {
+				memset64((u64 *)cs, scratch_pte,
+					 n_ptes - count);
+				cs += (n_ptes - count) * 2;
+			}
+		} else {
+			memset64((u64 *)cs, pte, n_ptes);
+			cs += n_ptes * 2;
+		}
+
+		intel_ring_advance(rq, cs);
+queue_err_rq:
+		i915_request_get(rq);
+		__i915_request_commit(rq);
+		__i915_request_queue(rq, &attr);
+
+		mutex_unlock(&ce->timeline->mutex);
+		/* This will break if the request is complete or after engine reset */
+		i915_request_wait(rq, 0, MAX_SCHEDULE_TIMEOUT);
+		if (rq->fence.error)
+			goto err_rq;
+
+		i915_request_put(rq);
+
+		num_entries -= n_ptes;
+		offset += n_ptes;
+	}
+
+	gen8_ggtt_bind_put_ce(ce);
+	return true;
+
+err_rq:
+	i915_request_put(rq);
+put_ce:
+	gen8_ggtt_bind_put_ce(ce);
+	return false;
+}
+
 static void gen8_set_pte(void __iomem *addr, gen8_pte_t pte)
 {
 	writeq(pte, addr);
@@ -318,6 +464,21 @@ static void gen8_ggtt_insert_page(struct i915_address_space *vm,
 	gen8_set_pte(pte, ggtt->vm.pte_encode(addr, pat_index, flags));
 
 	ggtt->invalidate(ggtt);
+}
+
+static void gen8_ggtt_insert_page_bind(struct i915_address_space *vm,
+				       dma_addr_t addr, u64 offset,
+				       unsigned int pat_index, u32 flags)
+{
+	struct i915_ggtt *ggtt = i915_vm_to_ggtt(vm);
+	gen8_pte_t pte;
+
+	pte = ggtt->vm.pte_encode(addr, pat_index, flags);
+	if (should_update_ggtt_with_bind(i915_vm_to_ggtt(vm)) &&
+	    gen8_ggtt_bind_ptes(ggtt, offset, NULL, 1, pte))
+		return ggtt->invalidate(ggtt);
+
+	gen8_ggtt_insert_page(vm, addr, offset, pat_index, flags);
 }
 
 static void gen8_ggtt_insert_entries(struct i915_address_space *vm,
@@ -359,6 +520,50 @@ static void gen8_ggtt_insert_entries(struct i915_address_space *vm,
 	ggtt->invalidate(ggtt);
 }
 
+static bool __gen8_ggtt_insert_entries_bind(struct i915_address_space *vm,
+					    struct i915_vma_resource *vma_res,
+					    unsigned int pat_index, u32 flags)
+{
+	struct i915_ggtt *ggtt = i915_vm_to_ggtt(vm);
+	gen8_pte_t scratch_pte = vm->scratch[0]->encode;
+	gen8_pte_t pte_encode;
+	u64 start, end;
+
+	pte_encode = ggtt->vm.pte_encode(0, pat_index, flags);
+	start = (vma_res->start - vma_res->guard) / I915_GTT_PAGE_SIZE;
+	end = start + vma_res->guard / I915_GTT_PAGE_SIZE;
+	if (!gen8_ggtt_bind_ptes(ggtt, start, NULL, end - start, scratch_pte))
+		goto err;
+
+	start = end;
+	end += (vma_res->node_size + vma_res->guard) / I915_GTT_PAGE_SIZE;
+	if (!gen8_ggtt_bind_ptes(ggtt, start, vma_res->bi.pages,
+	      vma_res->node_size / I915_GTT_PAGE_SIZE, pte_encode))
+		goto err;
+
+	start += vma_res->node_size / I915_GTT_PAGE_SIZE;
+	if (!gen8_ggtt_bind_ptes(ggtt, start, NULL, end - start, scratch_pte))
+		goto err;
+
+	return true;
+
+err:
+	return false;
+}
+
+static void gen8_ggtt_insert_entries_bind(struct i915_address_space *vm,
+					  struct i915_vma_resource *vma_res,
+					  unsigned int pat_index, u32 flags)
+{
+	struct i915_ggtt *ggtt = i915_vm_to_ggtt(vm);
+
+	if (should_update_ggtt_with_bind(i915_vm_to_ggtt(vm)) &&
+	    __gen8_ggtt_insert_entries_bind(vm, vma_res, pat_index, flags))
+		return ggtt->invalidate(ggtt);
+
+	gen8_ggtt_insert_entries(vm, vma_res, pat_index, flags);
+}
+
 static void gen8_ggtt_clear_range(struct i915_address_space *vm,
 				  u64 start, u64 length)
 {
@@ -378,6 +583,27 @@ static void gen8_ggtt_clear_range(struct i915_address_space *vm,
 
 	for (i = 0; i < num_entries; i++)
 		gen8_set_pte(&gtt_base[i], scratch_pte);
+}
+
+static void gen8_ggtt_scratch_range_bind(struct i915_address_space *vm,
+					 u64 start, u64 length)
+{
+	struct i915_ggtt *ggtt = i915_vm_to_ggtt(vm);
+	unsigned int first_entry = start / I915_GTT_PAGE_SIZE;
+	unsigned int num_entries = length / I915_GTT_PAGE_SIZE;
+	const gen8_pte_t scratch_pte = vm->scratch[0]->encode;
+	const int max_entries = ggtt_total_entries(ggtt) - first_entry;
+
+	if (WARN(num_entries > max_entries,
+		 "First entry = %d; Num entries = %d (max=%d)\n",
+		 first_entry, num_entries, max_entries))
+		num_entries = max_entries;
+
+	if (should_update_ggtt_with_bind(ggtt) && gen8_ggtt_bind_ptes(ggtt, first_entry,
+	     NULL, num_entries, scratch_pte))
+		return ggtt->invalidate(ggtt);
+
+	gen8_ggtt_clear_range(vm, start, length);
 }
 
 static void gen6_ggtt_insert_page(struct i915_address_space *vm,
@@ -946,13 +1172,20 @@ static unsigned int gen6_gttadr_offset(struct drm_i915_private *i915)
 static int ggtt_probe_common(struct i915_ggtt *ggtt, u64 size)
 {
 	struct drm_i915_private *i915 = ggtt->vm.i915;
+	struct intel_uncore *uncore = ggtt->vm.gt->uncore;
 	struct pci_dev *pdev = to_pci_dev(i915->drm.dev);
 	phys_addr_t phys_addr;
 	u32 pte_flags;
 	int ret;
 
 	GEM_WARN_ON(pci_resource_len(pdev, GEN4_GTTMMADR_BAR) != gen6_gttmmadr_size(i915));
-	phys_addr = pci_resource_start(pdev, GEN4_GTTMMADR_BAR) + gen6_gttadr_offset(i915);
+
+	if (i915_direct_stolen_access(i915)) {
+		drm_dbg(&i915->drm, "Using direct GSM access\n");
+		phys_addr = intel_uncore_read64(uncore, GEN6_GSMBASE) & GEN11_BDSM_MASK;
+	} else {
+		phys_addr = pci_resource_start(pdev, GEN4_GTTMMADR_BAR) + gen6_gttadr_offset(i915);
+	}
 
 	if (needs_wc_ggtt_mapping(i915))
 		ggtt->gsm = ioremap_wc(phys_addr, size);
@@ -991,6 +1224,7 @@ static int ggtt_probe_common(struct i915_ggtt *ggtt, u64 size)
 static int ggtt_probe_common(struct i915_ggtt *ggtt, u64 size)
 {
 	struct drm_i915_private *i915 = ggtt->vm.i915;
+	struct intel_uncore *uncore = ggtt->vm.gt->uncore;
 	struct pci_dev *pdev = i915->drm.pdev;
 	phys_addr_t phys_addr;
 	bus_addr_t addr;
@@ -1000,25 +1234,27 @@ static int ggtt_probe_common(struct i915_ggtt *ggtt, u64 size)
 	u32 pte_flags;
 	int ret;
 
-	/* For Modern GENs the PTEs and register space are split in the BAR */
 	type = pci_mapreg_type(i915->pc, i915->tag, 0x10);
 	ret = -pci_mapreg_info(i915->pc, i915->tag, 0x10, type,
 	    &addr, &len, NULL);
 	if (ret)
 		return ret;
 
-	/*
-	 * On BXT+/ICL+ writes larger than 64 bit to the GTT pagetable range
-	 * will be dropped. For WC mappings in general we have 64 byte burst
-	 * writes when the WC buffer is flushed, so we can't use it, but have to
-	 * resort to an uncached mapping. The WC issue is easily caught by the
-	 * readback check when writing GTT PTE entries.
-	 */
-	if (IS_GEN9_LP(i915) || GRAPHICS_VER(i915) >= 11)
-		flags = 0;
-	else
+	GEM_WARN_ON(len != gen6_gttmmadr_size(i915));
+
+	if (i915_direct_stolen_access(i915)) {
+		drm_dbg(&i915->drm, "Using direct GSM access\n");
+		phys_addr = intel_uncore_read64(uncore, GEN6_GSMBASE) & GEN11_BDSM_MASK;
+	} else {
+		phys_addr = addr + gen6_gttadr_offset(i915);
+	}
+
+	if (needs_wc_ggtt_mapping(i915))
 		flags = BUS_SPACE_MAP_PREFETCHABLE;
-	ret = -bus_space_map(i915->bst, addr + len / 2, size,
+	else
+		flags = 0;
+
+	ret = -bus_space_map(i915->bst, phys_addr, size,
 	    flags | BUS_SPACE_MAP_LINEAR, &ggtt->gsm_bsh);
 	if (ret) {
 		drm_err(&i915->drm, "Failed to map the ggtt page table\n");
@@ -1027,7 +1263,7 @@ static int ggtt_probe_common(struct i915_ggtt *ggtt, u64 size)
 	ggtt->gsm = bus_space_vaddr(i915->bst, ggtt->gsm_bsh);
 	ggtt->gsm_size = size;
 	if (!ggtt->gsm) {
-		DRM_ERROR("Failed to map the ggtt page table\n");
+		drm_err(&i915->drm, "Failed to map the ggtt page table\n");
 		return -ENOMEM;
 	}
 
@@ -1142,6 +1378,17 @@ static int gen8_gmch_probe(struct i915_ggtt *ggtt)
 
 		ggtt->vm.bind_async_flags =
 			I915_VMA_GLOBAL_BIND | I915_VMA_LOCAL_BIND;
+	}
+
+	if (i915_ggtt_require_binder(i915)) {
+		ggtt->vm.scratch_range = gen8_ggtt_scratch_range_bind;
+		ggtt->vm.insert_page = gen8_ggtt_insert_page_bind;
+		ggtt->vm.insert_entries = gen8_ggtt_insert_entries_bind;
+		/*
+		 * On GPU is hung, we might bind VMAs for error capture.
+		 * Fallback to CPU GGTT updates in that case.
+		 */
+		ggtt->vm.raw_insert_page = gen8_ggtt_insert_page;
 	}
 
 	if (intel_uc_wants_guc(&ggtt->vm.gt->uc))

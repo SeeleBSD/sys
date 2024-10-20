@@ -1,4 +1,4 @@
-/*	$OpenBSD: omehci.c,v 1.9 2021/10/24 17:52:27 mpi Exp $ */
+/*	$OpenBSD: omehci.c,v 1.11 2024/08/20 16:24:50 deraadt Exp $ */
 
 /*
  * Copyright (c) 2005 David Gwynne <dlg@openbsd.org>
@@ -85,11 +85,6 @@ struct omehci_softc {
 
 int omehci_init(struct omehci_softc *);
 void omehci_soft_phy_reset(struct omehci_softc *sc, unsigned int port);
-void omehci_enable(struct omehci_softc *);
-void omehci_disable(struct omehci_softc *);
-void omehci_utmi_init(struct omehci_softc *sc, unsigned int en_mask);
-void misc_setup(struct omehci_softc *sc);
-void omehci_uhh_init(struct omehci_softc *sc);
 
 const struct cfattach omehci_ca = {
 	sizeof (struct omehci_softc), omehci_match, omehci_attach,
@@ -454,9 +449,11 @@ int
 omehci_activate(struct device *self, int act)
 {
 	struct omehci_softc *sc = (struct omehci_softc *)self;
+	int rv;
 
 	switch (act) {
 	case DVACT_SUSPEND:
+		rv = config_activate_children(self, act);
 		sc->sc.sc_bus.use_polling++;
 		/* FIXME */
 		sc->sc.sc_bus.use_polling--;
@@ -465,10 +462,12 @@ omehci_activate(struct device *self, int act)
 		sc->sc.sc_bus.use_polling++;
 		/* FIXME */
 		sc->sc.sc_bus.use_polling--;
+		rv = config_activate_children(self, act);
 		break;
 	case DVACT_POWERDOWN:
+		rv = config_activate_children(self, act);
 		ehci_reset(&sc->sc);
 		break;
 	}
-	return 0;
+	return rv;
 }

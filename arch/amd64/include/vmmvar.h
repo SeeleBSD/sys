@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmmvar.h,v 1.98 2024/01/20 20:11:24 mlarkin Exp $	*/
+/*	$OpenBSD: vmmvar.h,v 1.106 2024/09/21 04:36:28 mlarkin Exp $	*/
 /*
  * Copyright (c) 2014 Mike Larkin <mlarkin@openbsd.org>
  *
@@ -22,14 +22,6 @@
 #define _MACHINE_VMMVAR_H_
 
 #define VMM_HV_SIGNATURE 	"OpenBSDVMM58"
-
-#define VMM_MAX_MEM_RANGES	16
-#define VMM_MAX_DISKS_PER_VM	4
-#define VMM_MAX_NAME_LEN	64
-#define VMM_MAX_VCPUS		512
-#define VMM_MAX_VCPUS_PER_VM	64
-#define VMM_MAX_VM_MEM_SIZE	128L * 1024 * 1024 * 1024
-#define VMM_MAX_NICS_PER_VM	4
 
 #define VMM_PCI_MMIO_BAR_BASE	0xF0000000ULL
 #define VMM_PCI_MMIO_BAR_END	0xFFDFFFFFULL		/* 2 MiB below 4 GiB */
@@ -96,14 +88,14 @@
 #define VMX_EXIT_XSAVES				63
 #define VMX_EXIT_XRSTORS			64
 
+#define VM_EXIT_TERMINATED			0xFFFE
+#define VM_EXIT_NONE				0xFFFF
+
 /*
  * VMX: Misc defines
  */
 #define VMX_MAX_CR3_TARGETS			256
 #define VMX_VMCS_PA_CLEAR			0xFFFFFFFFFFFFFFFFUL
-
-#define VM_EXIT_TERMINATED			0xFFFE
-#define VM_EXIT_NONE				0xFFFF
 
 /*
  * SVM: Intercept codes (exit reasons)
@@ -340,6 +332,7 @@ struct vm_exit_inout {
 	uint32_t		vei_data;	/* data */
 	uint8_t			vei_insn_len;	/* Count of instruction bytes */
 };
+
 /*
  *  vm_exit_eptviolation	: describes an EPT VIOLATION exit
  */
@@ -350,6 +343,19 @@ struct vm_exit_eptviolation {
 #define VEE_BYTES_VALID		0x2		/* vee_insn_bytes is valid */
 	uint8_t		vee_insn_len;		/* [VMX] instruction length */
 	uint8_t		vee_insn_bytes[15];	/* [SVM] bytes at {R,E,}IP */
+};
+
+/*
+ * struct vcpu_inject_event	: describes an exception or interrupt to inject.
+ */
+struct vcpu_inject_event {
+	uint8_t		vie_vector;	/* Exception or interrupt vector. */
+	uint32_t	vie_errorcode;	/* Optional error code. */
+	uint8_t		vie_type;
+#define VCPU_INJECT_NONE	0
+#define VCPU_INJECT_INTR	1	/* External hardware interrupt. */
+#define VCPU_INJECT_EX		2	/* HW or SW Exception */
+#define VCPU_INJECT_NMI		3	/* Non-maskable Interrupt */
 };
 
 /*
@@ -435,6 +441,15 @@ struct vcpu_reg_state {
 	struct vcpu_segment_info	vrs_idtr;
 };
 
+#define VCPU_HOST_REGS_EFER   		0
+#define VCPU_HOST_REGS_STAR   		1
+#define VCPU_HOST_REGS_LSTAR  		2
+#define VCPU_HOST_REGS_CSTAR  		3
+#define VCPU_HOST_REGS_SFMASK 		4
+#define VCPU_HOST_REGS_KGSBASE		5
+#define VCPU_HOST_REGS_MISC_ENABLE	6
+#define VCPU_HOST_REGS_NMSRS		(VCPU_HOST_REGS_MISC_ENABLE + 1)
+
 /*
  * struct vm_exit
  *
@@ -451,41 +466,11 @@ struct vm_exit {
 	int				cpl;
 };
 
-struct vm_run_params {
-	/* Input parameters to VMM_IOC_RUN */
-	uint32_t	vrp_vm_id;
-	uint32_t	vrp_vcpu_id;
-	uint8_t		vrp_continue;		/* Continuing from an exit */
-	uint16_t	vrp_irq;		/* IRQ to inject */
-	uint8_t		vrp_intr_pending;	/* Additional intrs pending? */
-
-	/* Input/output parameter to VMM_IOC_RUN */
-	struct vm_exit	*vrp_exit;		/* updated exit data */
-
-	/* Output parameter from VMM_IOC_RUN */
-	uint16_t	vrp_exit_reason;	/* exit reason */
-	uint8_t		vrp_irqready;		/* ready for IRQ on entry */
-};
-
 struct vm_intr_params {
 	/* Input parameters to VMM_IOC_INTR */
 	uint32_t		vip_vm_id;
 	uint32_t		vip_vcpu_id;
 	uint16_t		vip_intr;
-};
-
-#define VM_RWVMPARAMS_PVCLOCK_SYSTEM_GPA 0x1	/* read/write pvclock gpa */
-#define VM_RWVMPARAMS_PVCLOCK_VERSION	 0x2	/* read/write pvclock version */
-#define VM_RWVMPARAMS_ALL	(VM_RWVMPARAMS_PVCLOCK_SYSTEM_GPA | \
-    VM_RWVMPARAMS_PVCLOCK_VERSION)
-
-struct vm_rwvmparams_params {
-	/* Input parameters to VMM_IOC_READVMPARAMS/VMM_IOC_WRITEVMPARAMS */
-	uint32_t		vpp_vm_id;
-	uint32_t		vpp_vcpu_id;
-	uint32_t		vpp_mask;
-	paddr_t			vpp_pvclock_system_gpa;
-	uint32_t		vpp_pvclock_version;
 };
 
 #define VM_RWREGS_GPRS	0x1	/* read/write GPRs */
@@ -507,19 +492,8 @@ struct vm_rwregs_params {
 	struct vcpu_reg_state	vrwp_regs;
 };
 
-struct vm_mprotect_ept_params {
-	/* Input parameters to VMM_IOC_MPROTECT_EPT */
-	uint32_t		vmep_vm_id;
-	uint32_t		vmep_vcpu_id;
-	vaddr_t			vmep_sgpa;
-	size_t			vmep_size;
-	int			vmep_prot;
-};
-
 /* IOCTL definitions */
 #define VMM_IOC_INTR _IOW('V', 6, struct vm_intr_params) /* Intr pending */
-/* Control the protection of ept pages*/
-#define VMM_IOC_MPROTECT_EPT _IOW('V', 11, struct vm_mprotect_ept_params)
 
 /* CPUID masks */
 /*
@@ -617,8 +591,6 @@ struct vm_mprotect_ept_params {
 #define VMX_FAIL_LAUNCH_INVALID_VMCS	2
 #define VMX_FAIL_LAUNCH_VALID_VMCS	3
 
-#define VMX_NUM_MSR_STORE		7
-
 /* MSR bitmap manipulation macros */
 #define VMX_MSRIDX(m)			((m) / 8)
 #define VMX_MSRBIT(m)			(1 << (m) % 8)
@@ -641,6 +613,7 @@ enum {
 
 /* Forward declarations */
 struct vm;
+struct vm_create_params;
 
 /*
  * Implementation-specific cpu state
@@ -652,6 +625,9 @@ struct vmcb_segment {
 	uint32_t			vs_lim;			/* 004h */
 	uint64_t			vs_base;		/* 008h */
 };
+
+#define SVM_ENABLE_NP	(1ULL << 0)
+#define SVM_ENABLE_SEV	(1ULL << 1)
 
 struct vmcb {
 	union {
@@ -866,8 +842,7 @@ struct vcpu {
 	uint64_t vc_h_xcr0;			/* [v] */
 
 	struct vcpu_gueststate vc_gueststate;	/* [v] */
-
-	uint8_t vc_event;
+	struct vcpu_inject_event vc_inject;	/* [v] */
 
 	uint32_t vc_pvclock_version;		/* [v] */
 	paddr_t vc_pvclock_system_gpa;		/* [v] */
@@ -894,20 +869,24 @@ struct vcpu {
 	paddr_t vc_vmx_msr_exit_save_pa;
 	vaddr_t vc_vmx_msr_exit_load_va;
 	paddr_t vc_vmx_msr_exit_load_pa;
+#if 0	/* XXX currently use msr_exit_save for msr_entry_load too */
 	vaddr_t vc_vmx_msr_entry_load_va;
 	paddr_t vc_vmx_msr_entry_load_pa;
+#endif
 	uint8_t vc_vmx_vpid_enabled;
 	uint64_t vc_vmx_cr0_fixed1;
 	uint64_t vc_vmx_cr0_fixed0;
 	uint32_t vc_vmx_vmcs_state;		/* [a] */
 #define VMCS_CLEARED	0
 #define VMCS_LAUNCHED	1
+	uint64_t vc_vmx_invept_op;
 
 	/* SVM only (all requiring [v]) */
 	vaddr_t vc_svm_hsa_va;
 	paddr_t vc_svm_hsa_pa;
 	vaddr_t vc_svm_ioio_va;
 	paddr_t vc_svm_ioio_pa;
+	int vc_sev;				/* [I] */
 };
 
 SLIST_HEAD(vcpu_head, vcpu);
@@ -936,11 +915,9 @@ int	vmm_start(void);
 int	vmm_stop(void);
 int	vm_impl_init(struct vm *, struct proc *);
 void	vm_impl_deinit(struct vm *);
-int	vcpu_init(struct vcpu *);
+int	vcpu_init(struct vcpu *, struct vm_create_params *);
 void	vcpu_deinit(struct vcpu *);
-int	vm_rwvmparams(struct vm_rwvmparams_params *, int);
 int	vm_rwregs(struct vm_rwregs_params *, int);
-int	vm_run(struct vm_run_params *);
 int	vcpu_reset_regs(struct vcpu *, struct vcpu_reg_state *);
 
 #endif /* _KERNEL */

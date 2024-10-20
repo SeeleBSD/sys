@@ -1,4 +1,4 @@
-/*	$OpenBSD: psci.c,v 1.14 2023/02/19 17:16:13 kettenis Exp $	*/
+/*	$OpenBSD: psci.c,v 1.17 2024/07/10 11:01:24 kettenis Exp $	*/
 
 /*
  * Copyright (c) 2016 Jonathan Gray <jsg@openbsd.org>
@@ -34,28 +34,8 @@ extern void (*powerdownfn)(void);
 #define SMCCC_VERSION		0x80000000
 #define SMCCC_ARCH_FEATURES	0x80000001
 #define SMCCC_ARCH_WORKAROUND_1	0x80008000
+#define SMCCC_ARCH_WORKAROUND_2	0x80007fff
 #define SMCCC_ARCH_WORKAROUND_3	0x80003fff
-
-#define PSCI_VERSION		0x84000000
-#ifdef __LP64__
-#define CPU_SUSPEND		0xc4000001
-#else
-#define CPU_SUSPEND		0x84000001
-#endif
-#define CPU_OFF			0x84000002
-#ifdef __LP64__
-#define CPU_ON			0xc4000003
-#else
-#define CPU_ON			0x84000003
-#endif
-#define SYSTEM_OFF		0x84000008
-#define SYSTEM_RESET		0x84000009
-#define PSCI_FEATURES		0x8400000a
-#ifdef __LP64__
-#define SYSTEM_SUSPEND		0xc400000e
-#else
-#define SYSTEM_SUSPEND		0x8400000e
-#endif
 
 struct psci_softc {
 	struct device	 sc_dev;
@@ -212,14 +192,6 @@ psci_flush_bp_smccc_arch_workaround_1(void)
 }
 
 void
-psci_flush_bp_smccc_arch_workaround_3(void)
-{
-	struct psci_softc *sc = psci_sc;
-
-	(*sc->sc_callfn)(SMCCC_ARCH_WORKAROUND_3, 0, 0, 0);
-}
-
-void
 psci_flush_bp(void)
 {
 	struct psci_softc *sc = psci_sc;
@@ -240,8 +212,24 @@ psci_flush_bp(void)
 	}
 }
 
+void
+smccc_enable_arch_workaround_2(void)
+{
+	struct psci_softc *sc = psci_sc;
+
+	/*
+	 * SMCCC 1.1 allows us to detect if the workaround is
+	 * implemented and needed.
+	 */
+	if (sc && sc->sc_smccc_version >= 0x10001 &&
+	    smccc_arch_features(SMCCC_ARCH_WORKAROUND_2) == 0) {
+		/* Workaround implemented and needed. */
+		(*sc->sc_callfn)(SMCCC_ARCH_WORKAROUND_2, 1, 0, 0);
+	}
+}
+
 int
-psci_flush_bp_has_bhb(void)
+smccc_needs_arch_workaround_3(void)
 {
 	struct psci_softc *sc = psci_sc;
 

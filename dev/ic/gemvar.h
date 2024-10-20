@@ -1,4 +1,4 @@
-/*	$OpenBSD: gemvar.h,v 1.31 2015/11/28 09:42:10 jmatthew Exp $	*/
+/*	$OpenBSD: gemvar.h,v 1.33 2024/09/04 07:54:52 mglocker Exp $	*/
 /*	$NetBSD: gemvar.h,v 1.1 2001/09/16 00:11:43 eeh Exp $ */
 
 /*
@@ -106,7 +106,7 @@ struct gem_txthresh_tab {
 };
 
 /*
- * Some misc. statics, useful for debugging.
+ * Some misc. statistics, useful for debugging.
  */
 struct gem_stats {
 	u_long		ts_tx_uf;	/* transmit underflow errors */
@@ -272,15 +272,7 @@ do {									\
 } while (0)
 
 #ifdef _KERNEL
-void	gem_attach(struct gem_softc *, const u_int8_t *);
-int	gem_activate(struct device *, int);
-int	gem_detach(struct gem_softc *);
 int	gem_intr(void *);
-int	gem_read_srom(struct gem_softc *);
-int	gem_srom_crcok(const u_int8_t *);
-int	gem_isv_srom(const u_int8_t *);
-int	gem_isv_srom_enaddr(struct gem_softc *, u_int8_t *);
-int	gem_parse_old_srom(struct gem_softc *, u_int8_t *);
 
 int	gem_mediachange(struct ifnet *);
 void	gem_mediastatus(struct ifnet *, struct ifmediareq *);

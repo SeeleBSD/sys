@@ -681,4 +681,21 @@ const struct vops ntfs_vops = {
 	.vop_strategy	= ntfs_strategy,
 	.vop_bwrite	= vop_generic_bwrite,
 	.vop_read	= ntfs_read,
+
+	.vop_abortop	= NULL,
+	.vop_advlock	= NULL,
+	.vop_create	= NULL,
+	.vop_ioctl	= NULL,
+	.vop_link	= NULL,
+	.vop_mknod	= NULL,
+	.vop_readlink	= NULL,
+	.vop_remove	= eopnotsupp,
+	.vop_rename	= NULL,
+	.vop_revoke	= NULL,
+	.vop_mkdir	= NULL,
+	.vop_rmdir	= NULL,
+	.vop_setattr	= NULL,
+	.vop_symlink	= NULL,
+	.vop_write	= NULL,
+	.vop_kqfilter	= NULL
 };

@@ -1,4 +1,4 @@
-/*	$OpenBSD: acpi_machdep.c,v 1.108 2023/06/07 04:46:09 deraadt Exp $	*/
+/*	$OpenBSD: acpi_machdep.c,v 1.111 2024/09/01 03:08:56 jsg Exp $	*/
 /*
  * Copyright (c) 2005 Thorsten Lockert <tholo@sigmasoft.com>
  *
@@ -333,7 +333,8 @@ acpi_attach_machdep(struct acpi_softc *sc)
 	extern void (*cpuresetfn)(void);
 
 	sc->sc_interrupt = isa_intr_establish(NULL, sc->sc_fadt->sci_int,
-	    IST_LEVEL, IPL_BIO, acpi_interrupt, sc, sc->sc_dev.dv_xname);
+	    IST_LEVEL, IPL_BIO | IPL_WAKEUP, acpi_interrupt,
+	    sc, sc->sc_dev.dv_xname);
 	cpuresetfn = acpi_reset;
 
 #ifndef SMALL_KERNEL
@@ -376,6 +377,9 @@ acpi_attach_machdep(struct acpi_softc *sc)
 int
 acpi_sleep_cpu(struct acpi_softc *sc, int state)
 {
+	if (state == ACPI_STATE_S0)
+		return cpu_suspend_primary();
+
 	rtcstop();
 #if NLAPIC > 0
 	lapic_disable();
@@ -451,12 +455,15 @@ acpi_sleep_cpu(struct acpi_softc *sc, int state)
 /*
  * First repair the interrupt hardware so that any events which occur
  * will cause the least number of unexpected side effects.  We re-start
- * the clocks early because we will soon run AML whigh might do DELAY.
+ * the clocks early because we will soon run AML which might do DELAY.
  * Then PM, and then further system/CPU work for the BSP cpu.
  */ 
 void
 acpi_resume_cpu(struct acpi_softc *sc, int state)
 {
+	if (state == ACPI_STATE_S0)
+		return;
+
 	cpu_init_msrs(&cpu_info_primary);
 	cpu_fix_msrs(&cpu_info_primary);
 

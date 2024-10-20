@@ -1,4 +1,4 @@
-/*	$OpenBSD: pipex_local.h,v 1.51 2024/01/23 17:57:21 mvs Exp $	*/
+/*	$OpenBSD: pipex_local.h,v 1.53 2024/07/26 15:51:09 yasuoka Exp $	*/
 
 /*
  * Copyright (c) 2009 Internet Initiative Japan Inc.
@@ -140,6 +140,7 @@ struct pipex_l2tp_session {
 	uint16_t peer_tunnel_id;	/* [I] peer's tunnel-id */
 
 	uint32_t option_flags;		/* [I] protocol options */
+	uint32_t ipsecflowinfo;		/* [I] IPsec SA flow id for NAT-T */
 
 	int16_t ns_gap;		/* [s] gap between userland and pipex */
 	int16_t nr_gap;		/* [s] gap between userland and pipex */
@@ -150,7 +151,6 @@ struct pipex_l2tp_session {
 
 	uint16_t nr_nxt;	/* [s] next sequence number to recv */
 	uint16_t nr_acked;	/* [s] acked sequence number to recv */
-	uint32_t ipsecflowinfo;	/* [s] IPsec SA flow id for NAT-T */
 };
 #endif /* PIPEX_L2TP */
 
@@ -468,7 +468,6 @@ struct mbuf           *ip_is_idle_packet (struct mbuf *, int *);
 void                  pipex_session_log (struct pipex_session *, int, const char *, ...)  __attribute__((__format__(__printf__,3,4)));
 uint32_t              pipex_sockaddr_hash_key(struct sockaddr *);
 int                   pipex_sockaddr_compar_addr(struct sockaddr *, struct sockaddr *);
-int                   pipex_ppp_enqueue (struct mbuf *, struct pipex_session *, struct mbuf_queue *);
 void                  pipex_timer_start (void);
 void                  pipex_timer_stop (void);
 void                  pipex_timer (void *);

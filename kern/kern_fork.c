@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_fork.c,v 1.257 2024/01/24 19:23:38 cheloha Exp $	*/
+/*	$OpenBSD: kern_fork.c,v 1.265 2024/08/21 03:07:45 deraadt Exp $	*/
 /*	$NetBSD: kern_fork.c,v 1.29 1996/02/09 18:59:34 christos Exp $	*/
 
 /*
@@ -65,7 +65,7 @@
 #include <machine/tcb.h>
 
 int	nprocesses = 1;		/* process 0 */
-int	nthreads = 1;		/* proc 0 */
+int	nthreads = 1;		/* [a] proc 0 */
 struct	forkstat forkstat;
 
 void fork_return(void *);
@@ -178,6 +178,8 @@ thread_new(struct proc *parent, vaddr_t uaddr)
 void
 process_initialize(struct process *pr, struct proc *p)
 {
+	refcnt_init(&pr->ps_refcnt);
+
 	/* initialize the thread links */
 	pr->ps_mainproc = p;
 	TAILQ_INIT(&pr->ps_threads);
@@ -199,6 +201,7 @@ process_initialize(struct process *pr, struct proc *p)
 
 	rw_init(&pr->ps_lock, "pslock");
 	mtx_init(&pr->ps_mtx, IPL_HIGH);
+	klist_init_mutex(&pr->ps_klist, &pr->ps_mtx);
 
 	timeout_set_flags(&pr->ps_realit_to, realitexpire, pr,
 	    KCLOCK_UPTIME, 0);
@@ -253,14 +256,12 @@ process_new(struct proc *p, struct process *parent, int flags)
 		    sizeof(u_int), M_PINSYSCALL, M_WAITOK);
 		memcpy(pr->ps_pin.pn_pins, parent->ps_pin.pn_pins,
 		    parent->ps_pin.pn_npins * sizeof(u_int));
-		pr->ps_flags |= PS_PIN;
 	}
 	if (parent->ps_libcpin.pn_pins) {
 		pr->ps_libcpin.pn_pins = mallocarray(parent->ps_libcpin.pn_npins,
 		    sizeof(u_int), M_PINSYSCALL, M_WAITOK);
 		memcpy(pr->ps_libcpin.pn_pins, parent->ps_libcpin.pn_pins,
 		    parent->ps_libcpin.pn_npins * sizeof(u_int));
-		pr->ps_flags |= PS_LIBCPIN;
 	}
 
 	/*
@@ -304,6 +305,8 @@ struct timeval fork_tfmrate = { 10, 0 };
 int
 fork_check_maxthread(uid_t uid)
 {
+	int maxthread_local, val;
+
 	/*
 	 * Although process entries are dynamically created, we still keep
 	 * a global limit on the maximum number we will create. We reserve
@@ -313,14 +316,17 @@ fork_check_maxthread(uid_t uid)
 	 * the variable nthreads is the current number of procs, maxthread is
 	 * the limit.
 	 */
-	if ((nthreads >= maxthread - 5 && uid != 0) || nthreads >= maxthread) {
+	maxthread_local = atomic_load_int(&maxthread);
+	val = atomic_inc_int_nv(&nthreads);
+	if ((val > maxthread_local - 5 && uid != 0) ||
+	    val > maxthread_local) {
 		static struct timeval lasttfm;
 
 		if (ratecheck(&lasttfm, &fork_tfmrate))
 			tablefull("thread");
+		atomic_dec_int(&nthreads);
 		return EAGAIN;
 	}
-	nthreads++;
 
 	return 0;
 }
@@ -329,14 +335,13 @@ static inline void
 fork_thread_start(struct proc *p, struct proc *parent, int flags)
 {
 	struct cpu_info *ci;
-	int s;
 
-	SCHED_LOCK(s);
+	SCHED_LOCK();
 	ci = sched_choosecpu_fork(parent, flags);
 	TRACEPOINT(sched, fork, p->p_tid + THREAD_PID_OFFSET,
 	    p->p_p->ps_pid, CPU_INFO_UNIT(ci));
 	setrunqueue(ci, p, p->p_usrpri);
-	SCHED_UNLOCK(s);
+	SCHED_UNLOCK();
 }
 
 int
@@ -348,7 +353,7 @@ fork1(struct proc *curp, int flags, void (*func)(void *), void *arg,
 	struct proc *p;
 	uid_t uid = curp->p_ucred->cr_ruid;
 	struct vmspace *vm;
-	int count;
+	int count, maxprocess_local;
 	vaddr_t uaddr;
 	int error;
 	struct  ptrace_state *newptstat = NULL;
@@ -361,13 +366,14 @@ fork1(struct proc *curp, int flags, void (*func)(void *), void *arg,
 	if ((error = fork_check_maxthread(uid)))
 		return error;
 
-	if ((nprocesses >= maxprocess - 5 && uid != 0) ||
-	    nprocesses >= maxprocess) {
+	maxprocess_local = atomic_load_int(&maxprocess);
+	if ((nprocesses >= maxprocess_local - 5 && uid != 0) ||
+	    nprocesses >= maxprocess_local) {
 		static struct timeval lasttfm;
 
 		if (ratecheck(&lasttfm, &fork_tfmrate))
 			tablefull("process");
-		nthreads--;
+		atomic_dec_int(&nthreads);
 		return EAGAIN;
 	}
 	nprocesses++;
@@ -380,7 +386,7 @@ fork1(struct proc *curp, int flags, void (*func)(void *), void *arg,
 	if (uid != 0 && count > lim_cur(RLIMIT_NPROC)) {
 		(void)chgproccnt(uid, -1);
 		nprocesses--;
-		nthreads--;
+		atomic_dec_int(&nthreads);
 		return EAGAIN;
 	}
 
@@ -388,7 +394,7 @@ fork1(struct proc *curp, int flags, void (*func)(void *), void *arg,
 	if (uaddr == 0) {
 		(void)chgproccnt(uid, -1);
 		nprocesses--;
-		nthreads--;
+		atomic_dec_int(&nthreads);
 		return (ENOMEM);
 	}
 
@@ -485,7 +491,7 @@ fork1(struct proc *curp, int flags, void (*func)(void *), void *arg,
 	/*
 	 * Notify any interested parties about the new process.
 	 */
-	knote_locked(&curpr->ps_klist, NOTE_FORK | pr->ps_pid);
+	knote_processfork(curpr, pr->ps_pid);
 
 	/*
 	 * Update stats now that we know the fork was successful.
@@ -535,7 +541,7 @@ thread_fork(struct proc *curp, void *stack, void *tcb, pid_t *tidptr,
 	struct proc *p;
 	pid_t tid;
 	vaddr_t uaddr;
-	int s, error;
+	int error;
 
 	if (stack == NULL)
 		return EINVAL;
@@ -545,7 +551,7 @@ thread_fork(struct proc *curp, void *stack, void *tcb, pid_t *tidptr,
 
 	uaddr = uvm_uarea_alloc();
 	if (uaddr == 0) {
-		nthreads--;
+		atomic_dec_int(&nthreads);
 		return ENOMEM;
 	}
 
@@ -559,7 +565,6 @@ thread_fork(struct proc *curp, void *stack, void *tcb, pid_t *tidptr,
 
 	/* other links */
 	p->p_p = pr;
-	pr->ps_threadcnt++;
 
 	/* local copies */
 	p->p_fd		= pr->ps_fd;
@@ -578,18 +583,19 @@ thread_fork(struct proc *curp, void *stack, void *tcb, pid_t *tidptr,
 	LIST_INSERT_HEAD(&allproc, p, p_list);
 	LIST_INSERT_HEAD(TIDHASH(p->p_tid), p, p_hash);
 
-	SCHED_LOCK(s);
+	mtx_enter(&pr->ps_mtx);
 	TAILQ_INSERT_TAIL(&pr->ps_threads, p, p_thr_link);
+	pr->ps_threadcnt++;
 
 	/*
 	 * if somebody else wants to take us to single threaded mode,
 	 * count ourselves in.
 	 */
 	if (pr->ps_single) {
-		atomic_inc_int(&pr->ps_singlecount);
+		pr->ps_singlecnt++;
 		atomic_setbits_int(&p->p_flag, P_SUSPSINGLE);
 	}
-	SCHED_UNLOCK(s);
+	mtx_leave(&pr->ps_mtx);
 
 	/*
 	 * Return tid to parent thread and copy it out to userspace
@@ -688,12 +694,8 @@ proc_trampoline_mi(void)
 	struct proc *p = curproc;
 
 	SCHED_ASSERT_LOCKED();
-
 	clear_resched(curcpu());
-
-#if defined(MULTIPROCESSOR)
-	__mp_unlock(&sched_lock);
-#endif
+	mtx_leave(&sched_lock);
 	spl0();
 
 	SCHED_ASSERT_UNLOCKED();

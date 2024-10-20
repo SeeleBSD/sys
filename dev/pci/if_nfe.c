@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_nfe.c,v 1.125 2023/11/10 15:51:20 bluhm Exp $	*/
+/*	$OpenBSD: if_nfe.c,v 1.127 2024/08/31 16:23:09 deraadt Exp $	*/
 
 /*-
  * Copyright (c) 2006, 2007 Damien Bergamini <damien.bergamini@free.fr>
@@ -28,10 +28,8 @@
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
 #include <sys/queue.h>
-#include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/timeout.h>
-#include <sys/socket.h>
 
 #include <machine/bus.h>
 
@@ -164,23 +162,18 @@ nfe_activate(struct device *self, int act)
 {
 	struct nfe_softc *sc = (struct nfe_softc *)self;
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
-	int rv = 0;
 
 	switch (act) {
 	case DVACT_SUSPEND:
 		if (ifp->if_flags & IFF_RUNNING)
 			nfe_stop(ifp, 0);
-		rv = config_activate_children(self, act);
 		break;
 	case DVACT_RESUME:
 		if (ifp->if_flags & IFF_UP)
 			nfe_init(ifp);
 		break;
-	default:
-		rv = config_activate_children(self, act);
-		break;
 	}
-	return (rv);
+	return (0);
 }
 
 

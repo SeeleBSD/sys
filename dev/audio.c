@@ -1,4 +1,4 @@
-/*	$OpenBSD: audio.c,v 1.206 2023/02/10 14:34:16 visa Exp $	*/
+/*	$OpenBSD: audio.c,v 1.208 2024/08/20 07:44:36 mvs Exp $	*/
 /*
  * Copyright (c) 2015 Alexandre Ratchov <alex@caoua.org>
  *
@@ -27,10 +27,16 @@
 #include <sys/malloc.h>
 #include <sys/device.h>
 #include <sys/audioio.h>
+#include <sys/atomic.h>
 #include <dev/audio_if.h>
 #include <dev/mulaw.h>
 #include "audio.h"
 #include "wskbd.h"
+
+/*
+ * Locks used to protect data:
+ *	a	atomic
+ */
 
 #ifdef AUDIO_DEBUG
 #define DPRINTF(...)				\
@@ -47,8 +53,6 @@
 #define DPRINTF(...) do {} while(0)
 #define DPRINTFN(n, ...) do {} while(0)
 #endif
-
-#define IPL_SOFTAUDIO		IPL_SOFTNET
 
 #define DEVNAME(sc)		((sc)->dev.dv_xname)
 #define AUDIO_UNIT(n)		(minor(n) & 0x0f)
@@ -227,7 +231,7 @@ struct mutex audio_lock = MUTEX_INITIALIZER(IPL_AUDIO);
  * Global flag to control if audio recording is enabled when the
  * mixerctl setting is record.enable=sysctl
  */
-int audio_record_enable = 0;
+int audio_record_enable = 0;	/* [a] */
 
 #ifdef AUDIO_DEBUG
 /*
@@ -592,7 +596,7 @@ audio_rintr(void *addr)
 
 	sc->rec.pos += sc->rec.blksz;
 	if ((sc->record_enable == MIXER_RECORD_ENABLE_SYSCTL &&
-	    !audio_record_enable) ||
+	    atomic_load_int(&audio_record_enable) == 0) ||
 	    sc->record_enable == MIXER_RECORD_ENABLE_OFF) {
 		ptr = audio_buf_wgetblk(&sc->rec, &count);
 		audio_fill_sil(sc, ptr, sc->rec.blksz);

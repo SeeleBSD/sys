@@ -1,4 +1,4 @@
-/*	$OpenBSD: qle.c,v 1.63 2022/04/16 19:19:59 naddy Exp $ */
+/*	$OpenBSD: qle.c,v 1.66 2024/09/04 07:54:52 mglocker Exp $ */
 
 /*
  * Copyright (c) 2013, 2014 Jonathan Matthew <jmatthew@openbsd.org>
@@ -16,15 +16,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include "bio.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/atomic.h>
 #include <sys/malloc.h>
 #include <sys/device.h>
-#include <sys/sensors.h>
-#include <sys/rwlock.h>
 #include <sys/task.h>
 #include <sys/timeout.h>
 
@@ -33,10 +29,6 @@
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcidevs.h>
-
-#ifdef __sparc64__
-#include <dev/ofw/openfirm.h>
-#endif
 
 #include <scsi/scsi_all.h>
 #include <scsi/scsiconf.h>
@@ -359,7 +351,7 @@ qle_attach(struct device *parent, struct device *self, void *aux)
 
 	pcireg_t bars[] = { QLE_PCI_MEM_BAR, QLE_PCI_IO_BAR };
 	pcireg_t memtype;
-	int r, i, rv, loop_up;
+	int r, i, rv, loop_up = 0;
 
 	sc->sc_pc = pa->pa_pc;
 	sc->sc_tag = pa->pa_tag;
@@ -699,7 +691,7 @@ qle_detach(struct device *self, int flags)
 	struct qle_softc *sc = (struct qle_softc *)self;
 
 	if (sc->sc_ih == NULL) {
-		/* we didnt attach properly, so nothing to detach */
+		/* we didn't attach properly, so nothing to detach */
 		return (0);
 	}
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvideo.c,v 1.219 2022/10/21 18:29:37 kn Exp $ */
+/*	$OpenBSD: uvideo.c,v 1.222 2024/09/01 03:09:00 jsg Exp $ */
 
 /*
  * Copyright (c) 2008 Robert Nagy <robert@openbsd.org>
@@ -19,15 +19,9 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/device.h>
-#include <sys/ioctl.h>
-#include <sys/tty.h>
-#include <sys/fcntl.h>
-#include <sys/lock.h>
 #include <sys/stat.h>
-#include <sys/timeout.h>
 #include <sys/kthread.h>
 #include <sys/stdint.h>
 
@@ -183,6 +177,7 @@ usbd_status	uvideo_usb_control(struct uvideo_softc *, uint8_t, uint8_t,
 #include <sys/namei.h>
 #include <sys/proc.h>
 #include <sys/vnode.h>
+#include <sys/fcntl.h>
 
 void		uvideo_dump_desc_all(struct uvideo_softc *);
 void		uvideo_dump_desc_vc_header(struct uvideo_softc *,
@@ -3815,7 +3810,7 @@ uvideo_ucode_loader_ricoh(struct uvideo_softc *sc)
 
 /*
  * The iSight first generation device will first attach as
- * 0x8300 non-UVC.  After the firmware gots uploaded, the device
+ * 0x8300 non-UVC.  After the firmware is uploaded, the device
  * will reset and come back as 0x8501 UVC compatible.
  */
 usbd_status

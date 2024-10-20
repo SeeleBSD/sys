@@ -1,4 +1,4 @@
-/*	$OpenBSD: xhci_pci.c,v 1.12 2023/04/18 21:22:00 patrick Exp $ */
+/*	$OpenBSD: xhci_pci.c,v 1.14 2024/08/17 01:55:03 jsg Exp $ */
 
 /*
  * Copyright (c) 2001, 2002 The NetBSD Foundation, Inc.
@@ -31,11 +31,8 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/kernel.h>
 #include <sys/rwlock.h>
 #include <sys/device.h>
-#include <sys/timeout.h>
-#include <sys/queue.h>
 
 #include <machine/bus.h>
 
@@ -45,7 +42,6 @@
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdivar.h>
-#include <dev/usb/usb_mem.h>
 
 #include <dev/usb/xhcireg.h>
 #include <dev/usb/xhcivar.h>
@@ -154,6 +150,11 @@ xhci_pci_attach(struct device *parent, struct device *self, void *aux)
                 if (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_FRESCO_FL1000 ||
                     PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_FRESCO_FL1400)
 			pa->pa_flags &= ~PCI_FLAGS_MSI_ENABLED;
+		break;
+	case PCI_VENDOR_AMD:
+		if (PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_AMD_17_1X_XHCI_1 ||
+		    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_AMD_17_1X_XHCI_2)
+			psc->sc.sc_flags |= XHCI_NOCSS;
 		break;
 	}
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ncr53c9xvar.h,v 1.24 2020/07/22 13:16:04 krw Exp $	*/
+/*	$OpenBSD: ncr53c9xvar.h,v 1.26 2024/09/04 07:54:52 mglocker Exp $	*/
 /*	$NetBSD: ncr53c9xvar.h,v 1.13 1998/05/26 23:17:34 thorpej Exp $	*/
 
 /*-
@@ -55,8 +55,6 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <sys/timeout.h>
-
 /* Set this to 1 for normal debug, or 2 for per-target tracing. */
 #if !defined(SMALL_KERNEL)
 #define NCR53C9X_DEBUG		1
@@ -90,7 +88,7 @@
 /*
  * ECB. Holds additional information for each SCSI command Comments: We
  * need a separate scsi command block because we may need to overwrite it
- * with a request sense command.  Basicly, we refrain from fiddling with
+ * with a request sense command.  Basically, we refrain from fiddling with
  * the scsi_xfer struct (except do the expected updating of return values).
  * We'll generally update: xs->{flags,resid,error,sense,status} and
  * occasionally xs->retries.
@@ -105,8 +103,6 @@ struct ncr53c9x_ecb {
 #define	ECB_ABORT		0x40
 #define	ECB_RESET		0x80
 #define	ECB_TENTATIVE_DONE	0x100
-	int timeout;
-	struct timeout to;
 
 	struct {
 		u_char	msg[3];			/* Selection Id msg */

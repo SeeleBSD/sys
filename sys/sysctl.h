@@ -1,4 +1,4 @@
-/*	$OpenBSD: sysctl.h,v 1.235 2023/10/01 15:58:12 krw Exp $	*/
+/*	$OpenBSD: sysctl.h,v 1.237 2024/08/02 14:34:45 mvs Exp $	*/
 /*	$NetBSD: sysctl.h,v 1.16 1996/04/09 20:55:36 cgd Exp $	*/
 
 /*
@@ -589,7 +589,7 @@ struct kinfo_vmentry {
 #define	_FILL_KPROC_MIN(a,b) (((a)<(b))?(a):(b))
 
 #define FILL_KPROC(kp, copy_str, p, pr, uc, pg, paddr, \
-    praddr, sess, vm, lim, sa, isthread, show_addresses) \
+    praddr, sess, vm, lim, sa, tu, isthread, show_addresses) \
 do {									\
 	memset((kp), 0, sizeof(*(kp)));					\
 									\
@@ -625,21 +625,16 @@ do {									\
 									\
 	(kp)->p_estcpu = (p)->p_estcpu;					\
 	if (isthread) {							\
-		(kp)->p_rtime_sec = (p)->p_tu.tu_runtime.tv_sec;	\
-		(kp)->p_rtime_usec = (p)->p_tu.tu_runtime.tv_nsec/1000;	\
 		(kp)->p_tid = (p)->p_tid + THREAD_PID_OFFSET;		\
-		(kp)->p_uticks = (p)->p_tu.tu_uticks;			\
-		(kp)->p_sticks = (p)->p_tu.tu_sticks;			\
-		(kp)->p_iticks = (p)->p_tu.tu_iticks;			\
 		strlcpy((kp)->p_name, (p)->p_name, sizeof((kp)->p_name)); \
 	} else {							\
-		(kp)->p_rtime_sec = (pr)->ps_tu.tu_runtime.tv_sec;	\
-		(kp)->p_rtime_usec = (pr)->ps_tu.tu_runtime.tv_nsec/1000; \
 		(kp)->p_tid = -1;					\
-		(kp)->p_uticks = (pr)->ps_tu.tu_uticks;			\
-		(kp)->p_sticks = (pr)->ps_tu.tu_sticks;			\
-		(kp)->p_iticks = (pr)->ps_tu.tu_iticks;			\
 	}								\
+	(kp)->p_rtime_sec = (tu)->tu_runtime.tv_sec;			\
+	(kp)->p_rtime_usec = (tu)->tu_runtime.tv_nsec/1000;		\
+	(kp)->p_uticks = (tu)->tu_uticks;				\
+	(kp)->p_sticks = (tu)->tu_sticks;				\
+	(kp)->p_iticks = (tu)->tu_iticks;				\
 	(kp)->p_cpticks = (p)->p_cpticks;				\
 									\
 	if (show_addresses)						\
@@ -1053,6 +1048,9 @@ struct sysctl_bounded_args {
  * the name.
  */
 typedef int (sysctlfn)(int *, u_int, void *, size_t *, void *, size_t, struct proc *);
+
+int sysctl_vslock(void *, size_t);
+void sysctl_vsunlock(void *, size_t);
 
 int sysctl_int_lower(void *, size_t *, void *, size_t, int *);
 int sysctl_int(void *, size_t *, void *, size_t, int *);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: icmp6.c,v 1.251 2023/12/03 20:36:24 bluhm Exp $	*/
+/*	$OpenBSD: icmp6.c,v 1.255 2024/08/12 11:25:27 bluhm Exp $	*/
 /*	$KAME: icmp6.c,v 1.217 2001/06/20 15:03:29 jinmei Exp $	*/
 
 /*
@@ -1164,7 +1164,7 @@ icmp6_reflect(struct mbuf **mp, size_t off, struct sockaddr *sa)
 			rtfree(rt);
 			goto bad;
 		}
-		ia6 = in6_ifawithscope(rt->rt_ifa->ifa_ifp, &t, rtableid);
+		ia6 = in6_ifawithscope(rt->rt_ifa->ifa_ifp, &t, rtableid, rt);
 		if (ia6 != NULL)
 			src = &ia6->ia_addr.sin6_addr;
 		if (src == NULL)
@@ -1198,7 +1198,6 @@ icmp6_reflect(struct mbuf **mp, size_t off, struct sockaddr *sa)
 void
 icmp6_fasttimo(void)
 {
-
 	mld6_fasttimeo();
 }
 
@@ -1228,6 +1227,7 @@ icmp6_redirect_input(struct mbuf *m, int off)
 	char *lladdr = NULL;
 	int lladdrlen = 0;
 	struct rtentry *rt = NULL;
+	int i_am_router = (atomic_load_int(&ip6_forwarding) != 0);
 	int is_router;
 	int is_onlink;
 	struct in6_addr src6 = ip6->ip6_src;
@@ -1240,8 +1240,8 @@ icmp6_redirect_input(struct mbuf *m, int off)
 	if (ifp == NULL)
 		return;
 
-	/* XXX if we are router, we don't update route by icmp6 redirect */
-	if (ip6_forwarding)
+	/* if we are router, we don't update route by icmp6 redirect */
+	if (i_am_router)
 		goto freeit;
 	if (!(ifp->if_xflags & IFXF_AUTOCONF6))
 		goto freeit;
@@ -1366,7 +1366,7 @@ icmp6_redirect_input(struct mbuf *m, int off)
 
 	/* RFC 2461 8.3 */
 	nd6_cache_lladdr(ifp, &redtgt6, lladdr, lladdrlen, ND_REDIRECT,
-			 is_onlink ? ND_REDIRECT_ONLINK : ND_REDIRECT_ROUTER);
+	    is_onlink ? ND_REDIRECT_ONLINK : ND_REDIRECT_ROUTER, i_am_router);
 
 	if (!is_onlink) {	/* better router case.  perform rtredirect. */
 		/* perform rtredirect */
@@ -1438,11 +1438,12 @@ icmp6_redirect_output(struct mbuf *m0, struct rtentry *rt)
 	size_t maxlen;
 	u_char *p;
 	struct sockaddr_in6 src_sa;
+	int i_am_router = (atomic_load_int(&ip6_forwarding) != 0);
 
 	icmp6_errcount(ND_REDIRECT, 0);
 
 	/* if we are not router, we don't send icmp6 redirect */
-	if (!ip6_forwarding)
+	if (!i_am_router)
 		goto fail;
 
 	/* sanity check */

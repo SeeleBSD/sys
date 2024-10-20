@@ -1,0 +1,6 @@
+@@ -1,4 +1,4 @@
+-/*	$OpenBSD: udf_vnops.c,v 1.70.4.1 2024/09/15 22:44:29 bluhm Exp $	*/
++/*	$OpenBSD: udf_vnops.c,v 1.74 2024/09/20 02:00:46 jsg Exp $	*/
+ 
+ /*
+  * Copyright (c) 2001, 2002 Scott Long <scottl@freebsd.org>
