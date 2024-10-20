@@ -49,13 +49,20 @@ EOF
 compile_kernel() {
   echo "Compiling the kernel inside the VM..."
   sshpass -p ${VM_PASS} ssh -p ${VM_PORT} -o StrictHostKeyChecking=no "${VM_USER}@localhost" << EOF
-    pkg_add git rust # Install necessary packages
+    pkg_add git rust rust-src rustfmt llvm%17
+    cargo install bindgen-cli
+    ln -s /root/.cargo/bin/bindgen /usr/bin/bindgen
     cd /usr/src/sys/arch/\$(machine)/conf
     config CUSTOM.MP
     cd /usr/src/sys/arch/\$(machine)/compile/CUSTOM.MP
     # Compile the kernel
-    make clean && make -j8
+    rm -rf obj/bindings obj/uapi
+    make -j8
 EOF
+}
+
+copy_kernel_back() {
+  sshpass -p ${VM_PASS} scp -o StrictHostKeyChecking=no -P "${VM_PORT}" "${VM_USER}@localhost:/usr/src/sys/arch/arm64/compile/CUSTOM.MP/obj/bsd" "${LOCAL_SOURCE_DIR}/bsd"
 }
 
 # Main script execution
@@ -63,6 +70,7 @@ main() {
   start_vm
   copy_sources
   compile_kernel
+  copy_kernel_back
   stop_vm
 }
 
