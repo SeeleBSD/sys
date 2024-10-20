@@ -4,3 +4,8 @@
 **/.vscode
 **/.DS_Store
 **/.orig
+**/install*.img
+**/*.qcow2
+**/mirror
+**/tftp
+**/images

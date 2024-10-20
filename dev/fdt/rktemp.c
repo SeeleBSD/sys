@@ -421,7 +421,7 @@ rktemp_attach(struct device *parent, struct device *self, void *aux)
 		uint32_t gpio_en, cru_en;
 
 		sc->sc_data0 = TSADC_V3_DATA(0);
-		
+
 		HWRITE4(sc, TSADC_V3_AUTO_PERIOD, auto_period);
 		HWRITE4(sc, TSADC_V3_AUTO_PERIOD_HT, auto_period_ht);
 		HWRITE4(sc, TSADC_V3_HIGHT_INT_DEBOUNCE, 4);

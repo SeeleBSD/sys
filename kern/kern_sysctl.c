@@ -1086,7 +1086,7 @@ sysctl_int_lower(void *oldp, size_t *oldlenp, void *newp, size_t newlen,
 		oldval = atomic_load_int(valp);
 
 		if ((error = copyout(&oldval, oldp, sizeof(int))))
-			return (error);	
+			return (error);
 	}
 
 	return (0);
@@ -1154,7 +1154,7 @@ sysctl_securelevel(void *oldp, size_t *oldlenp, void *newp, size_t newlen,
 		oldval = atomic_load_int(&securelevel);
 
 		if ((error = copyout(&oldval, oldp, sizeof(int))))
-			return (error);	
+			return (error);
 	}
 
 	return (0);

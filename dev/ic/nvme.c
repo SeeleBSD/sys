@@ -2198,7 +2198,7 @@ nvme_refresh_sensors(void *arg)
 	if (flags != 0)
 		goto failed;
 
-	health = NVME_DMA_KVA(mem); 
+	health = NVME_DMA_KVA(mem);
 	cw = health->critical_warning;
 
 	sc->sc_temp_sensor.status = (cw & NVM_HEALTH_CW_TEMP) ?

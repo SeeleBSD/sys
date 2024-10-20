@@ -836,7 +836,7 @@ brgphy_reset_bge(struct mii_softc *sc)
 	if (bge_sc->bge_phy_flags & BGE_PHY_BER_BUG)
 		brgphy_ber_bug(sc);
 	else if (bge_sc->bge_phy_flags & BGE_PHY_JITTER_BUG) {
-	    	PHY_WRITE(sc, BRGPHY_MII_AUXCTL, 0x0c00);
+		PHY_WRITE(sc, BRGPHY_MII_AUXCTL, 0x0c00);
 		PHY_WRITE(sc, BRGPHY_MII_DSP_ADDR_REG, 0x000a);
 
 		if (bge_sc->bge_phy_flags & BGE_PHY_ADJUST_TRIM) {

@@ -450,6 +450,6 @@ struct nvm_smart_health {
 	u_int32_t	therm_mgmt_count_2;	/* 1.3+ */
 	u_int32_t	therm_mgmt_time_1;	/* 1.3+ */
 	u_int32_t	therm_mgmt_time_2;	/* 1.3+ */
-	
+
 	u_int8_t	_reserved2[280];
 } __packed __aligned(8);

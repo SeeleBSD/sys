@@ -1634,7 +1634,7 @@ vmxnet3_start(struct ifqueue *ifq)
 		 * Headers for Ether, IP, TCP including options must lay in
 		 * first mbuf to support TSO.  Usually our stack gets that
 		 * right. To avoid packet parsing here, make a rough estimate
-		 * for simple IPv4.  Cases seen in the wild contain only ether 
+		 * for simple IPv4.  Cases seen in the wild contain only ether
 		 * header in separate mbuf.  To support IPv6 with TCP options,
 		 * move as much as possible into first mbuf.  Realloc mbuf
 		 * before bus dma load.

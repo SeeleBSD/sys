@@ -121,7 +121,7 @@ struct xhci_softc {
 
 	char			 sc_vendor[16];	/* Vendor string for root hub */
 	int			 sc_id_vendor;	/* Vendor ID for root hub */
-	
+
 	int			 sc_flags;
 #define XHCI_NOCSS		 0x01
 };

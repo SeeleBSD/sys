@@ -46,7 +46,7 @@
 #define  GMAC_INT_MASK_RIM		(1 << 0)
 #define GMAC_VLAN_TAG_CTRL	0x0050
 #define  GMAC_VLAN_TAG_CTRL_EVLRXS		(1 << 24)
-#define  GMAC_VLAN_TAG_CTRL_STRIP_ALWAYS	((1 << 21) | (1 << 22))	
+#define  GMAC_VLAN_TAG_CTRL_STRIP_ALWAYS	((1 << 21) | (1 << 22))
 #define GMAC_VLAN_TAG_DATA	0x0054
 #define GMAC_VLAN_TAG_INCL	0x0060
 #define  GMAC_VLAN_TAG_INCL_VLTI	(1 << 20)
@@ -247,7 +247,7 @@ struct dwqe_desc {
 /* Tx context descriptor bits (host to device); precedes regular descriptor */
 #define TDES3_CTXT		(1 << 30)
 #define TDES3_VLAN_TAG_VALID	(1 << 16)
-#define TDES3_VLAN_TAG		0xffff	
+#define TDES3_VLAN_TAG		0xffff
 /* Bit 31 is the OWN bit, as in regular Tx descriptor. */
 
 /* Tx bits (read format; host to device) */

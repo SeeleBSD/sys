@@ -84,7 +84,7 @@ struct sosplice {
  * Variables for socket buffering.
  */
 struct sockbuf {
-	struct rwlock sb_lock; 
+	struct rwlock sb_lock;
 	struct mutex  sb_mtx;
 /* The following fields are all zeroed on flush. */
 #define	sb_startzero	sb_cc
@@ -288,7 +288,7 @@ sbspace(struct socket *so, struct sockbuf *sb)
 	sb_mtx_lock(sb);
 	ret = sbspace_locked(so, sb);
 	sb_mtx_unlock(sb);
-	
+
 	return ret;
 }
 

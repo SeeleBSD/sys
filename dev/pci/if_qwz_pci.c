@@ -96,7 +96,7 @@
 #include <dev/ic/qwzreg.h>
 #include <dev/ic/qwzvar.h>
 
-#ifdef QWZ_DEBUG 
+#ifdef QWZ_DEBUG
 /* Headers needed for RDDM dump */
 #include <sys/namei.h>
 #include <sys/pledge.h>
@@ -2758,7 +2758,7 @@ qwz_mhi_start(struct qwz_pci_softc *psc)
 	for (off = MHI_BHIE_RXVECADDR_LOW_OFFS;
 	     off < (MHI_BHIE_RXVECSTATUS_OFFS - 4);
 	     off += 4)
-	     	qwz_pci_write(sc, psc->bhie_off + off, 0x0);
+		qwz_pci_write(sc, psc->bhie_off + off, 0x0);
 
 	qwz_rddm_prepare(psc);
 

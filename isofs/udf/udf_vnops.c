@@ -1,4 +1,4 @@
-/*	$OpenBSD: udf_vnops.c,v 1.70 2023/04/13 02:19:05 jsg Exp $	*/
+/*	$OpenBSD: udf_vnops.c,v 1.74 2024/09/20 02:00:46 jsg Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002 Scott Long <scottl@freebsd.org>
@@ -564,6 +564,12 @@ udf_uiodir(struct udf_uiodir *uiodir, struct uio *uio, long off)
 	}
 	uiodir->dirent->d_off = off;
 	uiodir->dirent->d_reclen = de_size;
+
+	if (memchr(uiodir->dirent->d_name, '/',
+	    uiodir->dirent->d_namlen) != NULL) {
+		/* illegal file name */
+		return (EINVAL);
+	}
 
 	return (uiomove(uiodir->dirent, de_size, uio));
 }

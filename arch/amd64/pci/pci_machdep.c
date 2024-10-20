@@ -609,7 +609,7 @@ msix_hwunmask(struct pic *pic, int pin)
 	pcireg_t reg;
 	uint32_t ctrl;
 
-	if (pci_get_capability(pc, tag, PCI_CAP_MSIX, NULL, &reg) == 0) 
+	if (pci_get_capability(pc, tag, PCI_CAP_MSIX, NULL, &reg) == 0)
 		return;
 
 	if (pci_msix_table_map(pc, tag, memt, &memh))

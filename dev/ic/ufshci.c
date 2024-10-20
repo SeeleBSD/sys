@@ -141,7 +141,7 @@ ufshci_intr(void *arg)
 		handled = 1;
 	}
 	if (status & UFSHCI_REG_IS_UTRCS) {
-	  	DPRINTF(3, "%s: UTRCS interrupt\n", __func__);
+		DPRINTF(3, "%s: UTRCS interrupt\n", __func__);
 
 		ufshci_xfer_complete(sc);
 
@@ -1428,7 +1428,7 @@ ufshci_ccb_alloc(struct ufshci_softc *sc, int nccbs)
 		if (bus_dmamap_create(sc->sc_dmat, UFSHCI_UCD_PRDT_MAX_XFER,
 		    UFSHCI_UCD_PRDT_MAX_SEGS, UFSHCI_UCD_PRDT_MAX_XFER, 0,
 		    BUS_DMA_WAITOK | BUS_DMA_ALLOCNOW |
-	    	    ((sc->sc_cap & UFSHCI_REG_CAP_64AS) ? BUS_DMA_64BIT : 0),
+		    ((sc->sc_cap & UFSHCI_REG_CAP_64AS) ? BUS_DMA_64BIT : 0),
 		    &ccb->ccb_dmamap) != 0)
 			goto free_maps;
 

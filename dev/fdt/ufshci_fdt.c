@@ -17,7 +17,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
- 
+
 #include <machine/fdt.h>
 
 #include <dev/ofw/openfirm.h>

@@ -1006,7 +1006,7 @@ product APPLE WELLSPRING8_ANSI	0x0290	Keyboard/Trackpad
 product APPLE WELLSPRING8_ISO	0x0291	Keyboard/Trackpad
 product APPLE WELLSPRING8_JIS	0x0292	Keyboard/Trackpad
 product APPLE OPTMOUSE		0x0302	Optical mouse
-product APPLE WELLSPRINGM1_J293	0x0341	Keyboard/Trackpad	
+product APPLE WELLSPRINGM1_J293	0x0341	Keyboard/Trackpad
 product APPLE BLUETOOTH_HCI	0x1000	HID-proxy
 product APPLE SPEAKERS		0x1101	Speakers
 product APPLE IPHONE		0x1290	iPhone

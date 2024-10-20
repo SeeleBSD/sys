@@ -611,7 +611,7 @@ auvia_set_params(void *addr, int setmode, int usemode,
 				if (p->channels == 6
 				    && codec->vtbl->set_rate(codec, reg,
 				    &p->sample_rate))
- 					return (EINVAL);
+					return (EINVAL);
 			}
  		}
 

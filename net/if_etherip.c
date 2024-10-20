@@ -59,7 +59,7 @@
  * Locks used to protect data:
  *	a	atomic
  */
- 
+
 union etherip_addr {
 	struct in_addr	in4;
 	struct in6_addr	in6;

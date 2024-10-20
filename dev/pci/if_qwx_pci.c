@@ -96,7 +96,7 @@
 #include <dev/ic/qwxreg.h>
 #include <dev/ic/qwxvar.h>
 
-#ifdef QWX_DEBUG 
+#ifdef QWX_DEBUG
 /* Headers needed for RDDM dump */
 #include <sys/namei.h>
 #include <sys/pledge.h>

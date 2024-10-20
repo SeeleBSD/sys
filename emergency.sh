@@ -1,0 +1,11 @@
+qemu-system-aarch64 \
+  -machine virt \
+  -cpu host \
+  -accel hvf \
+  -smp 8 \
+  -m 8192 \
+  -bios /opt/homebrew/share/qemu/edk2-aarch64-code.fd \
+  -drive if=virtio,file=obsd_aarch64.qcow2,format=qcow2 \
+  -netdev user,id=net0,hostfwd=tcp::10022-:22 \
+  -device virtio-net,netdev=net0 \
+  -nographic

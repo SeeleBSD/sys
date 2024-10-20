@@ -296,7 +296,7 @@ qcpas_mountroot(struct device *self)
 	sc->sc_sens[1].type = SENSOR_WATTHOUR;
 	sc->sc_sens[1].flags = SENSOR_FUNKNOWN;
 	sensor_attach(&sc->sc_sensdev, &sc->sc_sens[1]);
-	
+
 	strlcpy(sc->sc_sens[2].desc, "low capacity",
 	    sizeof(sc->sc_sens[2].desc));
 	sc->sc_sens[2].type = SENSOR_WATTHOUR;

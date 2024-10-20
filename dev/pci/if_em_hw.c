@@ -6426,7 +6426,7 @@ em_init_eeprom_params(struct em_hw *hw)
 	case em_pch_lpt:
 		{
 			int32_t		i = 0;
-			uint32_t	flash_size = 
+			uint32_t	flash_size =
 			    E1000_READ_ICH_FLASH_REG(hw, ICH_FLASH_GFPREG);
 			eeprom->type = em_eeprom_ich8;
 			eeprom->use_eerd = FALSE;

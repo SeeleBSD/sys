@@ -282,8 +282,8 @@ dwqe_attach(struct dwqe_softc *sc)
 	/* Disable interrupts. */
 	dwqe_write(sc, GMAC_INT_EN, 0);
 	dwqe_write(sc, GMAC_CHAN_INTR_ENA(0), 0);
-	dwqe_write(sc, GMAC_MMC_RX_INT_MASK, 0xffffffff); 
-	dwqe_write(sc, GMAC_MMC_TX_INT_MASK, 0xffffffff); 
+	dwqe_write(sc, GMAC_MMC_RX_INT_MASK, 0xffffffff);
+	dwqe_write(sc, GMAC_MMC_TX_INT_MASK, 0xffffffff);
 
 	return 0;
 }

@@ -368,7 +368,7 @@ sys_getrlimit(struct proc *p, void *v, register_t *retval)
 	return (error);
 }
 
-/* Add the counts from *from to *tu, ensuring a consistent read of *from. */ 
+/* Add the counts from *from to *tu, ensuring a consistent read of *from. */
 void
 tuagg_sumup(struct tusage *tu, const struct tusage *from)
 {

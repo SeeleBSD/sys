@@ -491,7 +491,7 @@ uchcom_write_reg(struct uchcom_softc *sc,
 		 (unsigned)reg1, (unsigned)val1,
 		 (unsigned)reg2, (unsigned)val2));
 	return uchcom_generic_control_out(sc,
-	    	(sc->sc_type != UCHCOM_TYPE_CH343) ?
+		(sc->sc_type != UCHCOM_TYPE_CH343) ?
 		UCHCOM_REQ_WRITE_REG : UCHCOM_REQ_CH343_WRITE_REG,
 		reg1|((uint16_t)reg2<<8), val1|((uint16_t)val2<<8));
 }

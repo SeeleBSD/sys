@@ -48,7 +48,7 @@ mem_range_attach(void)
 	/* Try for i686 MTRRs */
 	if ((ci->ci_vendor == CPUV_AMD ||
 	     ci->ci_vendor == CPUV_INTEL ||
-	     ci->ci_vendor == CPUV_VIA) && 
+	     ci->ci_vendor == CPUV_VIA) &&
 	    (family == 0x6 || family == 0xf) &&
 	    cpu_feature & CPUID_MTRR) {
 		mem_range_softc.mr_op = &mrops;

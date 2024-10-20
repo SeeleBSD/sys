@@ -237,7 +237,7 @@ nfssvc_addsock(struct file *fp, struct mbuf *mynam)
 	/*
 	 * Allow only IPv4 UDP and TCP sockets.
 	 */
-	if ((so->so_type != SOCK_STREAM && so->so_type != SOCK_DGRAM) || 
+	if ((so->so_type != SOCK_STREAM && so->so_type != SOCK_DGRAM) ||
 	    so->so_proto->pr_domain->dom_family != AF_INET) {
 		m_freem(mynam);
 		return (EINVAL);

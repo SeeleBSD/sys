@@ -6400,7 +6400,7 @@ bwi_led_attach(struct bwi_softc *sc)
 		if (led->l_act == BWI_LED_ACT_BLINK_SLOW ||
 		    led->l_act == BWI_LED_ACT_BLINK_POLL ||
 		    led->l_act == BWI_LED_ACT_BLINK) {
-		    	led->l_flags |= BWI_LED_F_BLINK;
+			led->l_flags |= BWI_LED_F_BLINK;
 			if (led->l_act == BWI_LED_ACT_BLINK_POLL)
 				led->l_flags |= BWI_LED_F_POLLABLE;
 			else if (led->l_act == BWI_LED_ACT_BLINK_SLOW)

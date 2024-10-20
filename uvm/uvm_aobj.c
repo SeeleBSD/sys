@@ -298,7 +298,7 @@ uao_set_swslot(struct uvm_object *uobj, int pageidx, int slot)
 
 		/* but a set is not */
 		printf("uao_set_swslot: uobj = %p\n", uobj);
-	    	panic("uao_set_swslot: attempt to set a slot on a NOSWAP object");
+		panic("uao_set_swslot: attempt to set a slot on a NOSWAP object");
 	}
 
 	/*
