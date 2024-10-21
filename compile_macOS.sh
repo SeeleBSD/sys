@@ -42,7 +42,7 @@ copy_sources() {
     rm -rf /usr/src/sys
     pkg_add rsync--
 EOF
-  sshpass -p ${VM_PASS} rsync --exclude "${IMAGE_NAME}" --exclude "*git" -av -e "ssh -p ${VM_PORT} -o StrictHostKeyChecking=no" "${LOCAL_SOURCE_DIR}" "${VM_USER}@localhost:/usr/src/sys"
+  sshpass -p ${VM_PASS} rsync --exclude "${IMAGE_NAME}" --exclude "*git" --exclude "bsd" -av -e "ssh -p ${VM_PORT} -o StrictHostKeyChecking=no" "${LOCAL_SOURCE_DIR}" "${VM_USER}@localhost:/usr/src/sys"
 }
 
 # Function to compile the kernel inside the VM

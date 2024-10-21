@@ -4,21 +4,12 @@
 
 #include <linux/bitops.h>
 #include <linux/iommu.h>
+#include <linux/container_of.h>
 
 /*
  * Public API for use by IOMMU drivers
  */
 enum io_pgtable_fmt {
-	ARM_32_LPAE_S1,
-	ARM_32_LPAE_S2,
-	ARM_64_LPAE_S1,
-	ARM_64_LPAE_S2,
-	ARM_V7S,
-	ARM_MALI_LPAE,
-	AMD_IOMMU_V1,
-	AMD_IOMMU_V2,
-	APPLE_DART,
-	APPLE_DART2,
 	APPLE_UAT,
 	IO_PGTABLE_NUM_FMTS,
 };
@@ -101,6 +92,35 @@ struct io_pgtable_cfg {
 	const struct iommu_flush_ops	*tlb;
 	struct device			*iommu_dev;
 
+	/* DMA-related members */
+    bus_dma_tag_t          dmat;
+    bus_dmamap_t           dmamap;
+    bus_dma_segment_t      dma_segs[1]; /* Single segment */
+
+	/**
+	 * @alloc: Custom page allocator.
+	 *
+	 * Optional hook used to allocate page tables. If this function is NULL,
+	 * @free must be NULL too.
+	 *
+	 * Memory returned should be zeroed and suitable for dma_map_single() and
+	 * virt_to_phys().
+	 *
+	 * Not all formats support custom page allocators. Before considering
+	 * passing a non-NULL value, make sure the chosen page format supports
+	 * this feature.
+	 */
+	void *(*alloc)(void *cookie, size_t size, gfp_t gfp);
+
+	/**
+	 * @free: Custom page de-allocator.
+	 *
+	 * Optional hook used to free page tables allocated with the @alloc
+	 * hook. Must be non-NULL if @alloc is not NULL, must be NULL
+	 * otherwise.
+	 */
+	void (*free)(void *cookie, void *pages, size_t size);
+
 	/* Low-level data specific to the table format */
 	union {
 		struct {
@@ -115,37 +135,6 @@ struct io_pgtable_cfg {
 			}	tcr;
 			u64	mair;
 		} arm_lpae_s1_cfg;
-
-		struct {
-			u64	vttbr;
-			struct {
-				u32	ps:3;
-				u32	tg:2;
-				u32	sh:2;
-				u32	orgn:2;
-				u32	irgn:2;
-				u32	sl:2;
-				u32	tsz:6;
-			}	vtcr;
-		} arm_lpae_s2_cfg;
-
-		struct {
-			u32	ttbr;
-			u32	tcr;
-			u32	nmrr;
-			u32	prrr;
-		} arm_v7s_cfg;
-
-		struct {
-			u64	transtab;
-			u64	memattr;
-		} arm_mali_lpae_cfg;
-
-		struct {
-			u64 ttbr[4];
-			u32 n_ttbrs;
-			u32 n_levels;
-		} apple_dart_cfg;
 
 		struct {
 			u64	ttbr;
@@ -244,6 +233,14 @@ io_pgtable_tlb_add_page(struct io_pgtable *iop,
 }
 
 /**
+ * enum io_pgtable_caps - IO page table backend capabilities.
+ */
+enum io_pgtable_caps {
+	/** @IO_PGTABLE_CAP_CUSTOM_ALLOCATOR: Backend accepts custom page table allocators. */
+	IO_PGTABLE_CAP_CUSTOM_ALLOCATOR = BIT(0),
+};
+
+/**
  * struct io_pgtable_init_fns - Alloc/free a set of page tables for a
  *                              particular format.
  *
@@ -253,13 +250,9 @@ io_pgtable_tlb_add_page(struct io_pgtable *iop,
 struct io_pgtable_init_fns {
 	struct io_pgtable *(*alloc)(struct io_pgtable_cfg *cfg, void *cookie);
 	void (*free)(struct io_pgtable *iop);
+	u32 caps;
 };
 
-extern struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s1_init_fns;
-extern struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s2_init_fns;
-extern struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s1_init_fns;
-extern struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s2_init_fns;
-extern struct io_pgtable_init_fns io_pgtable_arm_mali_lpae_init_fns;
 extern struct io_pgtable_init_fns io_pgtable_apple_uat_init_fns;
 
 #endif /* __IO_PGTABLE_H */

@@ -1,4 +1,4 @@
-# $OpenBSD: files.drm,v 1.63 2024/04/11 03:40:05 jsg Exp $
+# $OpenBSD: files.drm,v 1.63 2024/10/21 04:02:42 aaaadev Exp $
 
 #file	dev/pci/drm/aperture.c			drm
 file	dev/pci/drm/dma-resv.c			drm
@@ -88,6 +88,8 @@ file	dev/pci/drm/hdmi.c			drm
 file	dev/pci/drm/linux_list_sort.c		drm
 file	dev/pci/drm/linux_radix.c		drm
 file	dev/pci/drm/linux_sort.c		drm
+file    dev/pci/drm/io-pgtable.c        drm
+file    dev/pci/drm/io-pgtable-arm.c        drm
 
 #file	dev/pci/drm/display/drm_display_helper_mod.c	drm
 #file	dev/pci/drm/display/drm_dp_aux_dev.c		drm

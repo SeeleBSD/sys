@@ -10,6 +10,14 @@ struct iommu_domain {
 	bus_dma_tag_t dmat;
 };
 
+struct iommu_iotlb_gather {
+	unsigned long		start;
+	unsigned long		end;
+	size_t			pgsize;
+	struct list_head	freelist;
+	bool			queued;
+};
+
 #define IOMMU_READ	0x0001
 #define IOMMU_WRITE	0x0002
 
