@@ -21,7 +21,7 @@ use kernel::{
     drm::mm,
     error::{to_result, Result},
     io_pgtable,
-    io_pgtable::{prot /*, AppleUAT, IoPageTable*/},
+    io_pgtable::{prot, AppleUAT, IoPageTable},
     platform,
     prelude::*,
     static_lock_class,
@@ -183,7 +183,7 @@ struct VmInner {
     is_kernel: bool,
     min_va: usize,
     max_va: usize,
-    // page_table: AppleUAT<Uat>,
+    page_table: AppleUAT<Uat>,
     mm: mm::Allocator<(), MappingInner>,
     uat_inner: Arc<UatInner>,
     active_users: usize,
@@ -215,8 +215,7 @@ impl VmInner {
 
     /// Returns the translation table base for this Vm
     fn ttb(&self) -> u64 {
-        // self.page_table.cfg().ttbr
-        todo!()
+        self.page_table.cfg().ttbr
     }
 
     /// Map an IOVA to the shifted address the underlying io_pgtable uses.
@@ -241,35 +240,22 @@ impl VmInner {
     ) -> Result<usize> {
         let mut left = pgcount;
         while left > 0 {
-            let mapped_iova = self.map_iova(iova, bindings::PAGE_SIZE as usize * left)?;
-            let mapped = unsafe {
-                bindings::pmap_enter(
-                    crate::PMAP,
-                    iova as u64,
-                    paddr as u64,
-                    prot as i32,
-                    ((prot as u32) | bindings::PMAP_WIRED) as i32,
-                )
-            };
+            let mapped_iova = self.map_iova(iova, pgsize * left)?;
+            let mapped =
+                self.page_table
+                    .map_pages(mapped_iova as usize, paddr, pgsize, left, prot)?;
+            assert!(mapped <= left * pgsize);
 
-            if mapped != 0 {
-                return Err(Error::from_errno(mapped as _));
-            }
-
-            left -= 1;
-            paddr += bindings::PAGE_SIZE as usize;
-            iova += bindings::PAGE_SIZE as usize;
+            left -= mapped / pgsize;
+            paddr += mapped;
+            iova += mapped;
         }
-        unsafe {
-            bindings::pmap_update(crate::PMAP);
-        }
-
-        Ok(pgcount * bindings::PAGE_SIZE as usize)
+        Ok(pgcount * pgsize)
     }
 
     /// Unmap a contiguous range of pages.
     fn unmap_pages(&mut self, mut iova: usize, pgsize: usize, pgcount: usize) -> Result<usize> {
-        /*let mut left = pgcount;
+        let mut left = pgcount;
         while left > 0 {
             let mapped_iova = self.map_iova(iova, pgsize * left)?;
             let unmapped = self.page_table.unmap_pages(mapped_iova, pgsize, left);
@@ -279,8 +265,7 @@ impl VmInner {
             iova += unmapped;
         }
 
-        Ok(pgcount * pgsize)*/
-        todo!()
+        Ok(pgcount * pgsize)
     }
 
     /// Map an `mm::Node` representing an mapping in VA space.
@@ -292,7 +277,7 @@ impl VmInner {
             let addr = range.dma_address();
             let len = range.dma_len();
 
-            /*if (addr | len | iova) & UAT_PGMSK != 0 {
+            if (addr | len | iova) & UAT_PGMSK != 0 {
                 dev_err!(
                     self.dev,
                     "MMU: Mapping {:#x}:{:#x} -> {:#x} is not page-aligned\n",
@@ -301,7 +286,7 @@ impl VmInner {
                     iova
                 );
                 return Err(EINVAL);
-            }*/
+            }
 
             mod_dev_dbg!(
                 self.dev,
@@ -760,7 +745,6 @@ impl HandoffFlush {
     }
 }
 
-/*
 // We do not implement FlushOps, since we flush manually in this module after
 // page table operations. Just provide dummy implementations.
 impl io_pgtable::FlushOps for Uat {
@@ -781,7 +765,6 @@ impl io_pgtable::FlushOps for Uat {
     ) {
     }
 }
-*/
 
 impl Vm {
     /// Create a new virtual memory address space
@@ -793,7 +776,7 @@ impl Vm {
         id: u64,
         file_id: u64,
     ) -> Result<Vm> {
-        /*let page_table = AppleUAT::new(
+        let page_table = AppleUAT::new(
             dev,
             io_pgtable::Config {
                 pgsize_bitmap: UAT_PGSZ,
@@ -801,9 +784,12 @@ impl Vm {
                 oas: cfg.uat_oas,
                 coherent_walk: true,
                 quirks: 0,
+
+                dmat: unsafe { crate::DMAT.expect("Uninitialized") },
+                dmamap: unsafe { crate::DMAMAP.expect("Uninitialized") },
             },
             (),
-        )?;*/
+        )?;
         let min_va = if is_kernel {
             IOVA_KERN_BASE
         } else {
@@ -826,7 +812,7 @@ impl Vm {
                     min_va,
                     max_va,
                     is_kernel,
-                    // page_table,
+                    page_table,
                     mm,
                     uat_inner,
                     binding: None,
@@ -1236,8 +1222,8 @@ impl Uat {
 
         dev_info!(dev, "MMU: Kernel page tables created\n");
 
-        // let ttb0 = kernel_lower_vm.ttb();
-        // let ttb1 = kernel_vm.ttb();
+        let ttb0 = kernel_lower_vm.ttb();
+        let ttb1 = kernel_vm.ttb();
 
         let uat = Self {
             dev: dev.into(),
@@ -1267,7 +1253,7 @@ impl Uat {
 
         inner.handoff().lock();
 
-        /*let ttbs = inner.ttbs();
+        let ttbs = inner.ttbs();
 
         ttbs[0].ttb0.store(ttb0 | TTBR_VALID, Ordering::Relaxed);
         ttbs[0]
@@ -1277,13 +1263,13 @@ impl Uat {
         for ctx in &ttbs[1..] {
             ctx.ttb0.store(0, Ordering::Relaxed);
             ctx.ttb1.store(0, Ordering::Relaxed);
-        }*/
+        }
 
         inner.handoff().unlock();
 
         core::mem::drop(inner);
 
-        // uat.kpt0()[2].store(ttb1 | PTE_TABLE, Ordering::Relaxed);
+        uat.kpt0()[2].store(ttb1 | PTE_TABLE, Ordering::Relaxed);
 
         dev_info!(dev, "MMU: initialized\n");
 

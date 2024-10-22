@@ -30,6 +30,7 @@ struct asahidrm_softc {
 
 	bus_space_tag_t	sc_iot;
 	bus_dma_tag_t	sc_dmat;
+	bus_dmamap_t	sc_dmamap;
 
 	void			(*sc_switchcb)(void *, int, int);
 	void			*sc_switchcbarg;

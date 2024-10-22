@@ -45,6 +45,8 @@ const INITIAL_TVB_SIZE: usize = 0x8;
 const __LOG_PREFIX: &'static str = "asahidrm";
 static mut INFO: Option<&'static HwConfig> = None;
 static mut PMAP: bindings::pmap_t = core::ptr::null_mut();
+static mut DMAT: Option<bindings::bus_dma_tag_t> = None;
+static mut DMAMAP: Option<bindings::bus_dmamap_t> = None;
 
 id_table! { ASAHI_ID_TABLE, &'static hw::HwConfig, [
     (c_str!("apple,agx-t8103"), Some(&hw::t8103::HWCONFIG)),
@@ -87,6 +89,9 @@ pub extern "C" fn asahidrm_attach(
         (*sc).sc_node = (*faa).fa_node;
         (*sc).sc_iot = (*faa).fa_iot;
         (*sc).sc_dmat = (*faa).fa_dmat;
+        assert_eq!(bindings::_dmamap_create((*sc).sc_dmat, mmu::UAT_PGSZ as u64, 1, mmu::UAT_PGSZ as u64, 0, 0, (&mut (*sc).sc_dmamap) as *mut bindings::bus_dmamap_t), 0);
+        DMAT = Some((*sc).sc_dmat);
+        DMAMAP = Some((*sc).sc_dmamap);
     }
 
     print!("\n");
@@ -137,7 +142,7 @@ pub extern "C" fn asahidrm_attach(
         .expect("Failed to get compat");
     dbg!("get property");
 
-    /*    let gpu = unsafe {
+    let gpu = unsafe {
         match (cfg.gpu_gen, cfg.gpu_variant, compat.as_slice()) {
             (hw::GpuGen::G13, _, &[12, 3, 0]) => {
                 gpu::GpuManagerG13V12_3::new(reg.device(), &res, cfg, sc).unwrap()
@@ -173,7 +178,7 @@ pub extern "C" fn asahidrm_attach(
     };
     dbg!("get gpu manager");
 
-    gpu.init().ok();*/
+    gpu.init().ok();
 
     info!("attached!");
 }

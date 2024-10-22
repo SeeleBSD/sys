@@ -40,6 +40,7 @@
 #include <linux/iommu.h>
 #include <linux/ioport.h>
 #include <linux/iosys-map.h>
+#include <linux/io-pgtable.h>
 #include <linux/ktime.h>
 #include <linux/lockdep.h>
 #include <linux/of.h>

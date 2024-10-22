@@ -95,7 +95,7 @@ struct io_pgtable_cfg {
 	/* DMA-related members */
     bus_dma_tag_t          dmat;
     bus_dmamap_t           dmamap;
-    bus_dma_segment_t      dma_segs[1]; /* Single segment */
+    //bus_dma_segment_t      dma_segs[1]; /* Single segment */
 
 	/**
 	 * @alloc: Custom page allocator.
