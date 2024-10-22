@@ -193,7 +193,7 @@ static inline int get_order(unsigned long size) {
 static void *
 arm_lpae_default_alloc_pages(size_t size, struct io_pgtable_cfg *cfg, int order)
 {
-    bus_dma_segment_t *segs = malloc(sizeof(bus_dma_segment_t), M_WAITOK, M_DEVBUF);
+    bus_dma_segment_t *segs = malloc(sizeof(bus_dma_segment_t), M_DEVBUF, M_WAITOK);
     void *pages = NULL;
     int error, nsegs = 1;
 
