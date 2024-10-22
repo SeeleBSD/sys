@@ -193,7 +193,7 @@ static inline int get_order(unsigned long size) {
 static void *
 arm_lpae_default_alloc_pages(size_t size, struct io_pgtable_cfg *cfg, int order)
 {
-    bus_dma_segment_t segs[1];
+    bus_dma_segment_t *segs = malloc(sizeof(bus_dma_segment_t), M_WAITOK, M_DEVBUF);
     void *pages = NULL;
     int error, nsegs = 1;
 
@@ -204,9 +204,9 @@ arm_lpae_default_alloc_pages(size_t size, struct io_pgtable_cfg *cfg, int order)
         return NULL;
     }
 
-    error = bus_dmamem_map(cfg->dmat, segs, nsegs, size, (caddr_t*)pages, BUS_DMA_NOWAIT);
+    error = bus_dmamap_load(cfg->dmat, cfg->dmamap, pages, size, NULL, BUS_DMA_NOWAIT);
     if (error != 0) {
-        ARM_LPAE_ERR("bus_dmamem_map failed with error %d", error);
+        ARM_LPAE_ERR("bus_dmamap_load failed with error %d", error);
         bus_dmamem_free(cfg->dmat, segs, nsegs);
         return NULL;
     }
