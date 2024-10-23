@@ -429,6 +429,33 @@ bar1:
 	bus_space_unmap(sc->sc_tcm_iot, sc->sc_tcm_ioh, sc->sc_tcm_ios);
 }
 
+void
+bwfm_chip_tcm_ramsize2(struct bwfm_softc *sc, struct bwfm_core *core)
+{
+	uint32_t cap, nab, nbb, totb, bxinfo, blksize, ramsize = 0;
+	int i;
+
+	cap = sc->sc_buscore_ops->bc_read(sc, core->co_base + BWFM_ARMCR4_CAP);
+	nab = (cap & BWFM_ARMCR4_CAP_TCBANB_MASK) >> BWFM_ARMCR4_CAP_TCBANB_SHIFT;
+	nbb = (cap & BWFM_ARMCR4_CAP_TCBBNB_MASK) >> BWFM_ARMCR4_CAP_TCBBNB_SHIFT;
+	totb = nab + nbb;
+
+	for (i = 0; i < totb; i++) {
+		sc->sc_buscore_ops->bc_write(sc,
+		    core->co_base + BWFM_ARMCR4_BANKIDX, i);
+		bxinfo = sc->sc_buscore_ops->bc_read(sc,
+		    core->co_base + BWFM_ARMCR4_BANKINFO);
+		if (bxinfo & BWFM_ARMCR4_BANKINFO_BLK_1K_MASK)
+			blksize = 1024;
+		else
+			blksize = 8192;
+		ramsize += ((bxinfo & BWFM_ARMCR4_BANKINFO_BSZ_MASK) + 1) *
+		    blksize;
+	}
+
+	sc->sc_chip.ch_ramsize = ramsize;
+}
+
 int
 bwfm_pci_preinit(struct bwfm_softc *bwfm)
 {
@@ -524,6 +551,12 @@ bwfm_pci_preinit(struct bwfm_softc *bwfm)
 		uint32_t *ramsize = (uint32_t *)&ucode[BWFM_RAMSIZE];
 		if (letoh32(ramsize[0]) == BWFM_RAMSIZE_MAGIC)
 			bwfm->sc_chip.ch_ramsize = letoh32(ramsize[1]);
+	}
+
+	if (bwfm->sc_chip.ch_ramsize == 0) {
+		struct bwfm_core *core;
+		core = bwfm_chip_get_core(bwfm, BWFM_AGENT_INTERNAL_MEM);
+		bwfm_chip_tcm_ramsize2(bwfm, core);
 	}
 
 	if (bwfm_pci_load_microcode(sc, ucode, size, nvram, nvlen) != 0) {
@@ -819,6 +852,8 @@ bwfm_pci_load_microcode(struct bwfm_pci_softc *sc, const u_char *ucode, size_t s
 	uint32_t addr, shared, written;
 	uint8_t *rndbuf;
 	int i;
+
+	printf("ramsize: 0x%x\n", bwfm->sc_chip.ch_rambase);
 
 	if (bwfm->sc_chip.ch_chip == BRCM_CC_43602_CHIP_ID) {
 		bwfm_pci_select_core(sc, BWFM_AGENT_CORE_ARM_CR4);

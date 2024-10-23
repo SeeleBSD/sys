@@ -100,7 +100,6 @@ pub extern "C" fn asahidrm_attach(
         (*sc).sc_pm = bindings::pmap_create();
         PMAP = (*sc).sc_pm;
         (*sc).sc_dev.faa = faa;
-        (*sc).sc_ddev.dev = _self;
         (*sc).sc_ddev.driver = &drm::drv::Registration::<AsahiDriver>::VTABLE as *const _ as *mut _;
         (*sc).sc_ddev.managed.resources.next = &mut (*sc).sc_ddev.managed.resources as *mut _;
         (*sc).sc_ddev.managed.resources.prev = &mut (*sc).sc_ddev.managed.resources as *mut _;
@@ -110,6 +109,7 @@ pub extern "C" fn asahidrm_attach(
         );
         bindings::drm_gem_init(&mut (*sc).sc_ddev as *mut _);
         bindings::platform_device_register(&mut (*sc).sc_dev as *mut _);
+        (*sc).sc_ddev.dev = &mut (*sc).sc_dev as *mut bindings::platform_device as *mut _;
         bindings::drm_attach_platform(
             &drm::drv::Registration::<AsahiDriver>::VTABLE as *const _ as *mut _,
             (*sc).sc_iot,
