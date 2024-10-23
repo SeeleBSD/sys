@@ -429,6 +429,93 @@ bar1:
 	bus_space_unmap(sc->sc_tcm_iot, sc->sc_tcm_ioh, sc->sc_tcm_ios);
 }
 
+/* RAM size helpers */
+void
+bwfm_chip_socram_ramsize2(struct bwfm_softc *sc, struct bwfm_core *core)
+{
+	uint32_t coreinfo, nb, lss, banksize, bankinfo;
+	uint32_t ramsize = 0, srsize = 0;
+	int i;
+
+	if (!sc->sc_chip.ch_core_isup(sc, core))
+		sc->sc_chip.ch_core_reset(sc, core, 0, 0, 0);
+
+	coreinfo = sc->sc_buscore_ops->bc_read(sc,
+	    core->co_base + BWFM_SOCRAM_COREINFO);
+	nb = (coreinfo & BWFM_SOCRAM_COREINFO_SRNB_MASK)
+	    >> BWFM_SOCRAM_COREINFO_SRNB_SHIFT;
+
+	if (core->co_rev <= 7 || core->co_rev == 12) {
+		banksize = coreinfo & BWFM_SOCRAM_COREINFO_SRBSZ_MASK;
+		lss = (coreinfo & BWFM_SOCRAM_COREINFO_LSS_MASK)
+		    >> BWFM_SOCRAM_COREINFO_LSS_SHIFT;
+		if (lss != 0)
+			nb--;
+		ramsize = nb * (1 << (banksize + BWFM_SOCRAM_COREINFO_SRBSZ_BASE));
+		if (lss != 0)
+			ramsize += (1 << ((lss - 1) + BWFM_SOCRAM_COREINFO_SRBSZ_BASE));
+	} else {
+		for (i = 0; i < nb; i++) {
+			sc->sc_buscore_ops->bc_write(sc,
+			    core->co_base + BWFM_SOCRAM_BANKIDX,
+			    (BWFM_SOCRAM_BANKIDX_MEMTYPE_RAM <<
+			    BWFM_SOCRAM_BANKIDX_MEMTYPE_SHIFT) | i);
+			bankinfo = sc->sc_buscore_ops->bc_read(sc,
+			    core->co_base + BWFM_SOCRAM_BANKINFO);
+			banksize = ((bankinfo & BWFM_SOCRAM_BANKINFO_SZMASK) + 1)
+			    * BWFM_SOCRAM_BANKINFO_SZBASE;
+			ramsize += banksize;
+			if (bankinfo & BWFM_SOCRAM_BANKINFO_RETNTRAM_MASK)
+				srsize += banksize;
+		}
+	}
+
+	switch (sc->sc_chip.ch_chip) {
+	case BRCM_CC_4334_CHIP_ID:
+		if (sc->sc_chip.ch_chiprev < 2)
+			srsize = 32 * 1024;
+		break;
+	case BRCM_CC_43430_CHIP_ID:
+		srsize = 64 * 1024;
+		break;
+	default:
+		break;
+	}
+
+	sc->sc_chip.ch_ramsize = ramsize;
+	sc->sc_chip.ch_srsize = srsize;
+}
+
+void
+bwfm_chip_sysmem_ramsize2(struct bwfm_softc *sc, struct bwfm_core *core)
+{
+	uint32_t coreinfo, nb, banksize, bankinfo;
+	uint32_t ramsize = 0;
+	int i;
+
+	if (!sc->sc_chip.ch_core_isup(sc, core))
+		sc->sc_chip.ch_core_reset(sc, core, 0, 0, 0);
+
+	coreinfo = sc->sc_buscore_ops->bc_read(sc,
+	    core->co_base + BWFM_SOCRAM_COREINFO);
+	nb = (coreinfo & BWFM_SOCRAM_COREINFO_SRNB_MASK)
+	    >> BWFM_SOCRAM_COREINFO_SRNB_SHIFT;
+
+	for (i = 0; i < nb; i++) {
+		sc->sc_buscore_ops->bc_write(sc,
+		    core->co_base + BWFM_SOCRAM_BANKIDX,
+		    (BWFM_SOCRAM_BANKIDX_MEMTYPE_RAM <<
+		    BWFM_SOCRAM_BANKIDX_MEMTYPE_SHIFT) | i);
+		bankinfo = sc->sc_buscore_ops->bc_read(sc,
+		    core->co_base + BWFM_SOCRAM_BANKINFO);
+		banksize = ((bankinfo & BWFM_SOCRAM_BANKINFO_SZMASK) + 1)
+		    * BWFM_SOCRAM_BANKINFO_SZBASE;
+		ramsize += banksize;
+	}
+
+	sc->sc_chip.ch_ramsize = ramsize;
+}
+
 void
 bwfm_chip_tcm_ramsize2(struct bwfm_softc *sc, struct bwfm_core *core)
 {
@@ -555,8 +642,13 @@ bwfm_pci_preinit(struct bwfm_softc *bwfm)
 
 	if (bwfm->sc_chip.ch_ramsize == 0) {
 		struct bwfm_core *core;
-		core = bwfm_chip_get_core(bwfm, BWFM_AGENT_INTERNAL_MEM);
-		bwfm_chip_tcm_ramsize2(bwfm, core);
+		if ((core = bwfm_chip_get_core(bwfm, BWFM_AGENT_CORE_ARM_CR4)) != NULL) {
+			bwfm_chip_tcm_ramsize2(bwfm, core);
+		} else if ((core = bwfm_chip_get_core(bwfm, BWFM_AGENT_SYS_MEM)) != NULL) {
+			bwfm_chip_sysmem_ramsize2(bwfm, core);
+		} else if ((core = bwfm_chip_get_core(bwfm, BWFM_AGENT_INTERNAL_MEM)) != NULL) {
+			bwfm_chip_socram_ramsize2(bwfm, core);
+		}
 	}
 
 	if (bwfm_pci_load_microcode(sc, ucode, size, nvram, nvlen) != 0) {
@@ -853,7 +945,7 @@ bwfm_pci_load_microcode(struct bwfm_pci_softc *sc, const u_char *ucode, size_t s
 	uint8_t *rndbuf;
 	int i;
 
-	printf("ramsize: 0x%x\n", bwfm->sc_chip.ch_rambase);
+	printf("ramsize: 0x%x\n", bwfm->sc_chip.ch_ramsize);
 
 	if (bwfm->sc_chip.ch_chip == BRCM_CC_43602_CHIP_ID) {
 		bwfm_pci_select_core(sc, BWFM_AGENT_CORE_ARM_CR4);
