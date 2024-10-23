@@ -1497,10 +1497,19 @@ bwfm_chip_socram_ramsize(struct bwfm_softc *sc, struct bwfm_core *core)
 	sc->sc_chip.ch_srsize = srsize;
 }
 
+#define SYSMEM_SRCI_ROMNB_MASK		0x3e0
+#define SYSMEM_SRCI_ROMNB_SHIFT		5
+#define SYSMEM_SRCI_SRNB_MASK		0x1f
+#define SYSMEM_SRCI_SRNB_SHIFT		0
+#define SYSMEM_SRCI_NEW_ROMNB_MASK	0xff000000
+#define SYSMEM_SRCI_NEW_ROMNB_SHIFT	24
+#define SYSMEM_SRCI_NEW_SRNB_MASK	0xff0000
+#define SYSMEM_SRCI_NEW_SRNB_SHIFT	16
+
 void
 bwfm_chip_sysmem_ramsize(struct bwfm_softc *sc, struct bwfm_core *core)
 {
-	uint32_t coreinfo, nb, banksize, bankinfo;
+	uint32_t coreinfo, nb, nrb, banksize, bankinfo;
 	uint32_t ramsize = 0;
 	int i;
 
@@ -1509,14 +1518,19 @@ bwfm_chip_sysmem_ramsize(struct bwfm_softc *sc, struct bwfm_core *core)
 
 	coreinfo = sc->sc_buscore_ops->bc_read(sc,
 	    core->co_base + BWFM_SOCRAM_COREINFO);
-	nb = (coreinfo & BWFM_SOCRAM_COREINFO_SRNB_MASK)
-	    >> BWFM_SOCRAM_COREINFO_SRNB_SHIFT;
+	if (core->co_rev >= 12) {
+		nrb = (coreinfo & SYSMEM_SRCI_NEW_ROMNB_MASK) >> SYSMEM_SRCI_NEW_ROMNB_SHIFT;
+		nb = (coreinfo & SYSMEM_SRCI_NEW_SRNB_MASK) >> SYSMEM_SRCI_NEW_SRNB_SHIFT;
+	} else {
+		nrb = (coreinfo & SYSMEM_SRCI_ROMNB_MASK) >> SYSMEM_SRCI_ROMNB_SHIFT;
+		nb = (coreinfo & SYSMEM_SRCI_SRNB_MASK) >> SYSMEM_SRCI_SRNB_SHIFT;
+	}
 
 	for (i = 0; i < nb; i++) {
 		sc->sc_buscore_ops->bc_write(sc,
 		    core->co_base + BWFM_SOCRAM_BANKIDX,
 		    (BWFM_SOCRAM_BANKIDX_MEMTYPE_RAM <<
-		    BWFM_SOCRAM_BANKIDX_MEMTYPE_SHIFT) | i);
+		    BWFM_SOCRAM_BANKIDX_MEMTYPE_SHIFT) | (i + nrb));
 		bankinfo = sc->sc_buscore_ops->bc_read(sc,
 		    core->co_base + BWFM_SOCRAM_BANKINFO);
 		banksize = ((bankinfo & BWFM_SOCRAM_BANKINFO_SZMASK) + 1)
