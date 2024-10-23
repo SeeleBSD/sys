@@ -100,7 +100,7 @@ pub extern "C" fn asahidrm_attach(
         (*sc).sc_pm = bindings::pmap_create();
         PMAP = (*sc).sc_pm;
         (*sc).sc_dev.faa = faa;
-        (*sc).sc_ddev.dev = (*sc).sc_dev;
+        (*sc).sc_ddev.dev = _self;
         (*sc).sc_ddev.driver = &drm::drv::Registration::<AsahiDriver>::VTABLE as *const _ as *mut _;
         (*sc).sc_ddev.managed.resources.next = &mut (*sc).sc_ddev.managed.resources as *mut _;
         (*sc).sc_ddev.managed.resources.prev = &mut (*sc).sc_ddev.managed.resources as *mut _;
