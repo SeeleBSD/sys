@@ -148,9 +148,7 @@ impl<T: DriverObject> Object<T> {
     pub fn new(dev: &device::Device<T::Driver>, size: usize) -> Result<gem::UniqueObjectRef<Self>> {
         // SAFETY: This function can be called as long as the ALLOC_OPS are set properly
         // for this driver, and the gem_create_object is called.
-        crate::dbg!("{:p}", unsafe { dev.raw_mut().driver });
         let p = unsafe { bindings::drm_gem_shmem_create(dev.raw_mut(), size) };
-        crate::dbg!("asdf");
         let p = crate::container_of!(p, Object<T>, obj) as *mut _;
 
         // SAFETY: The gem_create_object callback ensures this is a valid Object<T>,

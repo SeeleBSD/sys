@@ -143,9 +143,7 @@ impl ObjectRef {
             }
         }
 
-        dbg!("1");
         let sgt = self.gem.sg_table()?;
-        dbg!("2");
         let new_mapping =
             vm.map_in_range(self.gem.size(), sgt, alignment, start, end, prot, guard)?;
 
@@ -167,12 +165,10 @@ impl ObjectRef {
     ) -> Result {
         let vm_id = vm.id();
 
-        dbg!("1");
         if self.gem.vm_id.is_some() && self.gem.vm_id != Some(vm_id) {
             return Err(EINVAL);
         }
 
-        dbg!("2");
         let mut mappings = self.gem.mappings.lock();
         for (_mapped_fid, mapped_vmid, _mapping) in mappings.iter() {
             if *mapped_vmid == vm_id {
@@ -180,9 +176,7 @@ impl ObjectRef {
             }
         }
 
-        dbg!("3");
         let sgt = self.gem.sg_table()?;
-        dbg!("4");
         let new_mapping = vm.map_at(addr, self.gem.size(), sgt, prot, guard)?;
 
         let iova = new_mapping.iova();

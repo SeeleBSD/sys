@@ -204,7 +204,7 @@ arm_lpae_default_alloc_pages(size_t size, struct io_pgtable_cfg *cfg, int order)
         return NULL;
     }
 
-    error = bus_dmamap_load(cfg->dmat, cfg->dmamap, pages, size, NULL, BUS_DMA_NOWAIT);
+    error = bus_dmamem_map(cfg->dmat, segs, nsegs, size, (caddr_t*)&pages, BUS_DMA_NOWAIT);
     if (error != 0) {
         ARM_LPAE_ERR("bus_dmamap_load failed with error %d", error);
         bus_dmamem_free(cfg->dmat, segs, nsegs);
@@ -242,8 +242,10 @@ __arm_lpae_alloc_pages(size_t size, gfp_t flags,
     else
         pages = arm_lpae_default_alloc_pages(size, cfg, order);
 
-    if (!pages)
+    if (!pages) {
+        printf("pages is null");
         return NULL;
+    }
 
     /* Perform DMA mapping if walks are not coherent */
     if (!cfg->coherent_walk) {
@@ -296,6 +298,33 @@ static int __arm_lpae_map(struct arm_lpae_io_pgtable *data, vaddr_t iova,
               arm_lpae_iopte prot, int lvl, arm_lpae_iopte *ptep,
               gfp_t flags, size_t *mapped)
 {
+    vsize_t offset;
+    vsize_t end_addr = iova + size*pgcount;
+    int error = 0;
+
+    /* Align the addresses to the page size */
+    iova = trunc_page(iova);
+    paddr = trunc_page(paddr);
+
+    /* Iterate through the range of addresses and map them */
+    for (offset = 0; offset < size*pgcount; offset += size) {
+        vaddr_t curr_vaddr = iova + offset;
+        paddr_t curr_paddr = paddr + offset;
+
+        /* Insert the page table entry using OpenBSD's pmap_enter */
+        error = pmap_enter(pmap_kernel(), curr_vaddr, curr_paddr, prot, flags | PMAP_CANFAIL);
+        if (error != 0) {
+            printf("Failed to map vaddr: %lx to paddr: %lx with error: %d\n", curr_vaddr, curr_paddr, error);
+            return error;
+        }
+        *mapped += size;
+    }
+
+    /* Ensure that changes to the page table take effect */
+    pmap_update(pmap_kernel());
+
+    return 0;
+#ifdef notyet
     /* Implement mapping logic */
 
     /* Calculate the index at the current level */
@@ -339,6 +368,7 @@ static int __arm_lpae_map(struct arm_lpae_io_pgtable *data, vaddr_t iova,
     /* Recurse to the next level */
     return __arm_lpae_map(data, iova, paddr, size, pgcount, prot,
                           lvl + 1, cptep, flags, mapped);
+#endif
 }
 
 static int arm_lpae_map_pages(struct io_pgtable_ops *ops, vaddr_t iova,
@@ -365,6 +395,25 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
                    vaddr_t iova, size_t size, size_t pgcount,
                    int lvl, arm_lpae_iopte *ptep)
 {
+    vsize_t offset;
+    vsize_t end_addr = iova + size*pgcount;
+
+    /* Align the addresses to the page size */
+    iova = trunc_page(iova);
+
+    /* Unmap the virtual address range */
+    for (offset = 0; offset < size*pgcount; offset += size) {
+        vaddr_t curr_vaddr = iova + offset;
+
+        /* Remove the page table entry using OpenBSD's pmap_remove */
+        pmap_remove(pmap_kernel(), curr_vaddr, curr_vaddr + size);
+    }
+
+    /* Ensure that the page table changes are synchronized */
+    pmap_update(pmap_kernel());
+
+    return 0;
+#ifdef notyet
     /* Implement unmapping logic */
 
     /* Calculate the index at the current level */
@@ -388,6 +437,7 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
         /* Cannot unmap a block of incorrect size */
         return 0;
     }
+#endif
 }
 
 static size_t arm_lpae_unmap_pages(struct io_pgtable_ops *ops, vaddr_t iova,
@@ -516,7 +566,7 @@ static void arm_lpae_free_pgtable(struct io_pgtable *iop)
     struct arm_lpae_io_pgtable *data = io_pgtable_to_data(iop);
 
     __arm_lpae_free_pages(data->pgd, ARM_LPAE_PGD_SIZE(data), &data->iop.cfg, data->iop.cookie);
-    free(data, M_DEVBUF, sizeof(*data));
+    //free(data, M_DEVBUF, sizeof(*data));
 }
 
 static struct io_pgtable *

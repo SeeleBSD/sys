@@ -828,6 +828,59 @@ static const struct dma_buf_ops drm_gem_prime_dmabuf_ops =  {
 };
 
 /**
+ * sg_alloc_table_from_pages_segment - Create and initialize an sg_table from a page array
+ * @sg: scatter/gather table to fill
+ * @pages: pointer to an array of vm_page pointers
+ * @nr_pages: number of pages
+ * @offset: offset within the first page
+ * @size: size of the memory region
+ * @max_segment: maximum segment size for each entry
+ * @gfp_flags: memory allocation flags
+ *
+ * This function creates a scatter/gather table from the provided array of pages.
+ */
+int sg_alloc_table_from_pages_segment(struct drm_device *dev, struct sg_table *sg, struct vm_page **pages,
+                                      unsigned int nr_pages, off_t offset,
+                                      unsigned long size, size_t max_segment,
+                                      int gfp_flags)
+{
+    int i, err;
+    struct scatterlist *sgl;
+    bus_addr_t addr;
+    size_t seg_size;
+
+    /* Allocate memory for the scatterlist entries */
+    sgl = malloc(sizeof(struct scatterlist) * nr_pages, M_DRM, M_WAITOK | M_ZERO);
+    if (!sgl)
+        return ENOMEM;
+
+    sg->sgl = sgl;
+    sg->nents = nr_pages;
+    sg->orig_nents = nr_pages;
+
+    for (i = 0; i < nr_pages; i++) {
+        struct vm_page *page = pages[i*4];
+
+        /* Get the physical address of the page */
+        addr = VM_PAGE_TO_PHYS(page);
+
+        /* Calculate the segment size */
+        seg_size = (1 << 14) - (i == 0 ? offset : 0);
+        if (seg_size > size)
+            seg_size = size;
+
+        /* Initialize the scatterlist entry */
+        sg_set_page(&sgl[i], page, seg_size, (i == 0) ? offset : 0);
+
+        size -= seg_size;
+        if (size == 0)
+            break;
+    }
+
+    return 0;
+}
+
+/**
  * drm_prime_pages_to_sg - converts a page array into an sg list
  * @dev: DRM device
  * @pages: pointer to the array of page pointers to convert
@@ -842,30 +895,25 @@ static const struct dma_buf_ops drm_gem_prime_dmabuf_ops =  {
 struct sg_table *drm_prime_pages_to_sg(struct drm_device *dev,
 				       struct vm_page **pages, unsigned int nr_pages)
 {
-	STUB();
-	return NULL;
-#ifdef notyet
 	struct sg_table *sg;
-	size_t max_segment = 0;
-	int err;
+    size_t max_segment = 0;
+    int err;
 
-	sg = kmalloc(sizeof(struct sg_table), GFP_KERNEL);
-	if (!sg)
-		return ERR_PTR(-ENOMEM);
+    sg = malloc(sizeof(struct sg_table), M_DRM, M_WAITOK | M_ZERO);
+    if (!sg)
+        return ERR_PTR(ENOMEM);
 
-	if (dev)
-		max_segment = dma_max_mapping_size(dev->dev);
-	if (max_segment == 0)
-		max_segment = UINT_MAX;
-	err = sg_alloc_table_from_pages_segment(sg, pages, nr_pages, 0,
-						(unsigned long)nr_pages << PAGE_SHIFT,
-						max_segment, GFP_KERNEL);
-	if (err) {
-		kfree(sg);
-		sg = ERR_PTR(err);
-	}
-	return sg;
-#endif
+    if (dev)
+        max_segment = 0xFFFFFF;
+
+    err = sg_alloc_table_from_pages_segment(dev, sg, pages, nr_pages, 0,
+                                            (unsigned long)nr_pages << 14,
+                                            max_segment, GFP_KERNEL);
+    if (err) {
+        free(sg, sizeof(struct sg_table), M_DRM);
+        return ERR_PTR(err);
+    }
+    return sg;
 }
 EXPORT_SYMBOL(drm_prime_pages_to_sg);
 

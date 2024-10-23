@@ -33,6 +33,8 @@ use kernel::{
     types::ForeignOwnable,
 };
 
+use kernel::println;
+
 use crate::debug::*;
 use crate::no_debug;
 use crate::{driver, fw, gem, hw, mem, slotalloc};
@@ -790,6 +792,7 @@ impl Vm {
             },
             (),
         )?;
+        println!("page_table passed");
         let min_va = if is_kernel {
             IOVA_KERN_BASE
         } else {
@@ -910,13 +913,13 @@ impl Vm {
             return Err(EINVAL);
         }
 
-        dev_info!(
+        /*dev_info!(
             inner.dev,
             "MMU: IO map: {:#x}:{:#x} -> {:#x}\n",
             phys,
             size,
             iova
-        );
+        );*/
 
         let uat_inner = inner.uat_inner.clone();
         let node = inner.mm.reserve_node(
@@ -1017,7 +1020,6 @@ impl Uat {
                 name.as_char_ptr(),
             );
             to_result(idx)?;
-            dbg!("matching");
 
             let np = bindings::__of_parse_phandle(
                 node as usize as *mut _,
@@ -1052,7 +1054,6 @@ impl Uat {
             );
             return Err(ENOMEM);
         }
-        dbg!("res {}", bst as usize);
 
         // let flags = if cached {
         // bindings::MEMREMAP_WB

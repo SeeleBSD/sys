@@ -641,7 +641,6 @@ impl<T: Default, U: Allocation<T>> GpuArray<T, U> {
         for i in 0..count {
             // SAFETY: `pi` is valid per the Allocation type invariant, and GpuOnlyArray guarantees
             // that it can never iterate beyond the buffer length.
-            dbg!("{}", i);
             unsafe {
                 pi.write(Default::default());
                 pi = pi.add(1);

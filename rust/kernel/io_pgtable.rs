@@ -6,6 +6,8 @@ use crate::{
     types::{ForeignOwnable, ScopeGuard},
 };
 
+use kernel::println;
+
 use core::marker::PhantomData;
 use core::mem;
 use core::num::NonZeroU64;
@@ -92,6 +94,7 @@ pub trait IoPageTable: crate::private::Sealed {
         };
 
         if ops.is_null() {
+            println!("EINVAL due to ops.is_null()");
             return Err(EINVAL);
         }
 

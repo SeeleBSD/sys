@@ -11,6 +11,7 @@
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/module.h>
+#include <linux/iosys-map.h>
 
 #ifdef CONFIG_X86
 #include <asm/set_memory.h>
@@ -176,73 +177,85 @@ EXPORT_SYMBOL_GPL(drm_gem_shmem_free);
 
 static int drm_gem_shmem_get_pages(struct drm_gem_shmem_object *shmem)
 {
-	struct drm_gem_object *obj = &shmem->base;
-	struct vm_page **pages;
+    struct drm_gem_object *obj = &shmem->base;
+    struct vm_page **pages;
+    long npages = obj->size >> 14;
+    int ret = 0;
 
-	dma_resv_assert_held(shmem->base.resv);
+    dma_resv_assert_held(shmem->base.resv);
 
-	if (shmem->pages_use_count++ > 0)
-		return 0;
+    if (shmem->pages_use_count++ > 0)
+        return 0;
 
-#ifdef __linux__
-	pages = drm_gem_get_pages(obj);
-#else
-	long npages = obj->size >> PAGE_SHIFT;
-	pages = kvmalloc_array(npages, sizeof(struct vm_page *), GFP_KERNEL);
-	if (pages == NULL)
-		pages = ERR_PTR(-ENOMEM);
-	else {
-		struct vm_page *page;
-		struct pglist plist;
-		struct scatterlist *sg;
-		struct sg_table *st = kmalloc(sizeof(struct sg_table), GFP_KERNEL);
-		if (sg_alloc_table(st, npages, GFP_KERNEL | __GFP_NOWARN))
-			return -ENOMEM;
-		TAILQ_INIT(&plist);
-		sg = st->sgl;
-		st->nents = 0;
-		if (uvm_obj_wire(shmem->base.uao, 0, shmem->base.size, &plist)) {
-			sg_free_table(st);
-			kfree(st);
-			return -ENOMEM;
-		}
-		long i = 0;
-		TAILQ_FOREACH(page, &plist, pageq) {
-			if (i)
-				sg = sg_next(sg);
-			st->nents++;
-			sg_set_page(sg, page, PAGE_SIZE, 0);
-			pages[i] = page;
-			i++;
-		}
-		printk("%ld %ld\n", st->nents, npages);
-		if (sg)
-			sg_mark_end(sg);
-		shmem->sgt = st;
-// sg_free_table(st);
-				// kfree(st);
-	}
-#endif
-	if (IS_ERR(pages)) {
-		drm_dbg_kms(obj->dev, "Failed to get pages (%ld)\n",
-			    PTR_ERR(pages));
-		shmem->pages_use_count = 0;
-		return PTR_ERR(pages);
-	}
+    pages = mallocarray(npages*4, sizeof(struct vm_page *), M_DRM, M_WAITOK | M_ZERO);
+    if (pages == NULL) {
+        ret = -ENOMEM;
+        goto out;
+    }
 
-	/*
-	 * TODO: Allocating WC pages which are correctly flushed is only
-	 * supported on x86. Ideal solution would be a GFP_WC flag, which also
-	 * ttm_pool.c could use.
-	 */
-#ifdef CONFIG_X86
-	if (shmem->map_wc)
-		set_pages_array_wc(pages, obj->size >> PAGE_SHIFT);
-#endif
+    struct pglist plist;
+    struct vm_page *page;
+    struct scatterlist *sg;
+    struct sg_table *st = malloc(sizeof(struct sg_table), M_DRM, M_WAITOK | M_ZERO);
 
-	shmem->pages = pages;
+    if (!st) {
+        ret = -ENOMEM;
+        goto free_pages;
+    }
 
-	return 0;
+    if (sg_alloc_table(st, npages, M_WAITOK)) {
+        ret = -ENOMEM;
+        goto free_st;
+    }
+
+    TAILQ_INIT(&plist);
+
+    ret = uvm_pglistalloc(obj->size, (paddr_t)0, (paddr_t)(-1), (1 << 14), 0, &plist, npages * 4, UVM_PLA_WAITOK);
+    if (ret) {
+        sg_free_table(st);
+        ret = -ENOMEM;
+        goto free_st;
+    }
+
+    sg = st->sgl;
+    st->nents = 0;
+    long i = 0;
+
+    while (i < npages) {
+        int j;
+        for (j = 0; j < 4; j++) {
+            page = TAILQ_FIRST(&plist);
+            if (page == NULL) {
+                ret = -ENOMEM;
+                goto fail_unwire;
+            }
+            TAILQ_REMOVE(&plist, page, pageq);
+            pages[i * 4 + j] = page;
+        }
+
+        sg_set_page(sg, pages[i * 4], 16 * 1024, 0);
+        sg = sg_next(sg);
+        st->nents++;
+        i++;
+    }
+
+    if (sg)
+        sg_mark_end(sg);
+
+    shmem->sgt = st;
+    shmem->pages = pages;
+
+    return 0;
+
+fail_unwire:
+    uvm_pglistfree(&plist);
+free_st:
+    free(st, sizeof(struct sg_table), M_DRM);
+free_pages:
+    free(pages, 4 * npages * sizeof(struct vm_page *), M_DRM);
+out:
+    shmem->pages_use_count = 0;
+    return ret;
 }
 
 /*
@@ -339,6 +352,74 @@ void drm_gem_shmem_unpin(struct drm_gem_shmem_object *shmem)
 }
 EXPORT_SYMBOL(drm_gem_shmem_unpin);
 
+int dma_buf_vmap(struct dma_buf *dmabuf, struct iosys_map *map)
+{
+    struct pglist plist;
+    vaddr_t vaddr;
+    struct vm_page *page;
+    size_t size = dmabuf->size;  // Assume dma-buf has a 'size' field
+    size_t npages = size >> PAGE_SHIFT;  // Number of pages based on the buffer size
+    int ret = 0;
+
+    /* Initialize the page list */
+    TAILQ_INIT(&plist);
+
+    /* Simulate getting the pages backing the dma-buf */
+    /* This step is where you would typically fill the plist with pages backing the DMA buffer */
+    ret = uvm_pglistalloc(size, 0, -1, PAGE_SIZE, 0, &plist, npages, UVM_PLA_WAITOK);
+    if (ret) {
+        return -ENOMEM;
+    }
+
+	vaddr = (vaddr_t)km_alloc(round_page(size), &kv_any, &kp_none, &kd_waitok);
+
+    for (size_t i = 0; i < npages; i++) {
+        page = TAILQ_FIRST(&plist);
+        if (!page) {
+            ret = -ENOMEM;
+            goto err_unmap;
+        }
+
+        paddr_t paddr = VM_PAGE_TO_PHYS(page);
+		pmap_kenter_pa(vaddr + (i * PAGE_SIZE), paddr, PROT_READ | PROT_WRITE);  // Map page into the virtual address space
+
+        TAILQ_REMOVE(&plist, page, pageq);
+    }
+
+    /* Update the pmap to finalize the mappings */
+    pmap_update(pmap_kernel());
+
+    /* Set the virtual address in the iosys_map */
+    iosys_map_set_vaddr(map, (void*)vaddr);
+
+    return 0;
+
+err_unmap:
+    /* In case of failure, unmap the allocated virtual address space */
+    pmap_kremove(vaddr, round_page(size));
+    pmap_update(pmap_kernel());
+    uvm_pglistfree(&plist);  // Free the allocated pages
+    return ret;
+}
+
+int dma_buf_vunmap(struct dma_buf *dmabuf, struct iosys_map *map)
+{
+    vaddr_t vaddr = (vaddr_t)map->vaddr;
+    size_t size = dmabuf->size;          
+
+    if (!vaddr)
+        return -EINVAL;
+
+    /* Remove the page mappings */
+    pmap_kremove(vaddr, round_page(size));
+    pmap_update(pmap_kernel());
+
+    /* Reset the iosys_map structure */
+    iosys_map_clear(map);
+
+    return 0;
+}
+
 /*
  * drm_gem_shmem_vmap - Create a virtual mapping for a shmem GEM object
  * @shmem: shmem GEM object
@@ -359,16 +440,13 @@ int drm_gem_shmem_vmap(struct drm_gem_shmem_object *shmem,
 {
 	struct drm_gem_object *obj = &shmem->base;
 	int ret = 0;
-/*
 	dma_resv_assert_held(obj->resv);
 
 	if (obj->import_attach) {
-		ret = dma_buf_vmap(obj->import_attach->dmabuf, map);
+		ret = dma_buf_vmap(obj->dma_buf, map);
 		if (!ret) {
-			if (drm_WARN_ON(obj->dev, map->is_iomem)) {
-				dma_buf_vunmap(obj->import_attach->dmabuf, map);
-				return -EIO;
-			}
+			dma_buf_vunmap(obj->dma_buf, map);
+			return -EIO;
 		}
 	} else {
 		pgprot_t prot = PAGE_KERNEL;
@@ -386,8 +464,7 @@ int drm_gem_shmem_vmap(struct drm_gem_shmem_object *shmem,
 
 		if (shmem->map_wc)
 			prot = pgprot_writecombine(prot);
-		shmem->vaddr = vmap(shmem->pages, obj->size >> PAGE_SHIFT,
-				    VM_MAP, prot);
+		shmem->vaddr = vmap(shmem->pages, obj->size >> PAGE_SHIFT, 0, prot);
 		if (!shmem->vaddr)
 			ret = -ENOMEM;
 		else
@@ -406,7 +483,6 @@ err_put_pages:
 		drm_gem_shmem_put_pages(shmem);
 err_zero_use:
 	shmem->vmap_use_count = 0;
-*/
 	return ret;
 }
 EXPORT_SYMBOL(drm_gem_shmem_vmap);
@@ -738,7 +814,7 @@ struct sg_table *drm_gem_shmem_get_sg_table(struct drm_gem_shmem_object *shmem)
 
 	drm_WARN_ON(obj->dev, obj->import_attach);
 
-	return drm_prime_pages_to_sg(obj->dev, shmem->pages, obj->size >> PAGE_SHIFT);
+	return drm_prime_pages_to_sg(obj->dev, shmem->pages, obj->size >> 14);
 }
 EXPORT_SYMBOL_GPL(drm_gem_shmem_get_sg_table);
 
@@ -756,27 +832,35 @@ static struct sg_table *drm_gem_shmem_get_pages_sgt_locked(struct drm_gem_shmem_
 	ret = drm_gem_shmem_get_pages(shmem);
 	if (ret)
 		return ERR_PTR(ret);
+	
+	return shmem->sgt;
 
-	// sgt = drm_gem_shmem_get_sg_table(shmem);
-	// if (IS_ERR(sgt)) {
-		// ret = PTR_ERR(sgt);
-		// goto err_put_pages;
-	// }
+#ifdef notyet
+	sgt = drm_gem_shmem_get_sg_table(shmem);
+	if (IS_ERR(sgt)) {
+		ret = PTR_ERR(sgt);
+		goto err_put_pages;
+	}
+#ifdef __linux__
 	/* Map the pages for use by the h/w. */
-	// ret = dma_map_sgtable(obj->dev->dev, sgt, DMA_BIDIRECTIONAL, 0);
-	// if (ret)
-		// goto err_free_sgt;
+	ret = dma_map_sgtable(obj->dev->dev, sgt, DMA_BIDIRECTIONAL, 0);
+	if (ret)
+		goto err_free_sgt;
+#endif
 
-	// shmem->sgt = sgt;
+	shmem->sgt = sgt;
 
 	return shmem->sgt;
 
-// err_free_sgt:
-	// sg_free_table(sgt);
-	// kfree(sgt);
-// err_put_pages:
-	// drm_gem_shmem_put_pages(shmem);
-	// return ERR_PTR(ret);
+#ifdef __linux__
+err_free_sgt:
+	sg_free_table(sgt);
+	kfree(sgt);
+#endif
+err_put_pages:
+	drm_gem_shmem_put_pages(shmem);
+	return ERR_PTR(ret);
+#endif
 }
 
 /**
