@@ -1102,17 +1102,23 @@ impl GpuManager for GpuManager::ver {
         );
 
         let initdata = self.initdata.gpu_va().get();
+        dbg!("initdata");
         let mut guard = self.rtkit.lock();
+        dbg!("guard");
         let rtk = guard.as_mut().unwrap();
+        dbg!("guard2");
 
         rtk.boot()?;
+        dbg!("boot");
         rtk.start_endpoint(EP_FIRMWARE)?;
         rtk.start_endpoint(EP_DOORBELL)?;
         rtk.send_message(EP_FIRMWARE, MSG_INIT | (initdata & INIT_DATA_MASK))?;
         rtk.send_message(EP_DOORBELL, MSG_TX_DOORBELL | DOORBELL_DEVCTRL)?;
         core::mem::drop(guard);
+        dbg!("msg");
 
         self.kick_firmware()?;
+        dbg!("kick");
         Ok(())
     }
 
