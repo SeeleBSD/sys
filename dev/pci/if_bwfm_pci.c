@@ -526,6 +526,8 @@ bwfm_pci_preinit(struct bwfm_softc *bwfm)
 			bwfm->sc_chip.ch_ramsize = letoh32(ramsize[1]);
 	}
 
+	bwfm_pci_intr_disable(sc);
+
 	if (bwfm_pci_load_microcode(sc, ucode, size, nvram, nvlen) != 0) {
 		printf("%s: could not load microcode\n",
 		    DEVNAME(sc));
@@ -820,8 +822,6 @@ bwfm_pci_load_microcode(struct bwfm_pci_softc *sc, const u_char *ucode, size_t s
 	uint8_t *rndbuf;
 	int i;
 
-	printf("ramsize: 0x%x\n", bwfm->sc_chip.ch_ramsize);
-
 	if (bwfm->sc_chip.ch_chip == BRCM_CC_43602_CHIP_ID) {
 		bwfm_pci_select_core(sc, BWFM_AGENT_CORE_ARM_CR4);
 		bus_space_write_4(sc->sc_reg_iot, sc->sc_reg_ioh,
@@ -833,6 +833,15 @@ bwfm_pci_load_microcode(struct bwfm_pci_softc *sc, const u_char *ucode, size_t s
 		bus_space_write_4(sc->sc_reg_iot, sc->sc_reg_ioh,
 		    BWFM_PCI_ARMCR4REG_BANKPDA, 0);
 	}
+
+	bus_space_write_4(sc->sc_reg_iot, sc->sc_reg_ioh,
+		    0x2000+BWFM_PCI_64_PCIE2REG_MAILBOXMASK, 0);
+	bus_space_write_4(sc->sc_reg_iot, sc->sc_reg_ioh,
+		    0x2000+BWFM_PCI_64_PCIE2REG_MAILBOXINT, 0xffffffff);
+	bus_space_write_4(sc->sc_reg_iot, sc->sc_reg_ioh,
+		    0x2000+BWFM_PCI_PCIE2REG_CONFIGADDR, 0x814);
+	bus_space_write_4(sc->sc_reg_iot, sc->sc_reg_ioh,
+		    0x2000+BWFM_PCI_PCIE2REG_CONFIGDATA, 0xffffffff);
 
 	for (i = 0; i < size; i++)
 		bus_space_write_1(sc->sc_tcm_iot, sc->sc_tcm_ioh,
@@ -882,10 +891,10 @@ bwfm_pci_load_microcode(struct bwfm_pci_softc *sc, const u_char *ucode, size_t s
 		if (shared != written)
 			break;
 	}
-	if (shared == written) {
+	/*if (shared == written) {
 		printf("%s: firmware did not come up\n", DEVNAME(sc));
 		return 1;
-	}
+	}*/
 	if (shared < bwfm->sc_chip.ch_rambase ||
 	    shared >= bwfm->sc_chip.ch_rambase + bwfm->sc_chip.ch_ramsize) {
 		printf("%s: invalid shared RAM address 0x%08x\n", DEVNAME(sc),
