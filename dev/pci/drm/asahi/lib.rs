@@ -117,8 +117,13 @@ pub extern "C" fn asahidrm_attach(
             _self,
             &mut (*sc).sc_ddev as *mut _,
         );
+        bindings::config_mountroot(_self, Some(asahidrm_attachhook));
     }
+}
 
+#[no_mangle]
+pub extern "C" fn asahidrm_attachhook(_self: *mut bindings::device) {
+    let sc = _self as *mut bindings::asahidrm_softc;
     let cfg = unsafe { INFO.expect("No GPU information!") };
 
     let dev = unsafe { Device::new(_self) };
@@ -179,7 +184,7 @@ pub extern "C" fn asahidrm_attach(
     };
     dbg!("get gpu manager");
 
-    //gpu.init().ok();
+    gpu.init().ok();
 
     info!("attached!");
 }

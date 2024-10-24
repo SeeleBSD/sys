@@ -861,8 +861,8 @@ bwfm_pci_load_microcode(struct bwfm_pci_softc *sc, const u_char *ucode, size_t s
 			bus_space_write_1(sc->sc_tcm_iot, sc->sc_tcm_ioh,
 			    addr + i, nvram[i]);
 
-		footer.length = /*htole32(*/BWFM_RANDOM_SEED_LENGTH/*)*/;
-		footer.magic = /*htole32(*/BWFM_RANDOM_SEED_MAGIC/*)*/;
+		footer.length = htole32(BWFM_RANDOM_SEED_LENGTH);
+		footer.magic = htole32(BWFM_RANDOM_SEED_MAGIC);
 		{
 			uint32_t start_addr;
 			start_addr = addr - BWFM_RANDOM_SEED_LENGTH - sizeof(footer);
