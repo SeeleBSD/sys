@@ -811,6 +811,9 @@ cleanup:
 	return 1;
 }
 
+#define BRCMF_BL_HEAP_START_GAP		0x1000
+#define BRCMF_BL_HEAP_SIZE		0x10000
+
 int
 bwfm_pci_load_microcode(struct bwfm_pci_softc *sc, const u_char *ucode, size_t size,
     const u_char *nvram, size_t nvlen)
@@ -858,16 +861,19 @@ bwfm_pci_load_microcode(struct bwfm_pci_softc *sc, const u_char *ucode, size_t s
 			bus_space_write_1(sc->sc_tcm_iot, sc->sc_tcm_ioh,
 			    addr + i, nvram[i]);
 
-		footer.length = htole32(BWFM_RANDOM_SEED_LENGTH);
-		footer.magic = htole32(BWFM_RANDOM_SEED_MAGIC);
-		addr -= sizeof(footer);
-		for (i = 0; i < sizeof(footer); i++)
-			bus_space_write_1(sc->sc_tcm_iot, sc->sc_tcm_ioh,
-			    addr + i, ((uint8_t *)&footer)[i]);
+		footer.length = /*htole32(*/BWFM_RANDOM_SEED_LENGTH/*)*/;
+		footer.magic = /*htole32(*/BWFM_RANDOM_SEED_MAGIC/*)*/;
+		{
+			uint32_t start_addr;
+			start_addr = addr - BWFM_RANDOM_SEED_LENGTH - sizeof(footer);
+			for (i = 0; i < sizeof(footer); i++)
+				bus_space_write_1(sc->sc_tcm_iot, sc->sc_tcm_ioh,
+			    	addr - sizeof(footer) + i, ((uint8_t *)&footer)[i]);
+			addr = start_addr;
+		}
 
 		rndbuf = malloc(BWFM_RANDOM_SEED_LENGTH, M_TEMP, M_WAITOK);
 		arc4random_buf(rndbuf, BWFM_RANDOM_SEED_LENGTH);
-		addr -= BWFM_RANDOM_SEED_LENGTH;
 		for (i = 0; i < BWFM_RANDOM_SEED_LENGTH; i++)
 			bus_space_write_1(sc->sc_tcm_iot, sc->sc_tcm_ioh,
 			    addr + i, rndbuf[i]);
@@ -891,10 +897,10 @@ bwfm_pci_load_microcode(struct bwfm_pci_softc *sc, const u_char *ucode, size_t s
 		if (shared != written)
 			break;
 	}
-	/*if (shared == written) {
+	if (shared == written) {
 		printf("%s: firmware did not come up\n", DEVNAME(sc));
 		return 1;
-	}*/
+	}
 	if (shared < bwfm->sc_chip.ch_rambase ||
 	    shared >= bwfm->sc_chip.ch_rambase + bwfm->sc_chip.ch_ramsize) {
 		printf("%s: invalid shared RAM address 0x%08x\n", DEVNAME(sc),
