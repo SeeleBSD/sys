@@ -38,7 +38,7 @@ use kernel::{
     sync::Arc,
 };
 
-use crate::driver::AsahiDriver;
+use crate::driver::{AsahiData, AsahiDriver, DeviceData};
 use crate::hw::HwConfig;
 
 const INITIAL_TVB_SIZE: usize = 0x8;
@@ -90,26 +90,27 @@ pub extern "C" fn asahidrm_attach(
         (*sc).sc_iot = (*faa).fa_iot;
         (*sc).sc_dmat = (*faa).fa_dmat;
         assert_eq!(bindings::_dmamap_create((*sc).sc_dmat, mmu::UAT_PGSZ as u64, 1, mmu::UAT_PGSZ as u64, 0, 0, (&mut (*sc).sc_dmamap) as *mut bindings::bus_dmamap_t), 0);
-        DMAT = Some((*sc).sc_dmat);
-        DMAMAP = Some((*sc).sc_dmamap);
+        // DMAT = Some((*sc).sc_dmat);
+        // DMAMAP = Some((*sc).sc_dmamap);
     }
 
     print!("\n");
 
     unsafe {
         (*sc).sc_pm = bindings::pmap_create();
-        PMAP = (*sc).sc_pm;
+        // PMAP = (*sc).sc_pm;
         (*sc).sc_dev.faa = faa;
-        (*sc).sc_ddev.driver = &drm::drv::Registration::<AsahiDriver>::VTABLE as *const _ as *mut _;
-        (*sc).sc_ddev.managed.resources.next = &mut (*sc).sc_ddev.managed.resources as *mut _;
-        (*sc).sc_ddev.managed.resources.prev = &mut (*sc).sc_ddev.managed.resources as *mut _;
-        bindings::__mtx_init(
-            &mut (*sc).sc_ddev.managed.lock as *mut _,
-            bindings::IPL_VM as i32,
-        );
-        bindings::drm_gem_init(&mut (*sc).sc_ddev as *mut _);
+        // (*sc).sc_ddev.driver = &drm::drv::Registration::<AsahiDriver>::VTABLE as *const _ as *mut _;
+        // (*sc).sc_ddev.managed.resources.next = &mut (*sc).sc_ddev.managed.resources as *mut _;
+        // (*sc).sc_ddev.managed.resources.prev = &mut (*sc).sc_ddev.managed.resources as *mut _;
+        // bindings::__mtx_init(
+            // &mut (*sc).sc_ddev.managed.lock as *mut _,
+            // bindings::IPL_VM as i32,
+        // );
+        // bindings::drm_gem_init(&mut (*sc).sc_ddev as *mut _);
         bindings::platform_device_register(&mut (*sc).sc_dev as *mut _);
-        (*sc).sc_ddev.dev = &mut (*sc).sc_dev as *mut bindings::platform_device as *mut _;
+        // (*sc).sc_dev.node = (*sc).sc_node;
+        // (*sc).sc_ddev.dev = (&mut (*sc).sc_dev) as *mut bindings::platform_device as *mut bindings::device as *mut _;
         bindings::drm_attach_platform(
             &drm::drv::Registration::<AsahiDriver>::VTABLE as *const _ as *mut _,
             (*sc).sc_iot,
@@ -118,12 +119,24 @@ pub extern "C" fn asahidrm_attach(
             &mut (*sc).sc_ddev as *mut _,
         );
         bindings::config_mountroot(_self, Some(asahidrm_attachhook));
+        
     }
 }
 
 #[no_mangle]
 pub extern "C" fn asahidrm_attachhook(_self: *mut bindings::device) {
     let sc = _self as *mut bindings::asahidrm_softc;
+    if let Some(node) = of::Node::from_handle(unsafe { (*sc).sc_node }) {
+        unsafe {
+            INFO = compatible_info!(node, ASAHI_ID_TABLE);
+        }
+    }
+    unsafe {
+        DMAT = Some((*sc).sc_dmat);
+        DMAMAP = Some((*sc).sc_dmamap);
+        PMAP = (*sc).sc_pm;
+        // (*sc).sc_ddev.dev = &mut (*sc).sc_dev as *mut bindings::platform_device as *mut _;
+    }
     let cfg = unsafe { INFO.expect("No GPU information!") };
 
     let dev = unsafe { Device::new(_self) };
@@ -141,7 +154,7 @@ pub extern "C" fn asahidrm_attachhook(_self: *mut bindings::device) {
     res.start_cpu().ok();
     dbg!("started cpu");
 
-    let node = of::Node::from_handle(unsafe { (*faa).fa_node }).unwrap();
+    let node = of::Node::from_handle(unsafe { (*sc).sc_node }).unwrap();
     // let node = dev.of_node().unwrap();
     let compat: Vec<u32> = node
         .get_property(c_str!("apple,firmware-compat"))
@@ -184,12 +197,25 @@ pub extern "C" fn asahidrm_attachhook(_self: *mut bindings::device) {
     };
     dbg!("get gpu manager");
 
-    gpu.init().ok();
+    let data = kernel::new_device_data!(reg, res, AsahiData { dev, gpu }, "Asahi::Registrations").unwrap();
+    let data: Arc<DeviceData> = data.into();
+
+    data.gpu.init().unwrap();
+
+    kernel::drm_device_register!(
+        unsafe { Pin::new_unchecked(&mut *data.registrations().unwrap()) },
+        data.clone(),
+        0).unwrap();
+    // unsafe {
+        // bindings::drm_dev_register(&mut (*sc).sc_ddev as *mut _, 0);
+    // }
 
     info!("attached!");
 }
 
 #[no_mangle]
 pub extern "C" fn asahidrm_activate(_self: *mut bindings::device, act: i32) -> i32 {
-    0
+    unsafe {
+        bindings::config_activate_children(_self, act)
+    }
 }

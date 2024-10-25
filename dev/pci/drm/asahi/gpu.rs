@@ -541,7 +541,7 @@ impl GpuManager::ver {
 
         let mgr = Arc::from(mgr);
 
-        let rtkit = rtkit::RtKit::<GpuManager::ver>::new(dev, None, 0, mgr.clone())?;
+        let rtkit = rtkit::RtKit::<GpuManager::ver>::new(unsafe { &kernel::device::Device::new((&mut (*softc).sc_dev) as *mut bindings::platform_device as *mut bindings::device) }, None, 0, mgr.clone())?;
 
         *mgr.rtkit.lock() = Some(rtkit);
 
@@ -1108,8 +1108,9 @@ impl GpuManager for GpuManager::ver {
         let rtk = guard.as_mut().unwrap();
         dbg!("guard2");
 
-        rtk.boot()?;
+        rtk.boot().ok();
         dbg!("boot");
+        // coarse_sleep(Duration::from_secs(1));
         rtk.start_endpoint(EP_FIRMWARE)?;
         rtk.start_endpoint(EP_DOORBELL)?;
         rtk.send_message(EP_FIRMWARE, MSG_INIT | (initdata & INIT_DATA_MASK))?;

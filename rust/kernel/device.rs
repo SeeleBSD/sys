@@ -51,6 +51,18 @@ unsafe impl RawDevice for Device {
     }
 }
 
+#[macro_export]
+macro_rules! new_device_data {
+    ($reg:expr, $res:expr, $gen:expr, $name:literal) => {{
+       static CLASS1: $crate::sync::LockClassKey = $crate::static_lock_class!();
+       let regs = $reg;
+       let res = $res;
+       let gen = $gen;
+       let name = $crate::c_str!($name);
+       $crate::device::Data::try_new(regs, res, gen, name, CLASS1) 
+    }};
+}
+
 #[pin_data]
 pub struct Data<T, U, V> {
     #[pin]

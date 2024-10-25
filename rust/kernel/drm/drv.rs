@@ -196,7 +196,7 @@ macro_rules! drm_legacy_fields {
 #[macro_export]
 macro_rules! drm_device_register {
     ($reg:expr, $data:expr, $flags:expr $(,)?) => {{
-        $crate::drm::drv::Registration::register($reg, $data, $flags, &crate::THIS_MODULE)
+        $crate::drm::drv::Registration::register($reg, $data, $flags)
     }};
 }
 

@@ -1783,6 +1783,8 @@ drmopen(dev_t kdev, int flags, int fmt, struct proc *p)
 		goto err;
 	}
 
+	DRM_DEBUG("drm_file_alloc\n");
+
 	/* first opener automatically becomes master */
 	if (drm_is_primary_client(file_priv)) {
 		ret = drm_master_open(file_priv);
