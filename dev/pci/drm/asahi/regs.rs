@@ -210,7 +210,7 @@ impl Resources {
         let id_clusters = self.sgx_read32(ID_CLUSTERS);
 
         dev_info!(
-            self.dev,
+            self.dev,x
             "GPU ID registers: {:#x} {:#x} {:#x} {:#x} {:#x} {:#x}\n",
             id_version,
             id_unk08,

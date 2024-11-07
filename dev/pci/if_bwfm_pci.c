@@ -526,6 +526,7 @@ bwfm_pci_preinit(struct bwfm_softc *bwfm)
 			bwfm->sc_chip.ch_ramsize = letoh32(ramsize[1]);
 	}
 
+	bwfm_pci_select_core(sc, BWFM_AGENT_CORE_PCIE2);
 	bwfm_pci_intr_disable(sc);
 
 	if (bwfm_pci_load_microcode(sc, ucode, size, nvram, nvlen) != 0) {
