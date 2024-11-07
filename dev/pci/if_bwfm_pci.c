@@ -187,6 +187,8 @@ struct bwfm_pci_softc {
 	
 	int			sc_cap_off;
 	int			sc_msi_off;
+
+	pcireg_t sc_msi_cap;
 };
 
 struct bwfm_pci_dmamem {
