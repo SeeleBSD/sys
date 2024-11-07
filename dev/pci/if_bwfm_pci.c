@@ -184,6 +184,9 @@ struct bwfm_pci_softc {
 	uint8_t			 sc_mbdata_done;
 	uint8_t			 sc_pcireg64;
 	uint8_t			 sc_mb_via_ctl;
+	
+	int			sc_cap_off;
+	int			sc_msi_off;
 };
 
 struct bwfm_pci_dmamem {
@@ -304,6 +307,10 @@ void		 bwfm_pci_msgbuf_rxioctl(struct bwfm_pci_softc *,
 		    struct msgbuf_ioctl_resp_hdr *);
 int		 bwfm_pci_msgbuf_h2d_mb_write(struct bwfm_pci_softc *,
 		    uint32_t);
+
+void	bwfm_pci_msi_config(struct bwfm_pci_softc *sc, bool enable);
+void	bwfm_pci_msi_enable(struct bwfm_pci_softc *sc);
+void	bwfm_pci_msi_disable(struct bwfm_pci_softc *sc);
 
 struct bwfm_buscore_ops bwfm_pci_buscore_ops = {
 	.bc_read = bwfm_pci_buscore_read,
@@ -451,6 +458,12 @@ bwfm_pci_preinit(struct bwfm_softc *bwfm)
 		return 1;
 	}
 
+	if (pci_get_capability(sc->sc_pc, sc->sc_tag, PCI_CAP_MSI,
+	    &sc->sc_msi_off, &sc->sc_msi_cap) == 0) {
+		printf("%s: can't find MSI capability structure\n", DEVNAME(sc));
+		return 1;
+	}
+
 #if defined(__HAVE_FDT)
 	if (bwfm_pci_read_otp(sc)) {
 		printf("%s: cannot read OTP\n", DEVNAME(sc));
@@ -528,6 +541,7 @@ bwfm_pci_preinit(struct bwfm_softc *bwfm)
 
 	bwfm_pci_select_core(sc, BWFM_AGENT_CORE_PCIE2);
 	bwfm_pci_intr_disable(sc);
+	bwfm_pci_msi_enable(sc);
 
 	if (bwfm_pci_load_microcode(sc, ucode, size, nvram, nvlen) != 0) {
 		printf("%s: could not load microcode\n",
@@ -2623,4 +2637,33 @@ bwfm_pci_msgbuf_h2d_mb_write(struct bwfm_pci_softc *sc, uint32_t data)
 	splx(s);
 
 	return 0;
+}
+
+void
+bwfm_pci_msi_config(struct bwfm_pci_softc *sc, bool enable)
+{
+	uint32_t val;
+
+	val = pci_conf_read(sc->sc_pc, sc->sc_tag,
+	    sc->sc_msi_off + PCI_MSI_MC);
+
+	if (enable)
+		val |= PCI_MSI_MC_MSIE;
+	else
+		val &= ~PCI_MSI_MC_MSIE;
+
+	pci_conf_write(sc->sc_pc, sc->sc_tag,  sc->sc_msi_off + PCI_MSI_MC,
+	    val);
+}
+
+void
+bwfm_pci_msi_enable(struct bwfm_pci_softc *sc)
+{
+	bwfm_pci_msi_config(sc, true);
+}
+
+void
+bwfm_pci_msi_disable(struct bwfm_pci_softc *sc)
+{
+	bwfm_pci_msi_config(sc, false);
 }
