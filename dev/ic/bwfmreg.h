@@ -311,6 +311,13 @@
 #define BWFM_C_SET_VAR				263
 #define BWFM_C_SET_WSEC_PMK			268
 
+#define CC_WD_SSRESET_PCIE_F0_EN 0x10000000
+#define CC_WD_SSRESET_PCIE_F1_EN 0x20000000
+#define CC_WD_SSRESET_PCIE_F2_EN 0x40000000
+#define CC_WD_SSRESET_PCIE_ALL_FN_EN 0x80000000
+#define CC_WD_COUNTER_MASK 0x0ffffff
+#define CC_WD_ENABLE_MASK 0xf000000
+
 struct bwfm_proto_bcdc_dcmd {
 	struct {
 		uint32_t cmd;
@@ -351,28 +358,43 @@ struct bwfm_bss_info {
 	uint16_t capability;
 	uint8_t ssid_len;
 	uint8_t ssid[BWFM_MAX_SSID_LEN];
-	uint8_t pad0;
+	uint8_t bcnflags;
 	uint32_t nrates;
 	uint8_t rates[16];
 	uint16_t chanspec;
 	uint16_t atim_window;
 	uint8_t dtim_period;
-	uint8_t pad1;
+	uint8_t accessnet;
 	uint16_t rssi;
 	uint8_t phy_noise;
 	uint8_t n_cap;
-	uint16_t pad2;
+	uint8_t he_cap;
+	uint8_t load;
 	uint32_t nbss_cap;
 	uint8_t ctl_ch;
-	uint8_t pad3[3];
-	uint32_t reserved32[1];
+	uint8_t reserved1[3];
+	uint16_t vht_rxmcsmap;
+	uint16_t vht_txmcsmap;
 	uint8_t flags;
-	uint8_t reserved[3];
+	uint8_t vht_cap;
+	uint8_t reserved2[2];
 	uint8_t basic_mcs[BWFM_MCSSET_LEN];
 	uint16_t ie_offset;
-	uint16_t pad4;
+	uint8_t reserved3[2];
 	uint32_t ie_length;
 	uint16_t snr;
+	uint16_t vht_mcsmap;
+	uint16_t vht_mcsmap_prop;
+	uint16_t vht_txmcsmap_prop;
+	uint32_t he_mcsmap;
+	uint32_t he_rxmcsmap;
+	uint32_t he_txmcsmap;
+	uint32_t timestamp[2];
+	uint8_t eht_cap;
+	uint8_t reserved4[3];
+	uint32_t eht_mcsmap;
+	uint8_t eht_rxmcsmap[6];
+	uint8_t eht_txmcsmap[6];
 };
 
 #define BWFM_MAXRATES_IN_SET		BWFM_MCSSET_LEN
@@ -538,7 +560,7 @@ struct bwfm_scan_params_v2 {
 	struct bwfm_ssid ssid;
 	uint8_t bssid[ETHER_ADDR_LEN];
 	uint8_t bss_type;
-	uint8_t pad;
+	uint8_t ssid_type; /* v3 only */
 	uint32_t scan_type;
 	uint32_t nprobes;
 	uint32_t active_time;
@@ -555,6 +577,14 @@ struct bwfm_scan_results {
 	struct bwfm_bss_info bss_info[];
 };
 
+struct bwfm_wl_scan_version {
+	uint16_t version;
+	uint16_t length;
+	uint16_t scan_ver_major;
+};
+
+#define BWFM_WL_SCAN_VERSION_VERSION 1
+
 struct bwfm_escan_params_v0 {
 	uint32_t version;
 #define BWFM_ESCAN_REQ_VERSION		1
@@ -569,6 +599,7 @@ struct bwfm_escan_params_v0 {
 struct bwfm_escan_params_v2 {
 	uint32_t version;
 #define BWFM_ESCAN_REQ_VERSION_V2	2
+#define BWFM_ESCAN_REQ_VERSION_V3 3
 	uint16_t action;
 	uint16_t sync_id;
 	struct bwfm_scan_params_v2 scan_params;
@@ -584,9 +615,15 @@ struct bwfm_escan_results {
 
 struct bwfm_assoc_params {
 	uint8_t bssid[ETHER_ADDR_LEN];
-	uint16_t pad;
+	uint16_t bssid_cnt;
 	uint32_t chanspec_num;
 	uint16_t chanspec_list[];
+};
+
+struct bwfm_assoc_params_v1 {
+	uint16_t version;
+	uint16_t flags;
+	struct bwfm_assoc_params v0;
 };
 
 struct bwfm_join_pref_params {
@@ -610,6 +647,11 @@ struct bwfm_join_params {
 	struct bwfm_assoc_params assoc;
 };
 
+struct bwfm_join_params_v1 {
+	struct bwfm_ssid ssid;
+	struct bwfm_assoc_params_v1 assoc;
+};
+
 struct bwfm_join_scan_params {
 	uint8_t scan_type;
 	uint8_t pad[3];
@@ -620,9 +662,19 @@ struct bwfm_join_scan_params {
 };
 
 struct bwfm_ext_join_params {
+	uint16_t version;
+	uint16_t pad;
 	struct bwfm_ssid ssid;
 	struct bwfm_join_scan_params scan;
 	struct bwfm_assoc_params assoc;
+};
+
+struct bwfm_ext_join_params_v1 {
+	uint16_t version;
+	uint16_t pad;
+	struct bwfm_ssid ssid;
+	struct bwfm_join_scan_params scan;
+	struct bwfm_assoc_params_v1 assoc;
 };
 
 struct bwfm_wsec_key {
@@ -648,10 +700,12 @@ struct bwfm_wsec_key {
 
 struct bwfm_wsec_pmk {
 	uint16_t key_len;
-#define BWFM_WSEC_MAX_PSK_LEN		32
+#define BWFM_WSEC_MAX_PSK_LEN		256
 	uint16_t flags;
 #define BWFM_WSEC_PASSPHRASE		(1 << 0)
-	uint8_t key[2 * BWFM_WSEC_MAX_PSK_LEN + 1];
+	uint8_t key[BWFM_WSEC_MAX_PSK_LEN];
+	uint16_t opt_len;
+	uint8_t opt_tlvs[];
 };
 
 /* Event handling */
@@ -728,7 +782,7 @@ enum bwfm_fweh_event_code {
 	BWFM_E_ACTION_FRAME_RX = 75,
 	BWFM_E_TDLS_PEER_EVENT = 92,
 	BWFM_E_BCMC_CREDIT_SUPPORT = 127,
-	BWFM_E_LAST = 139
+	BWFM_E_LAST = 212
 };
 #define BWFM_EVENT_MASK_LEN		(roundup(BWFM_E_LAST, 8) / 8)
 
@@ -795,3 +849,45 @@ struct bwfm_dload_data {
 	uint32_t crc;
 	uint8_t data[];
 } __packed;
+
+enum event_msgs_ext_command {
+	BWFM_EVENTMSGS_NONE = 0,
+	BWFM_EVENTMSGS_SET_BIT = 1,
+	BWFM_EVENTMSGS_RESET_BIT = 2,
+	BWFM_EVENTMSGS_SET_MASK = 3
+};
+
+#define BWFM_EVENTMSGS_VER 1
+
+struct bwfm_eventmsgs_ext_le {
+	uint8_t version;
+	uint8_t command;
+	uint8_t len;
+	uint8_t maxgetsize;
+	uint8_t mask[];
+};
+
+#define BWFM_E_IF_ADD 1
+#define BWFM_E_IF_DEL 2
+#define BWFM_E_IF_CHANGE 3
+
+struct bwfm_if_event {
+	uint8_t ifidx;
+	uint8_t action;
+	uint8_t flags;
+	uint8_t bsscfgidx;
+	uint8_t role;
+};
+
+struct bwfm_scan_version {
+	uint16_t version;
+	uint16_t length;
+	uint16_t scan_ver_major;
+};
+
+struct bwfm_join_version {
+	uint16_t version;
+	uint16_t length;
+	uint16_t join_ver_major;
+	uint8_t pad[2];
+};

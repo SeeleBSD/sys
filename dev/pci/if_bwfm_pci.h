@@ -159,10 +159,38 @@
 
 #define BWFM_RANDOM_SEED_MAGIC			0xfeedc0de
 #define BWFM_RANDOM_SEED_LENGTH			0x100
+#define BWFM_BL_HEAP_START_GAP		0x1000
+#define BWFM_BL_HEAP_SIZE		0x10000
+#define BWFM_FW_SIG_MAGIC 0xfeedfe51
+#define BWFM_MEMMAP_MAGIC 0xfeedfe53
+#define BWFM_VSTATUS_MAGIC 0xfeedfe54
+#define BWFM_VSTATUS_SIZE 0x28
+#define BWFM_END_MAGIC 0xfeed0e2d
+
+#define ROUNDUP(x, y) (((x) + ((y) - 1)) & (~((__typeof(x))(y) - 1)))
 
 struct bwfm_pci_random_seed_footer {
 	uint32_t		length;
 	uint32_t		magic;
+};
+
+struct bwfm_pci_fw_memmap_region {
+	uint32_t start;
+	uint32_t end;
+};
+
+struct bwfm_pci_fw_memmap {
+	struct bwfm_pci_fw_memmap_region reset_vec;
+	struct bwfm_pci_fw_memmap_region int_vec;
+	struct bwfm_pci_fw_memmap_region rom;
+	struct bwfm_pci_fw_memmap_region mmap;
+	struct bwfm_pci_fw_memmap_region vstatus;
+	struct bwfm_pci_fw_memmap_region fw;
+	struct bwfm_pci_fw_memmap_region sig;
+	struct bwfm_pci_fw_memmap_region heap;
+	struct bwfm_pci_fw_memmap_region stack;
+	struct bwfm_pci_fw_memmap_region prng;
+	struct bwfm_pci_fw_memmap_region nvram;
 };
 
 struct bwfm_pci_ringinfo {

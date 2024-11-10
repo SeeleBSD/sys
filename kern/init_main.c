@@ -545,8 +545,6 @@ main(void *framep)
 
 	start_periodic_resettodr();
 
-	_rust_kernel_main();
-
         /*
          * proc0: nothing to do, back to sleep
          */

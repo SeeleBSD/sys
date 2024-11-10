@@ -565,6 +565,7 @@ ieee80211_recv_4way_msg3(struct ieee80211com *ic,
 		k->k_len = keylen;
 		memcpy(k->k_key, ni->ni_ptk.tk, k->k_len);
 		/* install the PTK */
+		DPRINTF(("PTK!\n"));
 		switch ((*ic->ic_set_key)(ic, ni, k)) {
 		case 0:
 			break;
@@ -605,6 +606,7 @@ ieee80211_recv_4way_msg3(struct ieee80211com *ic,
 			k->k_len = keylen;
 			memcpy(k->k_key, &gtk[8], k->k_len);
 			/* install the GTK */
+			DPRINTF(("GTK!\n"));
 			switch ((*ic->ic_set_key)(ic, ni, k)) {
 			case 0:
 				break;
@@ -642,6 +644,7 @@ ieee80211_recv_4way_msg3(struct ieee80211com *ic,
 			k->k_len = 16;
 			memcpy(k->k_key, &igtk[14], k->k_len);
 			/* install the IGTK */
+			DPRINTF(("IGTK!\n"));
 			switch ((*ic->ic_set_key)(ic, ni, k)) {
 			case 0:
 				break;
@@ -724,11 +727,14 @@ ieee80211_recv_4way_msg4(struct ieee80211com *ic,
 		k->k_len = ieee80211_cipher_keylen(k->k_cipher);
 		memcpy(k->k_key, ni->ni_ptk.tk, k->k_len);
 		/* install the PTK */
+		DPRINTF(("PTK!\n"));
 		switch ((*ic->ic_set_key)(ic, ni, k)) {
 		case 0:
 		case EBUSY:
+			DPRINTF(("EBUSY!\n"));
 			break;
 		default:
+			DPRINTF(("WTF?!\n"));
 			IEEE80211_SEND_MGMT(ic, ni,
 			    IEEE80211_FC0_SUBTYPE_DEAUTH,
 			    IEEE80211_REASON_ASSOC_TOOMANY);

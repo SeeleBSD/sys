@@ -176,6 +176,7 @@ struct bwfm_softc {
 	int			 sc_tx_timer;
 
 	int			 sc_scan_ver;
+	int      sc_join_ver;
 
 	int			 (*sc_newstate)(struct ieee80211com *,
 				     enum ieee80211_state, int);
@@ -200,6 +201,8 @@ struct bwfm_softc {
 	char			 sc_module[8];
 	char			 sc_vendor[8];
 	char			 sc_modrev[8];
+
+	struct mutex sc_key_lock;
 };
 
 void bwfm_attach(struct bwfm_softc *);
@@ -219,4 +222,4 @@ void bwfm_do_async(struct bwfm_softc *, void (*)(struct bwfm_softc *, void *),
     void *, int);
 int bwfm_nvram_convert(int, u_char **, size_t *, size_t *);
 int bwfm_loadfirmware(struct bwfm_softc *, const char *, const char *,
-    u_char **, size_t *, u_char **, size_t *, size_t *);
+    u_char **, size_t *, u_char **, size_t *, size_t *, u_char **, size_t *);

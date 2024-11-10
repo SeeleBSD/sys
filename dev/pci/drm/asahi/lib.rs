@@ -118,8 +118,7 @@ pub extern "C" fn asahidrm_attach(
             _self,
             &mut (*sc).sc_ddev as *mut _,
         );
-        bindings::config_mountroot(_self, Some(asahidrm_attachhook));
-        
+        // bindings::config_mountroot(_self, Some(asahidrm_attachhook));        
     }
 }
 

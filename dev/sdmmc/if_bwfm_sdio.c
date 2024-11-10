@@ -413,8 +413,11 @@ bwfm_sdio_preinit(struct bwfm_softc *bwfm)
 		goto err;
 	}
 
+	u_char *fwsig;
+	size_t fwsig_size;
+	
 	if (bwfm_loadfirmware(bwfm, chip, "-sdio", &ucode, &size,
-	    &nvram, &nvsize, &nvlen) != 0)
+	    &nvram, &nvsize, &nvlen, &fwsig, &fwsig_size) != 0)
 		goto err;
 
 	sc->sc_alp_only = 1;
