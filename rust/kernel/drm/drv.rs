@@ -271,9 +271,10 @@ impl<T: Driver> Registration<T> {
         // SAFETY: We never move out of `this`.
         let this = unsafe { self.get_unchecked_mut() };
         let data_pointer = <T::Data as ForeignOwnable>::into_foreign(data);
-        // SAFETY: This is the only code touching dev_private, so it is safe to upgrade to a
-        // mutable reference.
-        unsafe { this.drm.raw_mut() }.dev_private = data_pointer as *mut _;
+
+        unsafe {
+            bindings::dev_set_drvdata(this.drm.raw_mut() as *mut _ as *mut bindings::device, data_pointer as *mut _);
+        }
 
         //this.fops.owner = module.0;
         this.vtable.fops = &this.fops;
@@ -313,7 +314,7 @@ impl<T: Driver> Drop for Registration<T> {
         if self.registered {
             // Get a pointer to the data stored in device before destroying it.
             // SAFETY: `drm` is valid per the type invariant
-            let data_pointer = unsafe { self.drm.raw_mut().dev_private };
+            let data_pointer = unsafe { bindings::dev_get_drvdata(self.drm.raw_mut() as *mut _ as *mut bindings::device) };
 
             // SAFETY: Since `registered` is true, `self.drm` is both valid and registered.
             unsafe { bindings::drm_dev_unregister(self.drm.raw_mut()) };
@@ -321,6 +322,8 @@ impl<T: Driver> Drop for Registration<T> {
             // Free data as well.
             // SAFETY: `data_pointer` was returned by `into_foreign` during registration.
             unsafe { <T::Data as ForeignOwnable>::from_foreign(data_pointer) };
+
+            unsafe { bindings::dev_set_drvdata(self.drm.raw_mut() as *mut _ as *mut bindings::device, core::ptr::null_mut()) }
         }
     }
 }

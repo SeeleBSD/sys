@@ -222,13 +222,14 @@ impl VmInner {
 
     /// Map an IOVA to the shifted address the underlying io_pgtable uses.
     fn map_iova(&self, iova: usize, size: usize) -> Result<usize> {
-        if iova < self.min_va || (iova + size - 1) > self.max_va {
+        /*if iova < self.min_va || (iova + size - 1) > self.max_va {
             Err(EINVAL)
         } else if self.is_kernel {
             Ok(iova - self.min_va)
         } else {
             Ok(iova)
-        }
+        }*/
+        Ok(iova)
     }
 
     /// Map a contiguous range of virtual->physical pages.

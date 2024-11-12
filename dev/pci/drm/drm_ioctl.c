@@ -935,11 +935,15 @@ long drm_ioctl(struct file *filp,
 		out_size = 0;
 	ksize = max(max(in_size, out_size), drv_size);
 
-	drm_dbg_core(dev, "comm=\"%s\" pid=%d, dev=0x%lx, auth=%d, %s\n",
+	/*drm_dbg_core(dev, "comm=\"%s\" pid=%d, dev=0x%lx, auth=%d, %s\n",
 		     current->comm, task_pid_nr(current),
 		     (long)old_encode_dev(file_priv->minor->kdev->devt),
-		     file_priv->authenticated, ioctl->name);
+		     file_priv->authenticated, ioctl->name);*/
 
+	printf("comm=\"%s\" pid=%d, dev=0x%lx, auth=%d, %s\n",
+		     current->comm, task_pid_nr(current),
+		     (long)old_encode_dev(file_priv->minor->kdev->devt),
+		     file_priv->authenticated, ioctl->name);	
 	/* Do not trust userspace, use our own definition */
 	func = ioctl->func;
 
