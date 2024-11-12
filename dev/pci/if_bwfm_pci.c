@@ -943,8 +943,8 @@ bwfm_pci_load_microcode(struct bwfm_pci_softc *sc, const u_char *ucode, size_t s
 		sc->skip_reset_vector = 1;
 	}
 
-	// for (uint32_t addr_cl = bwfm->sc_chip.ch_rambase + size; addr_cl < addr; addr_cl++)
-		// bus_space_write_1(sc->sc_tcm_iot, sc->sc_tcm_ioh, addr_cl, 0);
+	for (uint32_t addr_cl = bwfm->sc_chip.ch_rambase + size; addr_cl < addr; addr_cl++)
+		bus_space_write_1(sc->sc_tcm_iot, sc->sc_tcm_ioh, addr_cl, 0);
 
 	written = bus_space_read_4(sc->sc_tcm_iot, sc->sc_tcm_ioh,
 	    bwfm->sc_chip.ch_rambase + bwfm->sc_chip.ch_ramsize - 4);
@@ -2304,6 +2304,8 @@ bwfm_pci_txcheck(struct bwfm_softc *bwfm)
 	struct bwfm_pci_msgring *ring;
 	int i;
 
+	// DPRINTF(("%s: bwfm_pci_txcheck\n", DEVNAME(sc)));
+
 	/* If we are transitioning, we cannot send. */
 	for (i = 0; i < sc->sc_max_flowrings; i++) {
 		ring = &sc->sc_flowrings[i];
@@ -2328,6 +2330,8 @@ bwfm_pci_txdata(struct bwfm_softc *bwfm, struct mbuf *m)
 	uint32_t pktid;
 	paddr_t paddr;
 	int flowid, ret;
+
+	// DPRINTF(("%s: bwfm_pci_txdata\n", DEVNAME(sc)));
 
 	flowid = bwfm_pci_flowring_lookup(sc, m);
 	if (flowid < 0) {

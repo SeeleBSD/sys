@@ -139,6 +139,9 @@ struct aplsmc_softc {
 	int			sc_nsensors;
 	struct ksensordev	sc_sensordev;
 	uint32_t		sc_suspend_pstr;
+
+	int sc_upd_avail;
+	int sc_remaining;
 };
 
 #define CH0I_DISCHARGE		(1 << 0)
@@ -230,6 +233,9 @@ aplsmc_attach(struct device *parent, struct device *self, void *aux)
 		printf(": no registers\n");
 		return;
 	}
+
+	sc->sc_upd_avail = 0;
+	sc->sc_remaining = -1;
 
 	sc->sc_iot = faa->fa_iot;
 	if (bus_space_map(sc->sc_iot, faa->fa_reg[0].addr,
@@ -381,6 +387,8 @@ aplsmc_activate(struct device *self, int act)
 	return 0;
 }
 
+int aplsmc_evindex;
+
 void
 aplsmc_handle_notification(struct aplsmc_softc *sc, uint64_t data)
 {
@@ -414,8 +422,8 @@ aplsmc_handle_notification(struct aplsmc_softc *sc, uint64_t data)
 		return;
 	}
 #endif
-
-	switch (SMC_EV_TYPE(data)) {
+	uint64_t evt = SMC_EV_TYPE(data);
+	switch (evt) {
 	case SMC_EV_TYPE_BTN:
 		switch (SMC_EV_SUBTYPE(data)) {
 		case SMC_PWRBTN_SHORT:
@@ -471,6 +479,19 @@ aplsmc_handle_notification(struct aplsmc_softc *sc, uint64_t data)
 		    sc->sc_dev.dv_xname, data);
 #endif
 		break;
+	}
+
+	evt = data >> 32ULL;
+	if (((evt & 0xffffff00ULL) == 0x71010100ULL)
+		|| ((evt & 0xffff0000ULL) == 0x71060000ULL)
+		|| ((evt & 0xff000000ULL) == 0x71000000ULL)) {
+		// aplsmc_refresh_sensors(sc);
+		aplsmc_evindex++;
+#ifdef APLSMC_DEBUG
+		printf("%s: APM_POWER_CHANGE\n", sc->sc_dev.dv_xname);
+#endif
+		sc->sc_upd_avail = 1;
+		// apm_record_event(APM_POWER_CHANGE);
 	}
 }
 
@@ -596,6 +617,7 @@ aplsmc_refresh_sensors(void *arg)
 	int64_t value;
 	uint32_t key;
 	int i, error;
+	int remaining = -1;
 
 	for (i = 0; i < sc->sc_nsensors; i++) {
 		sensor = sc->sc_smcsensors[i];
@@ -635,6 +657,15 @@ aplsmc_refresh_sensors(void *arg)
 
 		if (strcmp(sensor->key, "ACDI") == 0)
 			hw_power = (value > 0);
+
+		if (strcmp(sensor->key, "B0RM") == 0)
+			remaining = value;
+	}
+
+	if (sc->sc_upd_avail || remaining != sc->sc_remaining) {
+		apm_record_event(APM_POWER_CHANGE);
+		sc->sc_upd_avail = 0;
+		sc->sc_remaining = remaining;
 	}
 }
 

@@ -408,6 +408,8 @@ bwfm_start(struct ifnet *ifp)
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct mbuf *m;
 
+	// DPRINTF(("%s: bwfm_start\n", DEVNAME(sc)));
+
 	if (!(ifp->if_flags & IFF_RUNNING))
 		return;
 	if (ifq_is_oactive(&ifp->if_snd))
@@ -416,6 +418,8 @@ bwfm_start(struct ifnet *ifp)
 		return;
 
 	/* TODO: return if no link? */
+
+	// DPRINTF(("%s: bwfm_start2\n", DEVNAME(sc)));
 
 	for (;;) {
 		if (sc->sc_bus_ops->bs_txcheck(sc)) {
@@ -1872,12 +1876,14 @@ bwfm_proto_bcdc_rx(struct bwfm_softc *sc, struct mbuf *m, struct mbuf_list *ml)
 int
 bwfm_fwvar_cmd_get_data(struct bwfm_softc *sc, int cmd, void *data, size_t len)
 {
+	// DPRINTF(("%s: bwfm_fwvar_cmd_get_data %d\n", DEVNAME(sc), cmd));
 	return sc->sc_proto_ops->proto_query_dcmd(sc, 0, cmd, data, &len);
 }
 
 int
 bwfm_fwvar_cmd_set_data(struct bwfm_softc *sc, int cmd, void *data, size_t len)
 {
+	// DPRINTF(("%s: bwfm_fwvar_cmd_set_data %d\n", DEVNAME(sc), cmd));
 	return sc->sc_proto_ops->proto_set_dcmd(sc, 0, cmd, data, len);
 }
 
@@ -1916,6 +1922,7 @@ bwfm_fwvar_var_get_data(struct bwfm_softc *sc, char *name, void *data, size_t le
 int
 bwfm_fwvar_var_set_data(struct bwfm_softc *sc, char *name, void *data, size_t len)
 {
+	// DPRINTF(("%s: bwfm_fwvar_var_set_data %s\n", DEVNAME(sc), name));
 	char *buf;
 	int ret;
 
@@ -3313,6 +3320,8 @@ bwfm_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg)
 	int s;
 
 	s = splnet();
+
+	DPRINTF(("%s: bwfm_newstate\n", DEVNAME(sc)));
 
 	switch (nstate) {
 	case IEEE80211_S_INIT:
