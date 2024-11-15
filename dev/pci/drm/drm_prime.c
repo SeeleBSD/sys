@@ -850,7 +850,7 @@ int sg_alloc_table_from_pages_segment(struct drm_device *dev, struct sg_table *s
     size_t seg_size;
 
     /* Allocate memory for the scatterlist entries */
-    sgl = malloc(sizeof(struct scatterlist) * nr_pages, M_DRM, M_WAITOK | M_ZERO);
+    sgl = malloc(sizeof(struct scatterlist) * (nr_pages+1), M_DRM, M_WAITOK | M_ZERO);
     if (!sgl)
         return ENOMEM;
 

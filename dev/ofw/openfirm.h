@@ -79,6 +79,8 @@ int OF_getnodebyname(int, const char *);
 int OF_getnodebyphandle(uint32_t);
 int OF_getindex(int, const char *, const char *);
 
+void *OF_getfdtnode(int handle);
+
 /*
  * Generic OpenFirmware probe argument.
  * This is how all probe structures must start

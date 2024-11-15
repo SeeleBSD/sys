@@ -55,25 +55,19 @@ static const struct drm_gem_object_funcs drm_gem_shmem_funcs = {
 static struct drm_gem_shmem_object *
 __drm_gem_shmem_create(struct drm_device *dev, size_t size, bool private)
 {
-	printk("1");
 	struct drm_gem_shmem_object *shmem;
 	struct drm_gem_object *obj;
 	int ret = 0;
 
-	size = PAGE_ALIGN(size);
+	size = round_up(size, 0x4000);
 
 	if (dev->driver->gem_create_object) {
-		printk("2");
 		obj = dev->driver->gem_create_object(dev, size);
-		printk("2-1");
 		if (IS_ERR(obj))
 			return ERR_CAST(obj);
-		printk("2-2");
 		shmem = to_drm_gem_shmem_obj(obj);
-		printk("2-3");
 	} else {
 		shmem = kzalloc(sizeof(*shmem), GFP_KERNEL);
-		printk("2!");
 		if (!shmem)
 			return ERR_PTR(-ENOMEM);
 		obj = &shmem->base;
@@ -88,16 +82,13 @@ __drm_gem_shmem_create(struct drm_device *dev, size_t size, bool private)
 	} else {
 		ret = drm_gem_object_init(dev, obj, size);
 	}
-	printk("3");
 	if (ret) {
 		drm_gem_private_object_fini(obj);
 		goto err_free;
 	}
-	printk("4");
 	ret = drm_gem_create_mmap_offset(obj);
 	if (ret)
 		goto err_release;
-	printk("5");
 	INIT_LIST_HEAD(&shmem->madv_list);
 
 	if (!private) {
@@ -187,7 +178,7 @@ static int drm_gem_shmem_get_pages(struct drm_gem_shmem_object *shmem)
     if (shmem->pages_use_count++ > 0)
         return 0;
 
-    pages = mallocarray(npages*4, sizeof(struct vm_page *), M_DRM, M_WAITOK | M_ZERO);
+    pages = mallocarray((npages+1)*4, sizeof(struct vm_page *), M_DRM, M_WAITOK | M_ZERO);
     if (pages == NULL) {
         ret = -ENOMEM;
         goto out;
@@ -210,7 +201,7 @@ static int drm_gem_shmem_get_pages(struct drm_gem_shmem_object *shmem)
 
     TAILQ_INIT(&plist);
 
-    ret = uvm_pglistalloc(obj->size, (paddr_t)0, (paddr_t)(-1), (1 << 14), 0, &plist, npages * 4, UVM_PLA_WAITOK);
+    ret = uvm_pglistalloc(obj->size, (paddr_t)0, (paddr_t)(-1), (1 << 14), 0, &plist, 1, UVM_PLA_WAITOK);
     if (ret) {
         sg_free_table(st);
         ret = -ENOMEM;
@@ -252,7 +243,7 @@ fail_unwire:
 free_st:
     free(st, sizeof(struct sg_table), M_DRM);
 free_pages:
-    free(pages, 4 * npages * sizeof(struct vm_page *), M_DRM);
+    free(pages, 4 * (npages+1) * sizeof(struct vm_page *), M_DRM);
 out:
     shmem->pages_use_count = 0;
     return ret;

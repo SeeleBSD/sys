@@ -26,7 +26,7 @@ option		PCIVERBOSE
 option		USER_PCICONF	# user-space PCI configuration
 option		USBVERBOSE
 option		SUSPEND
-# option      DRMDEBUG
+option      DRMDEBUG
 option      BWFM_DEBUG
 # option      DEBUG
 option      APLSMC_DEBUG

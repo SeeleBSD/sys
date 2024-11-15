@@ -5,7 +5,7 @@
 //! C header: [`include/linux/drm/drm_device.h`](../../../../include/linux/drm/drm_device.h)
 
 use crate::{
-    bindings, device, drm,
+    bindings, device, drm, of::Node,
     types::{AlwaysRefCounted, ForeignOwnable},
 };
 use core::cell::UnsafeCell;
@@ -64,5 +64,12 @@ unsafe impl<T: drm::drv::Driver> device::RawDevice for Device<T> {
     fn raw_device(&self) -> *mut bindings::device {
         // SAFETY: dev is initialized by C for all Device objects
         unsafe { (*self.drm.get()).dev }
+    }
+    
+    fn of_node(&self) -> Option<Node> {
+        // let rdev = self.raw_device();
+        // let rnode = unsafe { (*(*(rdev as *mut bindings::drm_device)).pdev).node as usize as *mut bindings::device_node };
+        // unsafe { Node::from_raw(rnode) }
+        None
     }
 }

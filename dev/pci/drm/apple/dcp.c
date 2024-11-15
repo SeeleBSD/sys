@@ -885,7 +885,7 @@ static int dcp_comp_bind(struct device *dev, struct device *main, void *data)
 	writel_relaxed(cpu_ctrl | APPLE_DCP_COPROC_CPU_CONTROL_RUN,
 		       dcp->coproc_reg + APPLE_DCP_COPROC_CPU_CONTROL);
 
-	dcp->rtk = devm_apple_rtkit_init(dev, dcp, "mbox", 0, &rtkit_ops);
+	dcp->rtk = devm_apple_rtkit_init(dev, dcp, "mbox", 0, &rtkit_ops, "drmrtk", "apldcp_rtkit");
 	if (IS_ERR(dcp->rtk))
 		return dev_err_probe(dev, PTR_ERR(dcp->rtk),
 				     "Failed to initialize RTKit\n");

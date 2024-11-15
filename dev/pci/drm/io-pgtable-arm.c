@@ -312,10 +312,12 @@ static int __arm_lpae_map(struct arm_lpae_io_pgtable *data, vaddr_t iova,
         paddr_t curr_paddr = paddr + offset;
 
         /* Insert the page table entry using OpenBSD's pmap_enter */
-        error = pmap_enter(pmap_kernel(), curr_vaddr, curr_paddr, prot, flags | PMAP_CANFAIL);
-        if (error != 0) {
-            printf("Failed to map vaddr: %lx to paddr: %lx with error: %d\n", curr_vaddr, curr_paddr, error);
-            return error;
+        for (size_t offset = 0; offset < size; offset += PAGE_SIZE) {
+            error = pmap_enter(pmap_kernel(), curr_vaddr + offset*PAGE_SIZE, curr_paddr + offset*PAGE_SIZE, prot, flags | PMAP_CANFAIL);
+            if (error != 0) {
+                printf("Failed to map vaddr: %lx to paddr: %lx with error: %d\n", curr_vaddr, curr_paddr, error);
+                return error;
+            }
         }
         *mapped += size;
     }

@@ -1173,6 +1173,7 @@ extern "C" {
 #define DRM_IOCTL_SYNCOBJ_TRANSFER	DRM_IOWR(0xCC, struct drm_syncobj_transfer)
 #define DRM_IOCTL_SYNCOBJ_TIMELINE_SIGNAL	DRM_IOWR(0xCD, struct drm_syncobj_timeline_array)
 
+#define DRM_IOCTL_GET_PLATFORMINFO DRM_IOWR(0xD0, struct drm_platforminfo)
 /**
  * DRM_IOCTL_MODE_GETFB2 - Get framebuffer metadata.
  *
@@ -1282,6 +1283,13 @@ struct drm_pciinfo {
 	uint16_t	subvendor_id;
 	uint16_t	subdevice_id;
 	uint8_t		revision_id;
+};
+
+#define DRM_PLATFORM_DEVICE_NAME_LEN 512
+
+struct drm_platforminfo {
+	char fullname[DRM_PLATFORM_DEVICE_NAME_LEN];
+	char compatible[DRM_PLATFORM_DEVICE_NAME_LEN];
 };
 #endif
 

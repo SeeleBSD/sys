@@ -12,7 +12,7 @@ use crate::{
     // driver,
     error::{code::*, from_result, to_result, Result},
     io_mem::{IoMem, IoResource, Resource},
-    of,
+    of::{self, Node},
     str::CStr,
     types::ForeignOwnable,
     // ThisModule,
@@ -117,5 +117,11 @@ unsafe impl device::RawDevice for Device {
     fn raw_device(&self) -> *mut bindings::device {
         // SAFETY: By the type invariants, we know that `self.ptr` is non-null and valid.
         unsafe { &mut (*self.ptr).dev }
+    }
+
+    fn of_node(&self) -> Option<Node> {
+        let rdev = self.raw_device();
+        let rnode = unsafe { (*(rdev as *mut bindings::platform_device)).node as usize as *mut bindings::device_node };
+        unsafe { Node::from_raw(rnode) }
     }
 }

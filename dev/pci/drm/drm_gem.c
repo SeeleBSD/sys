@@ -501,6 +501,7 @@ int drm_gem_dumb_map_offset(struct drm_file *file, struct drm_device *dev,
 	struct drm_gem_object *obj;
 	int ret;
 
+	printf("lookup\n");
 	obj = drm_gem_object_lookup(file, handle);
 	if (!obj)
 		return -ENOENT;
@@ -511,14 +512,18 @@ int drm_gem_dumb_map_offset(struct drm_file *file, struct drm_device *dev,
 		goto out;
 	}
 
+	printf("create\n");
 	ret = drm_gem_create_mmap_offset(obj);
 	if (ret)
 		goto out;
 
+	printf("offset_addr\n");
 	*offset = drm_vma_node_offset_addr(&obj->vma_node);
+	printf("okok?\n");
 out:
 	drm_gem_object_put(obj);
 
+	printf("out\n");
 	return ret;
 }
 EXPORT_SYMBOL_GPL(drm_gem_dumb_map_offset);

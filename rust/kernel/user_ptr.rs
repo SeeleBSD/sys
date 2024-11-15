@@ -114,7 +114,7 @@ impl IoBufferReader for UserSlicePtrReader {
         if len > self.1 || len > u32::MAX as usize {
             return Err(EFAULT);
         }
-        let res = unsafe { bindings::copyin(out as _, self.0, len as _) };
+        let res = unsafe { bindings::copyin(self.0, out as _, len as _) };
         if res != 0 {
             return Err(EFAULT);
         }
@@ -162,7 +162,7 @@ impl IoBufferWriter for UserSlicePtrWriter {
         if len > self.1 || len > u32::MAX as usize {
             return Err(EFAULT);
         }
-        let res = unsafe { bindings::copyout(self.0, data as _, len as _) };
+        let res = unsafe { bindings::copyout(data as _, self.0, len as _) };
         if res != 0 {
             return Err(EFAULT);
         }

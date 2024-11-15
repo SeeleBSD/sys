@@ -618,6 +618,7 @@ const struct pci_device_id *drm_find_description(int, int,
     const struct pci_device_id *);
 
 int drm_getpciinfo(struct drm_device *, void *, struct drm_file *);
+int drm_getplatforminfo(struct drm_device *, void *, struct drm_file *);
 
 #endif
 

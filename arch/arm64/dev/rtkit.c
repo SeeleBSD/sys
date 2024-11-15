@@ -856,7 +856,7 @@ int
 rtkit_boot(struct rtkit_state *state)
 {
 	/* Wake up! */
-	return rtkit_set_iop_pwrstate(state, RTKIT_MGMT_PWR_STATE_ON);
+	return rtkit_set_iop_pwrstate(state, RTKIT_MGMT_PWR_STATE_INIT);
 }
 
 void
@@ -925,8 +925,11 @@ rtkit_set_ap_pwrstate(struct rtkit_state *state, uint16_t pwrstate)
 	while (state->ap_pwrstate != pwrstate) {
 		error = tsleep_nsec(&state->ap_pwrstate, PWAIT, "appwr",
 		    SEC_TO_NSEC(1));
-		if (error)
+		if (error != EWOULDBLOCK && error)
 			return error;
+		if (error == EWOULDBLOCK) {
+			return 0;
+		}
 	}
 
 	return 0;
@@ -964,8 +967,11 @@ rtkit_set_iop_pwrstate(struct rtkit_state *state, uint16_t pwrstate)
 	while (state->iop_pwrstate != (pwrstate & 0xff)) {
 		error = tsleep_nsec(&state->iop_pwrstate, PWAIT, "ioppwr",
 		    SEC_TO_NSEC(1));
-		if (error)
+		if (error != EWOULDBLOCK && error)
 			return error;
+		if (error == EWOULDBLOCK) {
+			return 0;
+		}
 	}
 
 	return 0;

@@ -188,6 +188,8 @@ impl<T: Operations> RtKit<T> {
         mbox_name: Option<&'static CStr>,
         mbox_idx: usize,
         data: T::Data,
+        taskq_name: &'static CStr,
+        pool_name: &'static CStr,
     ) -> Result<Self> {
         let ptr = data.into_foreign() as *mut _;
         let guard = ScopeGuard::new(|| {
@@ -205,6 +207,8 @@ impl<T: Operations> RtKit<T> {
                 },
                 mbox_idx.try_into()?,
                 &Self::VTABLE,
+                taskq_name.as_char_ptr(),
+                pool_name.as_char_ptr()
             ))
         }?;
 

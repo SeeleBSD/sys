@@ -230,28 +230,28 @@ apple_rtkit_wake(struct apple_rtkit *rtk)
 	error = rtkit_set_iop_pwrstate(rtk->state, RTKIT_MGMT_PWR_STATE_INIT);
 	if (error)
 		return -error;
-
+	
 	error = rtkit_set_ap_pwrstate(rtk->state, RTKIT_MGMT_PWR_STATE_ON);
 	return -error;
 }
 
 struct apple_rtkit *
 devm_apple_rtkit_init(struct device *dev, void *cookie,
-    const char *mbox_name, int mbox_idx, const struct apple_rtkit_ops *ops)
+    const char *mbox_name, int mbox_idx, const struct apple_rtkit_ops *ops, const char *taskq_name, const char *pool_name)
 {
 	struct platform_device *pdev = (struct platform_device *)dev;
 	struct apple_rtkit *rtk;
 	struct rtkit *rk;
 
 	rtk = malloc(sizeof(*rtk), M_DEVBUF, M_WAITOK | M_ZERO);
-	rtk->tq = taskq_create("drmrtk", 1, IPL_HIGH, 0);
+	rtk->tq = taskq_create(taskq_name, 1, IPL_HIGH, 0);
 	if (rtk->tq == NULL) {
 		free(rtk, M_DEVBUF, sizeof(*rtk));
 		return ERR_PTR(ENOMEM);
 	}
 
 	pool_init(&rtk->task_pool, sizeof(struct apple_rtkit_task), 0, IPL_TTY,
-	    0, "apldcp_rtkit", NULL);
+	    0, pool_name, NULL);
 
 	rk = malloc(sizeof(*rk), M_DEVBUF, M_WAITOK | M_ZERO);
 	rk->rk_cookie = rtk;

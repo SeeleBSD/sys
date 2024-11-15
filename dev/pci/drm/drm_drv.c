@@ -66,6 +66,12 @@
 #include "drm_internal.h"
 #include "drm_legacy.h"
 
+#include <linux/platform_device.h>
+
+#ifdef __HAVE_FDT
+#include <dev/ofw/openfirm.h>
+#endif
+
 MODULE_AUTHOR("Gareth Hughes, Leif Delgass, José Fonseca, Jon Smirl");
 MODULE_DESCRIPTION("DRM shared core routines");
 MODULE_LICENSE("GPL and additional rights");
@@ -1416,6 +1422,7 @@ drm_attach(struct device *parent, struct device *self, void *aux)
 #endif
 	}
 
+	drm_legacy_init_members(dev);
 	mtx_init(&dev->quiesce_mtx, IPL_NONE);
 	mtx_init(&dev->event_lock, IPL_TTY);
 	rw_init(&dev->struct_mutex, "drmdevlk");
@@ -2076,3 +2083,21 @@ drm_getpciinfo(struct drm_device *dev, void *data, struct drm_file *file_priv)
 
 	return 0;
 }
+
+#ifdef __HAVE_FDT
+int
+drm_getplatforminfo(struct drm_device *dev, void *data, struct drm_file *file_priv)
+{
+	struct drm_platforminfo *info = data;
+	struct platform_device *pdev;
+	pdev = (struct platform_device *)dev->dev_private;
+
+	if (pdev == NULL || pdev->node == 0)
+		return -ENOTTY;
+
+	OF_getprop(pdev->node, "name", info->fullname, 512);
+	OF_getprop(pdev->node, "compatible", info->compatible, 512);
+
+	return 0;
+}
+#endif

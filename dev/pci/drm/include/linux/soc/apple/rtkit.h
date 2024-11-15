@@ -23,7 +23,7 @@ struct apple_rtkit_ops {
 };
 
 struct apple_rtkit *devm_apple_rtkit_init(struct device *, void *,
-	    const char *, int, const struct apple_rtkit_ops *);
+	    const char *, int, const struct apple_rtkit_ops *, const char *, const char *);
 
 int	apple_rtkit_send_message(struct apple_rtkit *, uint8_t, uint64_t,
 				 struct completion *, int);

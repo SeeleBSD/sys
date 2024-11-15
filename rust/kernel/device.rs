@@ -21,11 +21,12 @@ use core::{
 pub unsafe trait RawDevice {
     fn raw_device(&self) -> *mut bindings::device;
 
-    fn of_node(&self) -> Option<Node> {
+    fn of_node(&self) -> Option<Node>;
+    /*fn of_node(&self) -> Option<Node> {
         let rdev = self.raw_device();
         let rnode = unsafe { bindings::__of_devnode((*rdev).dv_cfdata as *mut core::ffi::c_void) };
         unsafe { Node::from_raw(rnode) }
-    }
+    }*/
 }
 
 pub struct Device {
@@ -48,6 +49,13 @@ unsafe impl Sync for Device {}
 unsafe impl RawDevice for Device {
     fn raw_device(&self) -> *mut bindings::device {
         self.ptr
+    }
+
+    fn of_node(&self) -> Option<Node> {
+        // let rdev = self.raw_device();
+        // let rnode = unsafe { bindings::__of_devnode((*rdev).dv_cfdata as *mut core::ffi::c_void) };
+        // unsafe { Node::from_raw(rnode) }
+        None
     }
 }
 
