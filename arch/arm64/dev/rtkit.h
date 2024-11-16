@@ -20,6 +20,7 @@ struct rtkit {
 #define RK_SYSLOG	0x00000004
 
 struct rtkit_state *rtkit_init(int, const char *, int, struct rtkit *);
+struct rtkit_state *rtkit_init_by_idx(int, int, int, struct rtkit *);
 int	rtkit_boot(struct rtkit_state *);
 void	rtkit_shutdown(struct rtkit_state *);
 int	rtkit_set_ap_pwrstate(struct rtkit_state *, uint16_t);

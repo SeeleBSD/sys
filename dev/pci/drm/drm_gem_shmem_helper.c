@@ -905,7 +905,7 @@ drm_gem_shmem_prime_import_sg_table(struct drm_device *dev,
 				    struct dma_buf_attachment *attach,
 				    struct sg_table *sgt)
 {
-/*	size_t size = PAGE_ALIGN(attach->dmabuf->size);
+	size_t size = round_up(attach->dmabuf->size, 0x4000);
 	struct drm_gem_shmem_object *shmem;
 
 	shmem = __drm_gem_shmem_create(dev, size, true);
@@ -916,8 +916,7 @@ drm_gem_shmem_prime_import_sg_table(struct drm_device *dev,
 
 	drm_dbg_prime(dev, "size = %zu\n", size);
 
-	return &shmem->base;*/
-	return NULL;
+	return &shmem->base;
 }
 EXPORT_SYMBOL_GPL(drm_gem_shmem_prime_import_sg_table);
 

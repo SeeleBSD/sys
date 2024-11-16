@@ -258,7 +258,10 @@ devm_apple_rtkit_init(struct device *dev, void *cookie,
 	rk->rk_dmat = pdev->dmat;
 	rk->rk_logmap = apple_rtkit_logmap;
 
-	rtk->state = rtkit_init(pdev->node, mbox_name, 0, rk);
+	if (mbox_name)
+		rtk->state = rtkit_init(pdev->node, mbox_name, 0, rk);
+	else
+		rtk->state = rtkit_init_by_idx(pdev->node, mbox_idx, 0, rk);
 	rtk->cookie = cookie;
 	rtk->pdev = pdev;
 	rtk->ops = ops;

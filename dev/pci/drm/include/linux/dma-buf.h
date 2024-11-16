@@ -20,6 +20,7 @@
 
 #include <sys/types.h>
 #include <sys/systm.h>
+#include <linux/dma-direction.h>
 #include <linux/dma-resv.h>
 #include <linux/list.h>
 
@@ -36,7 +37,15 @@ struct dma_buf {
 };
 
 struct dma_buf_attachment {
+	struct dma_buf *dmabuf;
+	struct device *dev;
+	struct list_head node;
+	struct sg_table *sgt;
+	enum dma_data_direction dir;
+	bool peer2peer;
+	const struct dma_buf_attach_ops *importer_ops;
 	void *importer_priv;
+	void *priv;
 };
 
 struct dma_buf_attach_ops {

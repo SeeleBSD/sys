@@ -407,14 +407,13 @@ static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
     for (offset = 0; offset < size*pgcount; offset += size) {
         vaddr_t curr_vaddr = iova + offset;
 
-        /* Remove the page table entry using OpenBSD's pmap_remove */
-        pmap_remove(pmap_kernel(), curr_vaddr, curr_vaddr + size);
+        pmap_kremove(curr_vaddr, size);
     }
 
     /* Ensure that the page table changes are synchronized */
     pmap_update(pmap_kernel());
 
-    return 0;
+    return size*pgcount;
 #ifdef notyet
     /* Implement unmapping logic */
 
@@ -462,6 +461,13 @@ static size_t arm_lpae_unmap_pages(struct io_pgtable_ops *ops, vaddr_t iova,
 static paddr_t arm_lpae_iova_to_phys(struct io_pgtable_ops *ops,
                      vaddr_t iova)
 {
+    paddr_t phys;
+    if (pmap_extract(pmap_kernel(), iova, &phys)) {
+        return phys;
+    } else {
+        return (paddr_t)-1;
+    }
+#ifdef notyet
     struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
     arm_lpae_iopte pte, *ptep = data->pgd;
     int lvl = data->start_level;
@@ -494,6 +500,7 @@ static paddr_t arm_lpae_iova_to_phys(struct io_pgtable_ops *ops,
     paddr |= iova & (ARM_LPAE_BLOCK_SIZE(lvl, data) - 1);
 
     return paddr;
+#endif
 }
 
 /* Helper functions */

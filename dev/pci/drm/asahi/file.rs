@@ -445,6 +445,12 @@ impl File {
 
         let bo = gem::lookup_handle(file, data.handle)?;
         data.offset = bo.gem.create_mmap_offset()?;
+        mod_dev_dbg!(
+            device,
+            "[File {}]: gem_mmap_offset completed handle={:#x?}\n",
+            file.inner().id,
+            data.handle
+        );
         Ok(0)
     }
 

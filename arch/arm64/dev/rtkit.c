@@ -852,6 +852,39 @@ rtkit_init(int node, const char *name, int flags, struct rtkit *rk)
 	return state;
 }
 
+struct rtkit_state *
+rtkit_init_by_idx(int node, int idx, int flags, struct rtkit *rk)
+{
+	struct rtkit_state *state;
+	struct mbox_client client;
+
+	state = malloc(sizeof(*state), M_DEVBUF, M_WAITOK | M_ZERO);
+	client.mc_rx_callback = rtkit_rx_callback;
+	client.mc_rx_arg = state;
+	if (flags & RK_WAKEUP)
+		client.mc_flags = MC_WAKEUP;
+	else
+		client.mc_flags = 0;
+
+	state->mc = mbox_channel_idx(node, idx, &client);
+	if (state->mc == NULL) {
+		free(state, M_DEVBUF, sizeof(*state));
+		return NULL;
+	}
+	state->rk = rk;
+	state->flags = flags;
+
+	state->iop_pwrstate = RTKIT_MGMT_PWR_STATE_SLEEP;
+	state->ap_pwrstate = RTKIT_MGMT_PWR_STATE_QUIESCED;
+	
+	task_set(&state->crashlog_task, rtkit_handle_crashlog_buffer, state);
+	task_set(&state->syslog_task, rtkit_handle_syslog_buffer, state);
+	task_set(&state->ioreport_task, rtkit_handle_ioreport_buffer, state);
+	task_set(&state->oslog_task, rtkit_handle_oslog_buffer, state);
+
+	return state;
+}
+
 int
 rtkit_boot(struct rtkit_state *state)
 {
@@ -925,11 +958,10 @@ rtkit_set_ap_pwrstate(struct rtkit_state *state, uint16_t pwrstate)
 	while (state->ap_pwrstate != pwrstate) {
 		error = tsleep_nsec(&state->ap_pwrstate, PWAIT, "appwr",
 		    SEC_TO_NSEC(1));
-		if (error != EWOULDBLOCK && error)
-			return error;
-		if (error == EWOULDBLOCK) {
+		if (error == EWOULDBLOCK)
 			return 0;
-		}
+		if (error)
+			return error;
 	}
 
 	return 0;
@@ -967,11 +999,10 @@ rtkit_set_iop_pwrstate(struct rtkit_state *state, uint16_t pwrstate)
 	while (state->iop_pwrstate != (pwrstate & 0xff)) {
 		error = tsleep_nsec(&state->iop_pwrstate, PWAIT, "ioppwr",
 		    SEC_TO_NSEC(1));
-		if (error != EWOULDBLOCK && error)
-			return error;
-		if (error == EWOULDBLOCK) {
+		if (error == EWOULDBLOCK)
 			return 0;
-		}
+		if (error)
+			return error;
 	}
 
 	return 0;
