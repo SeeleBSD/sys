@@ -99,6 +99,9 @@ BINDING_PTR_ERR_OR_ZERO(const void *ptr)
 
 struct proc* BINDING_curproc();
 
+int __init drm_sched_fence_slab_init(void);
+void __exit drm_sched_fence_slab_fini(void);
+
 /* `bindgen` gets confused at certain things. */
 const size_t ARCH_SLAB_MINALIGN = 8;
 const gfp_t BINDINGS_GFP_KERNEL = GFP_KERNEL;

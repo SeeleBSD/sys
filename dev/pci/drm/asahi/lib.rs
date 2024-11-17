@@ -135,6 +135,7 @@ pub extern "C" fn asahidrm_attachhook(_self: *mut bindings::device) {
         DMAMAP = Some((*sc).sc_dmamap);
         PMAP = (*sc).sc_pm;
         // (*sc).sc_ddev.dev = &mut (*sc).sc_dev as *mut bindings::platform_device as *mut _;
+        bindings::drm_sched_fence_slab_init();
     }
     let cfg = unsafe { INFO.expect("No GPU information!") };
 
