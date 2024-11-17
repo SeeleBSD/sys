@@ -46,7 +46,7 @@ static const struct drm_gem_object_funcs drm_gem_shmem_funcs = {
 	.get_sg_table = drm_gem_shmem_object_get_sg_table,
 	.vmap = drm_gem_shmem_object_vmap,
 	.vunmap = drm_gem_shmem_object_vunmap,
-#ifdef __linux__
+#ifdef __OpenBSD__
 	.mmap = drm_gem_shmem_object_mmap,
 #endif
 	.vm_ops = &drm_gem_shmem_vm_ops,
@@ -166,6 +166,22 @@ void drm_gem_shmem_free(struct drm_gem_shmem_object *shmem)
 }
 EXPORT_SYMBOL_GPL(drm_gem_shmem_free);
 
+static inline void
+uvm_pageinsert(struct vm_page *pg)
+{
+	struct vm_page	*dupe;
+
+	KASSERT(UVM_OBJ_IS_DUMMY(pg->uobject) ||
+	    rw_write_held(pg->uobject->vmobjlock));
+	KASSERT((pg->pg_flags & PG_TABLED) == 0);
+
+	dupe = RBT_INSERT(uvm_objtree, &pg->uobject->memt, pg);
+	/* not allowed to insert over another page */
+	KASSERT(dupe == NULL);
+	atomic_setbits_int(&pg->pg_flags, PG_TABLED);
+	pg->uobject->uo_npages++;
+}
+
 static int drm_gem_shmem_get_pages(struct drm_gem_shmem_object *shmem)
 {
     struct drm_gem_object *obj = &shmem->base;
@@ -211,7 +227,13 @@ static int drm_gem_shmem_get_pages(struct drm_gem_shmem_object *shmem)
     sg = st->sgl;
     st->nents = 0;
     long i = 0;
+    struct uvm_object *uobj;
 
+    uobj = uao_create(obj->size, 0);
+
+    obj->uobj = *uobj;
+
+    rw_enter(obj->uobj.vmobjlock, RW_WRITE | RW_DUPOK);
     while (i < npages) {
         int j;
         for (j = 0; j < 4; j++) {
@@ -221,7 +243,12 @@ static int drm_gem_shmem_get_pages(struct drm_gem_shmem_object *shmem)
                 goto fail_unwire;
             }
             TAILQ_REMOVE(&plist, page, pageq);
-            pages[i * 4 + j] = page;
+            page->uobject = &obj->uobj;
+            page->offset = (i * 4 + j)*PAGE_SIZE;
+		        if (uvm_pagelookup(&obj->uobj, page->offset) == NULL) {
+	            uvm_pageinsert(page);
+		        }
+						pages[i * 4 + j] = page;
         }
 
         sg_set_page(sg, pages[i * 4], 16 * 1024, 0);
@@ -229,6 +256,7 @@ static int drm_gem_shmem_get_pages(struct drm_gem_shmem_object *shmem)
         st->nents++;
         i++;
     }
+    rw_exit(obj->uobj.vmobjlock);
 
     if (sg)
         sg_mark_end(sg);
@@ -765,6 +793,60 @@ int drm_gem_shmem_mmap(struct drm_gem_shmem_object *shmem, struct vm_area_struct
 	return 0;
 }
 EXPORT_SYMBOL_GPL(drm_gem_shmem_mmap);
+#else
+
+int
+drm_gem_shmem_object_mmap(struct drm_gem_object *obj, vm_prot_t accessprot,
+                          voff_t off, vsize_t size)
+{
+	struct drm_gem_shmem_object *shmem = NULL;
+
+	shmem = container_of(obj, struct drm_gem_shmem_object, base);
+	if (!shmem)
+		return -1;
+
+	int ret;	
+	dma_resv_lock(shmem->base.resv, NULL);
+	ret = drm_gem_shmem_get_pages(shmem);
+	dma_resv_unlock(shmem->base.resv);
+
+	return ret;
+}
+
+struct uvm_object *
+drm_gem_shmem_mmap(struct file *flip, vm_prot_t accessprot,
+                  voff_t off, vsize_t size)
+{
+	struct drm_vma_offset_node *node;
+	struct drm_file *priv = (void *)flip;
+	struct drm_device *dev = priv->minor->dev;
+	struct drm_gem_object *obj = NULL;
+	struct drm_gem_shmem_object *shmem = NULL;
+
+	drm_vma_offset_lock_lookup(dev->vma_offset_manager);
+	node = drm_vma_offset_exact_lookup_locked(dev->vma_offset_manager,
+						  off >> PAGE_SHIFT,
+						  atop(round_page(size)));
+	if (likely(node)) {
+		obj = container_of(node, struct drm_gem_object, vma_node);
+		if (!kref_get_unless_zero(&obj->refcount))
+			obj = NULL;
+	}
+	drm_vma_offset_unlock_lookup(dev->vma_offset_manager);
+
+	if (!obj)
+		return NULL;
+
+	if (!drm_vma_node_is_allowed(node, priv)) {
+		drm_gem_object_put(obj);
+		return NULL;
+	}
+
+	if (drm_gem_shmem_object_mmap(obj, accessprot, off, size))
+		return NULL;
+
+	return &obj->uobj;
+}
 #endif
 
 /**

@@ -132,10 +132,9 @@ impl<T: DriverObject> Object<T> {
         get_sg_table: Some(bindings::BINDINGS_drm_gem_shmem_object_get_sg_table),
         vmap: Some(bindings::BINDINGS_drm_gem_shmem_object_vmap),
         vunmap: Some(bindings::BINDINGS_drm_gem_shmem_object_vunmap),
-        // mmap: Some(bindings::drm_gem_shmem_object_mmap),
-        mmap: None,
+        mmap: Some(bindings::drm_gem_shmem_object_mmap),
         status: None,
-        vm_ops: &SHMEM_VM_OPS,
+        vm_ops: core::ptr::null_mut(),
         evict: None,
     };
 

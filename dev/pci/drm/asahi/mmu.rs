@@ -241,32 +241,14 @@ impl VmInner {
         pgcount: usize,
         prot: u32,
     ) -> Result<usize> {
-        let mut left = pgcount;
-        while left > 0 {
-            let mapped_iova = self.map_iova(iova, pgsize * left)?;
-            let mapped =
-                self.page_table
-                    .map_pages(mapped_iova as usize, paddr, pgsize, left, prot)?;
-            assert!(mapped <= left * pgsize);
-
-            left -= mapped / pgsize;
-            paddr += mapped;
-            iova += mapped;
-        }
+        let mapped_iova = self.map_iova(iova, pgsize * pgcount)?;
+        let mapped = self.page_table.map_pages(mapped_iova as usize, paddr, pgsize, pgcount, prot)?;
+        assert_eq!(mapped, pgcount * pgsize);
         Ok(pgcount * pgsize)
     }
 
     /// Unmap a contiguous range of pages.
     fn unmap_pages(&mut self, mut iova: usize, pgsize: usize, pgcount: usize) -> Result<usize> {
-        /*let mut left = pgcount;
-        while left > 0 {
-            let mapped_iova = self.map_iova(iova, pgsize * left)?;
-            let unmapped = self.page_table.unmap_pages(mapped_iova, pgsize, left);
-            assert!(unmapped <= left * pgsize);
-
-            left -= unmapped / pgsize;
-            iova += unmapped;
-        }*/
         let mapped_iova = self.map_iova(iova, pgsize * pgcount)?;
         self.page_table.unmap_pages(mapped_iova, pgsize, pgcount);
 

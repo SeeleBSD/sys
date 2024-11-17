@@ -111,6 +111,8 @@ void drm_gem_shmem_vunmap(struct drm_gem_shmem_object *shmem,
 			  struct iosys_map *map);
 #ifdef __linux__
 int drm_gem_shmem_mmap(struct drm_gem_shmem_object *shmem, struct vm_area_struct *vma);
+#else
+struct uvm_object *drm_gem_shmem_mmap(struct file *flip, vm_prot_t accessprot, voff_t off, vsize_t size);
 #endif
 
 int drm_gem_shmem_madvise(struct drm_gem_shmem_object *shmem, int madv);
@@ -174,6 +176,7 @@ void BINDINGS_drm_gem_shmem_object_free(struct drm_gem_object *obj);
 static inline void drm_gem_shmem_object_print_info(struct drm_printer *p, unsigned int indent,
 						   const struct drm_gem_object *obj)
 {
+	printf("drm_gem_shmem_object_print_info\n");
 	const struct drm_gem_shmem_object *shmem = to_drm_gem_shmem_obj(obj);
 
 	drm_gem_shmem_print_info(shmem, p, indent);
@@ -191,6 +194,7 @@ void BINDINGS_drm_gem_shmem_object_print_info(struct drm_printer *p, unsigned in
  */
 static inline int drm_gem_shmem_object_pin(struct drm_gem_object *obj)
 {
+	printf("drm_gem_shmem_object_pin\n");
 	struct drm_gem_shmem_object *shmem = to_drm_gem_shmem_obj(obj);
 
 	return drm_gem_shmem_pin(shmem);
@@ -207,6 +211,7 @@ int BINDINGS_drm_gem_shmem_object_pin(struct drm_gem_object *obj);
  */
 static inline void drm_gem_shmem_object_unpin(struct drm_gem_object *obj)
 {
+	printf("drm_gem_shmem_object_unpin\n");
 	struct drm_gem_shmem_object *shmem = to_drm_gem_shmem_obj(obj);
 
 	drm_gem_shmem_unpin(shmem);
@@ -226,6 +231,7 @@ void BINDINGS_drm_gem_shmem_object_unpin(struct drm_gem_object *obj);
  */
 static inline struct sg_table *drm_gem_shmem_object_get_sg_table(struct drm_gem_object *obj)
 {
+	printf("drm_gem_shmem_object_get_sg_table\n");
 	struct drm_gem_shmem_object *shmem = to_drm_gem_shmem_obj(obj);
 
 	return drm_gem_shmem_get_sg_table(shmem);
@@ -247,6 +253,7 @@ struct sg_table *BINDINGS_drm_gem_shmem_object_get_sg_table(struct drm_gem_objec
 static inline int drm_gem_shmem_object_vmap(struct drm_gem_object *obj,
 					    struct iosys_map *map)
 {
+	printf("drm_gem_shmem_object_vmap\n");
 	struct drm_gem_shmem_object *shmem = to_drm_gem_shmem_obj(obj);
 
 	return drm_gem_shmem_vmap(shmem, map);
@@ -266,6 +273,7 @@ int BINDINGS_drm_gem_shmem_object_vmap(struct drm_gem_object *obj,
 static inline void drm_gem_shmem_object_vunmap(struct drm_gem_object *obj,
 					       struct iosys_map *map)
 {
+	printf("drm_gem_shmem_object_vunmap\n");
 	struct drm_gem_shmem_object *shmem = to_drm_gem_shmem_obj(obj);
 
 	drm_gem_shmem_vunmap(shmem, map);
@@ -292,6 +300,8 @@ static inline int drm_gem_shmem_object_mmap(struct drm_gem_object *obj, struct v
 
 	return drm_gem_shmem_mmap(shmem, vma);
 }
+#else
+int drm_gem_shmem_object_mmap(struct drm_gem_object *obj, vm_prot_t accessprot, voff_t off, vsize_t size);
 #endif
 
 /*
