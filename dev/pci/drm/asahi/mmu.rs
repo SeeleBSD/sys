@@ -235,22 +235,49 @@ impl VmInner {
     /// Map a contiguous range of virtual->physical pages.
     fn map_pages(
         &mut self,
-        mut iova: usize,
+        mut iova: u64,
         mut paddr: usize,
         pgsize: usize,
         pgcount: usize,
         prot: u32,
     ) -> Result<usize> {
-        let mapped_iova = self.map_iova(iova, pgsize * pgcount)?;
-        let mapped = self.page_table.map_pages(mapped_iova as usize, paddr, pgsize, pgcount, prot)?;
-        assert_eq!(mapped, pgcount * pgsize);
+        let mut left = pgcount;
+        while left > 0 {
+            let mapped_iova = self.map_iova(iova, pgsize * left)?;
+            let mapped =
+                self.page_table
+                    .map_pages(mapped_iova as usize, paddr, pgsize, left, prot)?;
+            assert!(mapped <= left * pgsize);
+
+            left -= mapped / pgsize;
+            paddr += mapped;
+            iova += mapped as u64;
+        }
         Ok(pgcount * pgsize)
     }
 
     /// Unmap a contiguous range of pages.
-    fn unmap_pages(&mut self, mut iova: usize, pgsize: usize, pgcount: usize) -> Result<usize> {
-        let mapped_iova = self.map_iova(iova, pgsize * pgcount)?;
-        self.page_table.unmap_pages(mapped_iova, pgsize, pgcount);
+    fn unmap_pages(&mut self, mut iova: u64, pgsize: usize, pgcount: usize) -> Result<usize> {
+        let mut left = pgcount;
+        while left > 0 {
+            let mapped_iova = self.map_iova(iova, pgsize * left)?;
+            let mut unmapped = self
+                .page_table
+                .unmap_pages(mapped_iova as usize, pgsize, left);
+            if unmapped == 0 {
+                dev_err!(
+                    self.dev,
+                    "unmap_pages {:#x}:{:#x} returned 0\n",
+                    mapped_iova,
+                    left
+                );
+                unmapped = pgsize; // Pretend we unmapped one page and try again...
+            }
+            assert!(unmapped <= left * pgsize);
+
+            left -= unmapped / pgsize;
+            iova += unmapped as u64;
+        }
 
         Ok(pgcount * pgsize)
     }
@@ -773,7 +800,6 @@ impl Vm {
                 quirks: 0,
 
                 dmat: unsafe { crate::DMAT.expect("Uninitialized") },
-                dmamap: unsafe { crate::DMAMAP.expect("Uninitialized") },
             },
             (),
         )?;

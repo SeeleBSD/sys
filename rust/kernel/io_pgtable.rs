@@ -25,7 +25,6 @@ pub struct Config {
     pub coherent_walk: bool,
 
     pub dmat: bindings::bus_dma_tag_t,
-    pub dmamap: bindings::bus_dmamap_t,
 }
 
 pub trait FlushOps {
@@ -81,7 +80,6 @@ pub trait IoPageTable: crate::private::Sealed {
             oas: config.oas.try_into()?,
             coherent_walk: config.coherent_walk,
             dmat: config.dmat,
-            dmamap: config.dmamap,
             tlb: &Self::FLUSH_OPS,
             iommu_dev: dev.raw_device(),
             alloc: None,

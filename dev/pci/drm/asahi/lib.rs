@@ -46,7 +46,6 @@ const __LOG_PREFIX: &'static str = "asahidrm";
 static mut INFO: Option<&'static HwConfig> = None;
 static mut PMAP: bindings::pmap_t = core::ptr::null_mut();
 static mut DMAT: Option<bindings::bus_dma_tag_t> = None;
-static mut DMAMAP: Option<bindings::bus_dmamap_t> = None;
 
 id_table! { ASAHI_ID_TABLE, &'static hw::HwConfig, [
     (c_str!("apple,agx-t8103"), Some(&hw::t8103::HWCONFIG)),
@@ -89,28 +88,14 @@ pub extern "C" fn asahidrm_attach(
         (*sc).sc_node = (*faa).fa_node;
         (*sc).sc_iot = (*faa).fa_iot;
         (*sc).sc_dmat = (*faa).fa_dmat;
-        assert_eq!(bindings::_dmamap_create((*sc).sc_dmat, mmu::UAT_PGSZ as u64, 1, mmu::UAT_PGSZ as u64, 0, 0, (&mut (*sc).sc_dmamap) as *mut bindings::bus_dmamap_t), 0);
-        // DMAT = Some((*sc).sc_dmat);
-        // DMAMAP = Some((*sc).sc_dmamap);
     }
 
     print!("\n");
 
     unsafe {
         (*sc).sc_pm = bindings::pmap_create();
-        // PMAP = (*sc).sc_pm;
         (*sc).sc_dev.faa = faa;
-        // (*sc).sc_ddev.driver = &drm::drv::Registration::<AsahiDriver>::VTABLE as *const _ as *mut _;
-        // (*sc).sc_ddev.managed.resources.next = &mut (*sc).sc_ddev.managed.resources as *mut _;
-        // (*sc).sc_ddev.managed.resources.prev = &mut (*sc).sc_ddev.managed.resources as *mut _;
-        // bindings::__mtx_init(
-            // &mut (*sc).sc_ddev.managed.lock as *mut _,
-            // bindings::IPL_VM as i32,
-        // );
-        // bindings::drm_gem_init(&mut (*sc).sc_ddev as *mut _);
         bindings::platform_device_register(&mut (*sc).sc_dev as *mut _);
-        // (*sc).sc_dev.node = (*sc).sc_node;
-        // (*sc).sc_ddev.dev = (&mut (*sc).sc_dev) as *mut bindings::platform_device as *mut bindings::device as *mut _;
         bindings::drm_attach_platform(
             &drm::drv::Registration::<AsahiDriver>::VTABLE as *const _ as *mut _,
             (*sc).sc_iot,
@@ -132,9 +117,7 @@ pub extern "C" fn asahidrm_attachhook(_self: *mut bindings::device) {
     }
     unsafe {
         DMAT = Some((*sc).sc_dmat);
-        DMAMAP = Some((*sc).sc_dmamap);
         PMAP = (*sc).sc_pm;
-        // (*sc).sc_ddev.dev = &mut (*sc).sc_dev as *mut bindings::platform_device as *mut _;
         bindings::drm_sched_fence_slab_init();
     }
     let cfg = unsafe { INFO.expect("No GPU information!") };
@@ -146,20 +129,15 @@ pub extern "C" fn asahidrm_attachhook(_self: *mut bindings::device) {
 
     let mut pdev =
         unsafe { platform::Device::from_ptr(&mut (*sc).sc_dev as *mut bindings::platform_device) };
-    info!("{}", unsafe { (*sc).sc_dev.num_resources });
     let res = regs::Resources::new(&mut pdev).expect("Failed to create res");
 
-    dbg!("variables init");
     res.init_mmio().ok();
     res.start_cpu().ok();
-    dbg!("started cpu");
 
     let node = of::Node::from_handle(unsafe { (*sc).sc_node }).unwrap();
-    // let node = dev.of_node().unwrap();
     let compat: Vec<u32> = node
         .get_property(c_str!("apple,firmware-compat"))
         .expect("Failed to get compat");
-    dbg!("get property");
 
     let gpu = unsafe {
         match (cfg.gpu_gen, cfg.gpu_variant, compat.as_slice()) {
@@ -195,7 +173,6 @@ pub extern "C" fn asahidrm_attachhook(_self: *mut bindings::device) {
             }
         }
     };
-    dbg!("get gpu manager");
 
     let data = kernel::new_device_data!(reg, res, AsahiData { dev, gpu }, "Asahi::Registrations").unwrap();
     let data: Arc<DeviceData> = data.into();
@@ -206,11 +183,6 @@ pub extern "C" fn asahidrm_attachhook(_self: *mut bindings::device) {
         unsafe { Pin::new_unchecked(&mut *data.registrations().unwrap()) },
         data.clone(),
         0).unwrap();
-    // unsafe {
-        // bindings::drm_dev_register(&mut (*sc).sc_ddev as *mut _, 0);
-    // }
-
-    info!("attached!");
 }
 
 #[no_mangle]
