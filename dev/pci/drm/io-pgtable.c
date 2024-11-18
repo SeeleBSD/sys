@@ -16,9 +16,6 @@
 
 #include <linux/io-pgtable.h>
 
-/* Define the number of page table formats */
-#define IO_PGTABLE_NUM_FMTS 1  /* Adjust this number as needed */
-
 /* Initialize the page table formats */
 static const struct io_pgtable_init_fns *
 io_pgtable_init_table[IO_PGTABLE_NUM_FMTS] = {

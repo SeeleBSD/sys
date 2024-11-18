@@ -10,6 +10,16 @@
  * Public API for use by IOMMU drivers
  */
 enum io_pgtable_fmt {
+	ARM_32_LPAE_S1,
+	ARM_32_LPAE_S2,
+	ARM_64_LPAE_S1,
+	ARM_64_LPAE_S2,
+	ARM_V7S,
+	ARM_MALI_LPAE,
+	AMD_IOMMU_V1,
+	AMD_IOMMU_V2,
+	APPLE_DART,
+	APPLE_DART2,
 	APPLE_UAT,
 	IO_PGTABLE_NUM_FMTS,
 };
@@ -84,6 +94,7 @@ struct io_pgtable_cfg {
 	#define IO_PGTABLE_QUIRK_ARM_MTK_TTBR_EXT	BIT(4)
 	#define IO_PGTABLE_QUIRK_ARM_TTBR1		BIT(5)
 	#define IO_PGTABLE_QUIRK_ARM_OUTER_WBWA		BIT(6)
+	#define IO_PGTABLE_QUIRK_ARM_HD			BIT(7)
 	unsigned long			quirks;
 	unsigned long			pgsize_bitmap;
 	unsigned int			ias;
@@ -94,8 +105,6 @@ struct io_pgtable_cfg {
 
 	/* DMA-related members */
     bus_dma_tag_t          dmat;
-    bus_dmamap_t           dmamap;
-    //bus_dma_segment_t      dma_segs[1]; /* Single segment */
 
 	/**
 	 * @alloc: Custom page allocator.
@@ -135,6 +144,37 @@ struct io_pgtable_cfg {
 			}	tcr;
 			u64	mair;
 		} arm_lpae_s1_cfg;
+
+		struct {
+			u64	vttbr;
+			struct {
+				u32	ps:3;
+				u32	tg:2;
+				u32	sh:2;
+				u32	orgn:2;
+				u32	irgn:2;
+				u32	sl:2;
+				u32	tsz:6;
+			}	vtcr;
+		} arm_lpae_s2_cfg;
+
+		struct {
+			u32	ttbr;
+			u32	tcr;
+			u32	nmrr;
+			u32	prrr;
+		} arm_v7s_cfg;
+
+		struct {
+			u64	transtab;
+			u64	memattr;
+		} arm_mali_lpae_cfg;
+
+		struct {
+			u64 ttbr[4];
+			u32 n_ttbrs;
+			u32 n_levels;
+		} apple_dart_cfg;
 
 		struct {
 			u64	ttbr;

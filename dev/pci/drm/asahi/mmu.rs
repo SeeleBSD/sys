@@ -222,20 +222,19 @@ impl VmInner {
 
     /// Map an IOVA to the shifted address the underlying io_pgtable uses.
     fn map_iova(&self, iova: usize, size: usize) -> Result<usize> {
-        /*if iova < self.min_va || (iova + size - 1) > self.max_va {
+        if iova < self.min_va || (iova + size - 1) > self.max_va {
             Err(EINVAL)
         } else if self.is_kernel {
             Ok(iova - self.min_va)
         } else {
             Ok(iova)
-        }*/
-        Ok(iova)
+        }
     }
 
     /// Map a contiguous range of virtual->physical pages.
     fn map_pages(
         &mut self,
-        mut iova: u64,
+        mut iova: usize,
         mut paddr: usize,
         pgsize: usize,
         pgcount: usize,
@@ -251,13 +250,13 @@ impl VmInner {
 
             left -= mapped / pgsize;
             paddr += mapped;
-            iova += mapped as u64;
+            iova += mapped;
         }
         Ok(pgcount * pgsize)
     }
 
     /// Unmap a contiguous range of pages.
-    fn unmap_pages(&mut self, mut iova: u64, pgsize: usize, pgcount: usize) -> Result<usize> {
+    fn unmap_pages(&mut self, mut iova: usize, pgsize: usize, pgcount: usize) -> Result<usize> {
         let mut left = pgcount;
         while left > 0 {
             let mapped_iova = self.map_iova(iova, pgsize * left)?;
@@ -276,7 +275,7 @@ impl VmInner {
             assert!(unmapped <= left * pgsize);
 
             left -= unmapped / pgsize;
-            iova += unmapped as u64;
+            iova += unmapped;
         }
 
         Ok(pgcount * pgsize)

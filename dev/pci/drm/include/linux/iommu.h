@@ -20,6 +20,10 @@ struct iommu_iotlb_gather {
 
 #define IOMMU_READ	0x0001
 #define IOMMU_WRITE	0x0002
+#define IOMMU_CACHE 0x0004
+#define IOMMU_NOEXEC 0x0008
+#define IOMMU_MMIO 0x0010
+#define IOMMU_PRIV 0x0020
 
 size_t	iommu_map_sgtable(struct iommu_domain *, u_long,
 	    struct sg_table *, int);

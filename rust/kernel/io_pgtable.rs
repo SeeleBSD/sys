@@ -270,7 +270,7 @@ macro_rules! iopt_type {
 iopt_cfg!(
     AppleUATCfg,
     apple_uat_cfg,
-    io_pgtable_cfg__bindgen_ty_1__bindgen_ty_2
+    io_pgtable_cfg__bindgen_ty_1__bindgen_ty_6
 );
 
 iopt_type!(AppleUAT, AppleUATCfg, io_pgtable_fmt_APPLE_UAT);
