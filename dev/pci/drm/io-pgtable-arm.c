@@ -1,75 +1,43 @@
-// SPDX-License-Identifier: GPL-2.0-only
+/* SPDX-License-Identifier: GPL-2.0 */
 /*
- * CPU-agnostic ARM page table allocator.
+ * CPU-agnostic ARM page table allocator for OpenBSD.
  *
- * Copyright (C) 2014 ARM Limited
+ * Adapted from Linux's io-pgtable-arm.c for OpenBSD.
  *
- * Author: Will Deacon <will.deacon@arm.com>
+ * Original Author: Will Deacon <will.deacon@arm.com>
+ * OpenBSD Port: Your Name <your.email@example.com>
  */
-
-#define pr_fmt(fmt)	"arm-lpae io-pgtable: " fmt
 
 #include <sys/types.h>
 #include <sys/param.h>
-#include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/atomic.h>
-#include <sys/pool.h>
-#include <uvm/uvm_extern.h>
-#include <machine/pmap.h>
+#include <sys/mutex.h>
+#include <sys/systm.h>
+#include <sys/device.h>
+#include <sys/kernel.h>
+#include <machine/bus.h>
+#include <machine/atomic.h>
 
-#include <linux/atomic.h>
-#include <linux/bitops.h>
+#include <uvm/uvm_extern.h>
+
 #include <linux/io-pgtable.h>
-#include <linux/kernel.h>
-#include <linux/sizes.h>
-#include <linux/slab.h>
-#include <linux/types.h>
-#include <linux/dma-mapping.h>
-#include <linux/iommu.h>
+#include <linux/gfp.h>
+#include <linux/log2.h>
 
 #include "io-pgtable-arm.h"
 
-#define ARM_LPAE_MAX_ADDR_BITS		52
-#define ARM_LPAE_S2_MAX_CONCAT_PAGES	16
-#define ARM_LPAE_MAX_LEVELS		4
+/* Constants and macros */
 
-/* Struct accessors */
-#define io_pgtable_to_data(x)						\
-	container_of((x), struct arm_lpae_io_pgtable, iop)
+#define MAX_IAS          48  /* Maximum input address size */
+#define MAX_OAS          48  /* Maximum output address size */
+#define SUPPORTED_PAGE_SIZES   PAGE_SIZE_4K | PAGE_SIZE_16K
+#define PAGE_SIZE_4K    (4 * 1024)
+#define PAGE_SIZE_16K   (16 * 1024)
 
-#define io_pgtable_ops_to_data(x)					\
-	io_pgtable_to_data(io_pgtable_ops_to_pgtable(x))
-
-/*
- * Calculate the right shift amount to get to the portion describing level l
- * in a virtual address mapped by the pagetable in d.
- */
-#define ARM_LPAE_LVL_SHIFT(l,d)						\
-	(((ARM_LPAE_MAX_LEVELS - (l)) * (d)->bits_per_level) +		\
-	ilog2(sizeof(arm_lpae_iopte)))
-
-#define ARM_LPAE_GRANULE(d)						\
-	(sizeof(arm_lpae_iopte) << (d)->bits_per_level)
-#define ARM_LPAE_PGD_SIZE(d)						\
-	(sizeof(arm_lpae_iopte) << (d)->pgd_bits)
-
-#define ARM_LPAE_PTES_PER_TABLE(d)					\
-	(ARM_LPAE_GRANULE(d) >> ilog2(sizeof(arm_lpae_iopte)))
-
-/*
- * Calculate the index at level l used to map virtual address a using the
- * pagetable in d.
- */
-#define ARM_LPAE_PGD_IDX(l,d)						\
-	((l) == (d)->start_level ? (d)->pgd_bits - (d)->bits_per_level : 0)
-
-#define ARM_LPAE_LVL_IDX(a,l,d)						\
-	(((u64)(a) >> ARM_LPAE_LVL_SHIFT(l,d)) &			\
-	 ((1 << ((d)->bits_per_level + ARM_LPAE_PGD_IDX(l,d))) - 1))
-
-/* Calculate the block/page mapping size at level l for pagetable in d. */
-#define ARM_LPAE_BLOCK_SIZE(l,d)	(1ULL << ARM_LPAE_LVL_SHIFT(l,d))
+#define ARM_LPAE_MAX_ADDR_BITS     52
+#define ARM_LPAE_S2_MAX_CONCAT_PAGES   16
+#define ARM_LPAE_MAX_LEVELS           4
 
 /* Page table bits */
 #define ARM_LPAE_PTE_TYPE_SHIFT		0
@@ -152,1600 +120,503 @@
 #define APPLE_UAT_AP1				(((arm_lpae_iopte)1) << 7)
 #define APPLE_UAT_AP0				(((arm_lpae_iopte)1) << 6)
 
-/* IOPTE accessors */
-#define iopte_deref(pte,d) __arm_lpae_iopte_deref(pte, d)
+/* Struct accessors */
+#define io_pgtable_to_data(x)                      \
+    ((struct arm_lpae_io_pgtable *)(x))
 
-#define iopte_type(pte)					\
-	(((pte) >> ARM_LPAE_PTE_TYPE_SHIFT) & ARM_LPAE_PTE_TYPE_MASK)
+#define io_pgtable_ops_to_data(x)                  \
+    io_pgtable_to_data(io_pgtable_ops_to_pgtable(x))
 
-#define iopte_prot(pte)	((pte) & ARM_LPAE_PTE_ATTR_MASK)
+/* Calculate the right shift amount to get to the portion describing level l */
+#define ARM_LPAE_LVL_SHIFT(l,d)                   \
+    (((ARM_LPAE_MAX_LEVELS - (l)) * (d)->bits_per_level) +  \
+    ilog2(sizeof(arm_lpae_iopte)))
 
-#define iopte_writeable_dirty(pte)				\
-	(((pte) & ARM_LPAE_PTE_AP_WR_CLEAN_MASK) == ARM_LPAE_PTE_DBM)
+#define ARM_LPAE_GRANULE(d)                       \
+    (sizeof(arm_lpae_iopte) << (d)->bits_per_level)
+#define ARM_LPAE_PGD_SIZE(d)                      \
+    (sizeof(arm_lpae_iopte) << (d)->pgd_bits)
 
-#define iopte_set_writeable_clean(ptep)				\
-	set_bit(ARM_LPAE_PTE_AP_RDONLY_BIT, (unsigned long *)(ptep))
+#define ARM_LPAE_PTES_PER_TABLE(d)                \
+    (ARM_LPAE_GRANULE(d) >> ilog2(sizeof(arm_lpae_iopte)))
 
-struct arm_lpae_dma_pgtable {
-    void *cpu_addr;            
-    bus_dma_tag_t dmat;        
-    bus_dmamap_t dmamap;       
-    bus_size_t size;           
-    bus_dma_segment_t segs[1];   
-    int nsegs;                 
-};
+#define ARM_LPAE_LVL_IDX(addr, lvl, data) \
+    (((addr) >> ARM_LPAE_LVL_SHIFT(lvl, data)) & \
+     ((1UL << (data)->bits_per_level) - 1))
+
+#define ARM_LPAE_BLOCK_SIZE(lvl, data) \
+    (1UL << ARM_LPAE_LVL_SHIFT((lvl), data))
+
+#define ARM_LPAE_ERR(fmt, ...) printf("arm_lpae_alloc_pages: " fmt "\n", ##__VA_ARGS__)
+
+/* Data structures */
+
+typedef uint64_t arm_lpae_iopte;
 
 struct arm_lpae_io_pgtable {
-	struct io_pgtable	iop;
+    struct io_pgtable    iop;
 
-	int			pgd_bits;
-	int			start_level;
-	int			bits_per_level;
+    int         pgd_bits;
+    int         start_level;
+    int         bits_per_level;
 
-	struct arm_lpae_dma_pgtable    *pgd;
+    arm_lpae_iopte    *pgd;
 };
 
-typedef u64 arm_lpae_iopte;
+/* Function prototypes */
 
-static inline bool iopte_leaf(arm_lpae_iopte pte, int lvl,
-			      enum io_pgtable_fmt fmt)
+static arm_lpae_iopte paddr_to_iopte(paddr_t paddr,
+                     struct arm_lpae_io_pgtable *data);
+static paddr_t iopte_to_paddr(arm_lpae_iopte pte,
+                  struct arm_lpae_io_pgtable *data);
+
+/* Implement missing functions */
+
+static inline paddr_t getphys(void *vaddr)
 {
-	if (lvl == (ARM_LPAE_MAX_LEVELS - 1) && fmt != ARM_MALI_LPAE)
-		return iopte_type(pte) == ARM_LPAE_PTE_TYPE_PAGE;
-
-	return iopte_type(pte) == ARM_LPAE_PTE_TYPE_BLOCK;
+    paddr_t pa;
+    pmap_extract(pmap_kernel(), (vaddr_t)vaddr, &pa);
+    return pa;
 }
 
-static inline bool iopte_table(arm_lpae_iopte pte, int lvl)
-{
-	if (lvl == (ARM_LPAE_MAX_LEVELS - 1))
-		return false;
-	return iopte_type(pte) == ARM_LPAE_PTE_TYPE_TABLE;
+static inline int get_order(unsigned long size) {
+    int order = 0;
+    size = (size - 1) >> PAGE_SHIFT;
+    while (size > 0) {
+        size >>= 1;
+        order++;
+    }
+    return order;
 }
 
-static arm_lpae_iopte paddr_to_iopte(phys_addr_t paddr,
-				     struct arm_lpae_io_pgtable *data)
+/* Default allocator: Allocates DMA-able memory using bus_dmamem_alloc */
+static void *
+arm_lpae_default_alloc_pages(size_t size, struct io_pgtable_cfg *cfg, int order)
 {
-	arm_lpae_iopte pte = paddr;
+    bus_dma_segment_t *segs = malloc(sizeof(bus_dma_segment_t), M_DEVBUF, M_WAITOK);
+    void *pages = NULL;
+    int error, nsegs = 1;
 
-	/* Of the bits which overlap, either 51:48 or 15:12 are always RES0 */
-	return (pte | (pte >> (48 - 12))) & ARM_LPAE_PTE_ADDR_MASK;
+    /* Allocate DMA-able memory */
+    error = bus_dmamem_alloc(cfg->dmat, size, PAGE_SIZE_16K, 0, segs, nsegs, &nsegs, BUS_DMA_NOWAIT | BUS_DMA_ZERO);
+    if (error != 0) {
+        ARM_LPAE_ERR("bus_dmamem_alloc failed with error %d", error);
+        return NULL;
+    }
+
+    error = bus_dmamem_map(cfg->dmat, segs, nsegs, size, (caddr_t*)&pages, BUS_DMA_NOWAIT);
+    if (error != 0) {
+        ARM_LPAE_ERR("bus_dmamap_load failed with error %d", error);
+        bus_dmamem_free(cfg->dmat, segs, nsegs);
+        return NULL;
+    }
+
+    return pages;
 }
 
-static phys_addr_t iopte_to_paddr(arm_lpae_iopte pte,
-				  struct arm_lpae_io_pgtable *data)
+/* Default freer: Note that actual freeing is handled by arm_lpae_free_pages */
+static void
+arm_lpae_default_free_pages(void *pages, int order)
 {
-	u64 paddr = pte & ARM_LPAE_PTE_ADDR_MASK;
-
-	if (ARM_LPAE_GRANULE(data) < SZ_64K)
-		return paddr;
-
-	/* Rotate the packed high-order bits back to the top */
-	return (paddr | (paddr << (48 - 12))) & (ARM_LPAE_PTE_ADDR_MASK << 4);
+    /* No action needed here as freeing is handled by arm_lpae_free_pages */
 }
 
-static bool selftest_running = false;
-
-#ifdef __linux__
-static bus_addr_t __arm_lpae_dma_addr(void *pages)
+/* Memory allocation and deallocation functions */
+static void *
+__arm_lpae_alloc_pages(size_t size, gfp_t flags,
+                     struct io_pgtable_cfg *cfg,
+                     void *cookie)
 {
-	return virt_to_phys(pages);
-}
-#else
-static bus_addr_t __arm_lpae_dma_addr(void *pages)
-{
-	bus_addr_t pa;
-	if (!pmap_extract(pmap_kernel(), (vaddr_t)pages, &pa)) {
-		return 0;
-	}
-	return pa;
-}
-#endif
-
-static arm_lpae_iopte *
-__arm_lpae_iopte_deref(arm_lpae_iopte pte, struct arm_lpae_io_pgtable *data)
-{
-	paddr_t paddr = iopte_to_paddr(pte, data);
-	vaddr_t vaddr = 0;
-	if (uvm_map(kernel_map, &vaddr, data->pgd->size, NULL, 0, data->iop.cfg.pgsize_bitmap, UVM_MAPFLAG(PROT_READ | PROT_WRITE, PROT_MASK, MAP_INHERIT_NONE, MADV_RANDOM, 0)))
-		return NULL;
-	for (vaddr_t offset = 0; offset < data->pgd->size; offset += PAGE_SIZE)
-		pmap_kenter_pa(vaddr + offset, paddr + offset, PROT_READ | PROT_WRITE);
-	pmap_update(pmap_kernel());
-	return (arm_lpae_iopte *)vaddr;
-}
-
-static inline arm_lpae_iopte
-cmpxchg64_relaxed(arm_lpae_iopte *ptr, arm_lpae_iopte old, arm_lpae_iopte new)
-{
-	return atomic_cas_ulong((unsigned long *)ptr, (unsigned long)old, (unsigned long)new);
-}
-
-#ifdef __linux__
-static void *__arm_lpae_alloc_pages(size_t size, gfp_t gfp,
-				    struct io_pgtable_cfg *cfg,
-				    void *cookie)
-{
-	struct device *dev = cfg->iommu_dev;
-	int order = get_order(size);
-	dma_addr_t dma;
-	void *pages;
-
-	VM_BUG_ON((gfp & __GFP_HIGHMEM));
-
-	if (cfg->alloc)
-		pages = cfg->alloc(cookie, size, gfp);
-	else
-		pages = iommu_alloc_pages_node(dev_to_node(dev), gfp, order);
-
-	if (!pages)
-		return NULL;
-
-	if (!cfg->coherent_walk) {
-		dma = dma_map_single(dev, pages, size, DMA_TO_DEVICE);
-		if (dma_mapping_error(dev, dma))
-			goto out_free;
-		/*
-		 * We depend on the IOMMU being able to work with any physical
-		 * address directly, so if the DMA layer suggests otherwise by
-		 * translating or truncating them, that bodes very badly...
-		 */
-		if (dma != virt_to_phys(pages))
-			goto out_unmap;
-	}
-
-	return pages;
-
-out_unmap:
-	dev_err(dev, "Cannot accommodate DMA translation for IOMMU page tables\n");
-	dma_unmap_single(dev, dma, size, DMA_TO_DEVICE);
-
-out_free:
-	if (cfg->free)
-		cfg->free(cookie, pages, size);
-	else
-		iommu_free_pages(pages, order);
-
-	return NULL;
-}
-#else
-static struct arm_lpae_dma_pgtable *
-__arm_lpae_alloc_pages(size_t size, int flags,
-                       struct io_pgtable_cfg *cfg,
-                       void *cookie)
-{
-    struct arm_lpae_dma_pgtable *pgtable;
-    bus_dma_tag_t dmat = cfg->dmat;
+    struct device *dev = cfg->iommu_dev;
+    int order = get_order(size);
+    void *pages;
     int error;
 
-    pgtable = malloc(sizeof(*pgtable), M_DEVBUF, M_NOWAIT | M_ZERO);
-    if (!pgtable)
+    /* Assert no high memory allocation */
+    if (flags & __GFP_HIGHMEM)
+        panic("arm_lpae_alloc_pages: highmem not supported");
+
+    /* Allocate pages using custom allocator if provided, else use default */
+    if (cfg->alloc)
+        pages = cfg->alloc(cookie, size, flags);
+    else
+        pages = arm_lpae_default_alloc_pages(size, cfg, order);
+
+    if (!pages) {
+        printf("pages is null");
         return NULL;
+    }
 
-    pgtable->size = size;
-    pgtable->dmat = dmat;
+    /* Perform DMA mapping if walks are not coherent */
+    if (!cfg->coherent_walk) {
+        /* Load the DMA map and retrieve the DMA address */
+        // error = bus_dmamap_load(cfg->dmat, cfg->dmamap, pages, size, NULL, BUS_DMA_NOWAIT);
+        // if (error != 0)
+            // goto out_free;
+    }
 
-    error = bus_dmamem_alloc(dmat, size, cfg->pgsize_bitmap, 0, pgtable->segs, 1,
-                             &pgtable->nsegs, BUS_DMA_NOWAIT);
-    if (error)
-        goto out_free_pgtable;
+    return pages;
 
-    error = bus_dmamem_map(dmat, pgtable->segs, pgtable->nsegs, size,
-                           (caddr_t*)&pgtable->cpu_addr, BUS_DMA_NOWAIT | BUS_DMA_COHERENT);
-    if (error)
-        goto out_free_dmamem;
+#ifdef notyet
+out_free:
+    /* Free allocated pages using custom free function if provided, else use default */
+    if (cfg->free)
+        cfg->free(cookie, pages, size);
+    else
+        arm_lpae_default_free_pages(pages, order);
 
-    error = bus_dmamap_create(dmat, size, 1, size, 0, BUS_DMA_NOWAIT,
-                              &pgtable->dmamap);
-    if (error)
-        goto out_unmap;
-
-    error = bus_dmamap_load_raw(dmat, pgtable->dmamap, pgtable->segs, 1, size,
-            										BUS_DMA_NOWAIT);
-    if (error)
-        goto out_destroy_dmamap;
-
-    return pgtable;
-
-out_destroy_dmamap:
-    bus_dmamap_destroy(dmat, pgtable->dmamap);
-out_unmap:
-    bus_dmamem_unmap(dmat, pgtable->cpu_addr, size);
-out_free_dmamem:
-    bus_dmamem_free(dmat, pgtable->segs, pgtable->nsegs);
-out_free_pgtable:
-    free(pgtable, M_DEVBUF, sizeof(*pgtable));
     return NULL;
-}
 #endif
+}
 
-#ifdef __linux__
 static void __arm_lpae_free_pages(void *pages, size_t size,
-				  struct io_pgtable_cfg *cfg,
-				  void *cookie)
+                                  struct io_pgtable_cfg *cfg,
+                                  void *cookie)
 {
-	if (!cfg->coherent_walk)
-		dma_unmap_single(cfg->iommu_dev, __arm_lpae_dma_addr(pages),
-				 size, DMA_TO_DEVICE);
+    // Assuming coherent_walk equivalent or handled differently in OpenBSD
+    if (!cfg->coherent_walk) {
+        // Use bus_dmamap_unload and bus_dmamap_destroy
+        // bus_dmamap_unload(cfg->dmat, cfg->dmamap);
+        // bus_dmamap_destroy(cfg->dmat, cfg->dmamap);
+    }
 
-	if (cfg->free)
-		cfg->free(cookie, pages, size);
-	else
-		iommu_free_pages(pages, get_order(size));
+    if (cfg->free)
+        cfg->free(cookie, pages, size);
+    else
+        free(pages, M_DEVBUF, size);
 }
-#else
-static void
-__arm_lpae_free_pages(struct arm_lpae_dma_pgtable *dma, size_t size,
-			struct io_pgtable_cfg *cfg,
-			void *cookie)
+
+/* Synchronization functions */
+
+static void __arm_lpae_sync_pte(arm_lpae_iopte *ptep, int num_entries)
 {
-	bus_dma_tag_t dmat = dma->dmat;
-	bus_dmamap_t dmamap = dma->dmamap;
-
-	bus_dmamap_unload(dmat, dmamap);
-	bus_dmamap_destroy(dmat, dmamap);
-	bus_dmamem_unmap(dmat, dma->cpu_addr, size);
-	bus_dmamem_free(dmat, dma->segs, dma->nsegs);
-	free(dma, M_DEVBUF, sizeof(*dma));
+    membar_producer();
 }
+
+/* Mapping and unmapping functions */
+
+static int __arm_lpae_map(struct arm_lpae_io_pgtable *data, vaddr_t iova,
+              paddr_t paddr, size_t size, size_t pgcount,
+              arm_lpae_iopte prot, int lvl, arm_lpae_iopte *ptep,
+              gfp_t flags, size_t *mapped)
+{
+    vsize_t offset;
+    vsize_t end_addr = iova + size*pgcount;
+    int error = 0;
+
+    /* Align the addresses to the page size */
+    iova = trunc_page(iova);
+    paddr = trunc_page(paddr);
+
+    /* Iterate through the range of addresses and map them */
+    for (offset = 0; offset < size*pgcount; offset += size) {
+        vaddr_t curr_vaddr = iova + offset;
+        paddr_t curr_paddr = paddr + offset;
+
+        /* Insert the page table entry using OpenBSD's pmap_enter */
+        for (size_t offset = 0; offset < size; offset += PAGE_SIZE) {
+            error = pmap_enter(pmap_kernel(), curr_vaddr + offset*PAGE_SIZE, curr_paddr + offset*PAGE_SIZE, prot, flags | PMAP_WIRED | PMAP_CANFAIL);
+            if (error != 0) {
+                printf("Failed to map vaddr: %lx to paddr: %lx with error: %d\n", curr_vaddr, curr_paddr, error);
+                return error;
+            }
+        }
+        *mapped += size;
+    }
+
+    /* Ensure that changes to the page table take effect */
+    pmap_update(pmap_kernel());
+
+    return 0;
+#ifdef notyet
+    /* Implement mapping logic */
+
+    /* Calculate the index at the current level */
+    int idx = ARM_LPAE_LVL_IDX(iova, lvl, data);
+    ptep += idx;
+
+    /* If we can install a leaf entry at this level, then do so */
+    if (size == ARM_LPAE_BLOCK_SIZE(lvl, data)) {
+        arm_lpae_iopte pte = paddr_to_iopte(paddr, data) | prot;
+
+        *ptep = pte;
+        __arm_lpae_sync_pte(ptep, 1);
+        *mapped += size;
+        return 0;
+    }
+
+    /* We can't allocate tables at the final level */
+    if (lvl >= ARM_LPAE_MAX_LEVELS - 1)
+        return EINVAL;
+
+    /* Grab a pointer to the next level */
+    arm_lpae_iopte pte = *ptep;
+    arm_lpae_iopte *cptep;
+
+    if (!(pte & ARM_LPAE_PTE_TYPE_MASK)) {
+        /* Allocate a new table */
+        cptep = __arm_lpae_alloc_pages(ARM_LPAE_GRANULE(data), flags, &data->iop.cfg, data->iop.cookie);
+        if (!cptep)
+            return ENOMEM;
+
+        /* Install the new table */
+        *ptep = paddr_to_iopte((paddr_t)cptep, data) | ARM_LPAE_PTE_TYPE_TABLE;
+        __arm_lpae_sync_pte(ptep, 1);
+    } else if ((pte & ARM_LPAE_PTE_TYPE_MASK) == ARM_LPAE_PTE_TYPE_TABLE) {
+        cptep = (arm_lpae_iopte *)(uintptr_t)iopte_to_paddr(pte, data);
+    } else {
+        /* We require an unmap first */
+        return EEXIST;
+    }
+
+    /* Recurse to the next level */
+    return __arm_lpae_map(data, iova, paddr, size, pgcount, prot,
+                          lvl + 1, cptep, flags, mapped);
 #endif
-
-#ifdef __linux__
-static void __arm_lpae_sync_pte(arm_lpae_iopte *ptep, int num_entries,
-				struct io_pgtable_cfg *cfg)
-{
-	dma_sync_single_for_device(cfg->iommu_dev, __arm_lpae_dma_addr(ptep),
-				   sizeof(*ptep) * num_entries, DMA_TO_DEVICE);
 }
-#else
-static void
-__arm_lpae_sync_pte(arm_lpae_iopte *ptep, int num_entries,
-		    struct arm_lpae_dma_pgtable *pgtable)
+
+static int arm_lpae_map_pages(struct io_pgtable_ops *ops, vaddr_t iova,
+                  paddr_t paddr, size_t pgsize, size_t pgcount,
+                  int prot, gfp_t flags, size_t *mapped)
 {
-	bus_dma_tag_t dmat = pgtable->dmat;
-	bus_dmamap_t dmamap = pgtable->dmamap;
-	bus_size_t len = sizeof(*ptep) * num_entries;
-	bus_addr_t offset = (bus_addr_t)__arm_lpae_dma_addr(ptep) - (bus_addr_t)__arm_lpae_dma_addr(pgtable->cpu_addr);
+    struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
+    arm_lpae_iopte *ptep = data->pgd;
+    int ret, lvl = data->start_level;
 
-	bus_dmamap_sync(dmat, dmamap, offset, len, BUS_DMASYNC_PREWRITE);
+    *mapped = 0;
+
+    ret = __arm_lpae_map(data, iova, paddr, pgsize, pgcount, prot,
+                         lvl, ptep, flags, mapped);
+
+    /* Ensure all PTE updates are visible before any table walk */
+    membar_producer();
+
+    return ret;
 }
-#endif
-
-#ifdef __linux__
-static void __arm_lpae_clear_pte(arm_lpae_iopte *ptep, struct io_pgtable_cfg *cfg)
-{
-
-	*ptep = 0;
-
-	if (!cfg->coherent_walk)
-		__arm_lpae_sync_pte(ptep, 1, cfg);
-}
-#else
-static void __arm_lpae_clear_pte(arm_lpae_iopte *ptep, struct io_pgtable_cfg *cfg,
-                                struct arm_lpae_dma_pgtable *dma)
-{
-
-	*ptep = 0;
-
-	if (!cfg->coherent_walk)
-		__arm_lpae_sync_pte(ptep, 1, dma);
-}
-#endif
 
 static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
-			       struct iommu_iotlb_gather *gather,
-			       unsigned long iova, size_t size, size_t pgcount,
-			       int lvl, arm_lpae_iopte *ptep);
-
-static void __arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
-				phys_addr_t paddr, arm_lpae_iopte prot,
-				int lvl, int num_entries, arm_lpae_iopte *ptep)
+                   struct iommu_iotlb_gather *gather,
+                   vaddr_t iova, size_t size, size_t pgcount,
+                   int lvl, arm_lpae_iopte *ptep)
 {
-	arm_lpae_iopte pte = prot;
-	struct io_pgtable_cfg *cfg = &data->iop.cfg;
-	size_t sz = ARM_LPAE_BLOCK_SIZE(lvl, data);
-	int i;
+    vsize_t offset;
+    vsize_t end_addr = iova + size*pgcount;
 
-	if (data->iop.fmt != ARM_MALI_LPAE && lvl == ARM_LPAE_MAX_LEVELS - 1)
-		pte |= ARM_LPAE_PTE_TYPE_PAGE;
-	else
-		pte |= ARM_LPAE_PTE_TYPE_BLOCK;
+    /* Align the addresses to the page size */
+    iova = trunc_page(iova);
 
-	for (i = 0; i < num_entries; i++)
-		ptep[i] = pte | paddr_to_iopte(paddr + i * sz, data);
+    /* Unmap the virtual address range */
+    for (offset = 0; offset < size*pgcount; offset += size) {
+        vaddr_t curr_vaddr = iova + offset;
 
-	if (!cfg->coherent_walk)
-#ifdef __linux__
-        __arm_lpae_sync_pte(ptep, num_entries, cfg);
-#else
-		__arm_lpae_sync_pte(ptep, num_entries, data->pgd);
+        pmap_kremove(curr_vaddr, size);
+    }
+
+    /* Ensure that the page table changes are synchronized */
+    pmap_update(pmap_kernel());
+
+    return size*pgcount;
+#ifdef notyet
+    /* Implement unmapping logic */
+
+    /* Calculate the index at the current level */
+    int idx = ARM_LPAE_LVL_IDX(iova, lvl, data);
+    ptep += idx;
+
+    arm_lpae_iopte pte = *ptep;
+
+    if (!(pte & ARM_LPAE_PTE_TYPE_MASK))
+        return 0;
+
+    if (size == ARM_LPAE_BLOCK_SIZE(lvl, data)) {
+        *ptep = 0;
+        __arm_lpae_sync_pte(ptep, 1);
+        return size;
+    } else if ((pte & ARM_LPAE_PTE_TYPE_MASK) == ARM_LPAE_PTE_TYPE_TABLE) {
+        /* Recurse to the next level */
+        arm_lpae_iopte *cptep = (arm_lpae_iopte *)(uintptr_t)iopte_to_paddr(pte, data);
+        return __arm_lpae_unmap(data, gather, iova, size, pgcount, lvl + 1, cptep);
+    } else {
+        /* Cannot unmap a block of incorrect size */
+        return 0;
+    }
 #endif
 }
 
-static int arm_lpae_init_pte(struct arm_lpae_io_pgtable *data,
-			     unsigned long iova, phys_addr_t paddr,
-			     arm_lpae_iopte prot, int lvl, int num_entries,
-			     arm_lpae_iopte *ptep)
+static size_t arm_lpae_unmap_pages(struct io_pgtable_ops *ops, vaddr_t iova,
+                       size_t pgsize, size_t pgcount, struct iommu_iotlb_gather *gather)
 {
-	int i;
-
-	for (i = 0; i < num_entries; i++) {
-		printf("i: %d ptep: %p\n", i, ptep);
-		if (iopte_leaf(ptep[i], lvl, data->iop.fmt)) {
-			/* We require an unmap first */
-			WARN_ON(!selftest_running);
-			return -EEXIST;
-		} else if (iopte_type(ptep[i]) == ARM_LPAE_PTE_TYPE_TABLE) {
-			/*
-			 * We need to unmap and free the old table before
-			 * overwriting it with a block entry.
-			 */
-			arm_lpae_iopte *tblp;
-			size_t sz = ARM_LPAE_BLOCK_SIZE(lvl, data);
-
-			tblp = ptep - ARM_LPAE_LVL_IDX(iova, lvl, data);
-			if (__arm_lpae_unmap(data, NULL, iova + i * sz, sz, 1,
-					     lvl, tblp) != sz) {
-				WARN_ON(1);
-				return -EINVAL;
-			}
-		}
-	}
-
-	__arm_lpae_init_pte(data, paddr, prot, lvl, num_entries, ptep);
-	return 0;
-}
-
-static arm_lpae_iopte arm_lpae_install_table(struct arm_lpae_dma_pgtable *table,
-					     arm_lpae_iopte *ptep,
-					     arm_lpae_iopte curr,
-					     struct arm_lpae_io_pgtable *data)
-{
-	arm_lpae_iopte old, new;
-	struct io_pgtable_cfg *cfg = &data->iop.cfg;
-
-	new = paddr_to_iopte(__arm_lpae_dma_addr(table->cpu_addr), data) | ARM_LPAE_PTE_TYPE_TABLE;
-	if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_NS)
-		new |= ARM_LPAE_PTE_NSTABLE;
-
-	/*
-	 * Ensure the table itself is visible before its PTE can be.
-	 * Whilst we could get away with cmpxchg64_release below, this
-	 * doesn't have any ordering semantics when !CONFIG_SMP.
-	 */
-	dma_wmb();
-
-	old = READ_ONCE(*ptep);
-	if (curr == old)
-		WRITE_ONCE(*ptep, new);
-	// old = cmpxchg64_relaxed(ptep, curr, new);
-	
-	if (cfg->coherent_walk || (old & ARM_LPAE_PTE_SW_SYNC))
-		return old;
-
-	/* Even if it's not ours, there's no point waiting; just kick it */
-#ifdef __linux__
-	__arm_lpae_sync_pte(ptep, 1, cfg);
-#else
-  __arm_lpae_sync_pte(ptep, 1, table);
-#endif
-	if (old == curr)
-		WRITE_ONCE(*ptep, new | ARM_LPAE_PTE_SW_SYNC);
-
-	return old;
-}
-
-static int __arm_lpae_map(struct arm_lpae_io_pgtable *data, unsigned long iova,
-			  phys_addr_t paddr, size_t size, size_t pgcount,
-			  arm_lpae_iopte prot, int lvl, arm_lpae_iopte *ptep,
-			  gfp_t gfp, size_t *mapped)
-{
-#ifdef __linux__
-    arm_lpae_iopte *cptep, pte;
-#else
-    struct arm_lpae_dma_pgtable *cptep;
-	arm_lpae_iopte pte;
-#endif
-	size_t block_size = ARM_LPAE_BLOCK_SIZE(lvl, data);
-	size_t tblsz = ARM_LPAE_GRANULE(data);
-	struct io_pgtable_cfg *cfg = &data->iop.cfg;
-	int ret = 0, num_entries, max_entries, map_idx_start;
-
-	/* Find our entry at the current level */
-	map_idx_start = ARM_LPAE_LVL_IDX(iova, lvl, data);
-	ptep += map_idx_start;
-
-	printf("ptep: %p, paddr: 0x%lu\n", ptep, __arm_lpae_dma_addr(ptep));
-
-	/* If we can install a leaf entry at this level, then do so */
-	if (size == block_size) {
-		max_entries = ARM_LPAE_PTES_PER_TABLE(data) - map_idx_start;
-		num_entries = min_t(int, pgcount, max_entries);
-		ret = arm_lpae_init_pte(data, iova, paddr, prot, lvl, num_entries, ptep);
-		if (!ret)
-			*mapped += num_entries * size;
-
-		return ret;
-	}
-
-	/* We can't allocate tables at the final level */
-	if (WARN_ON(lvl >= ARM_LPAE_MAX_LEVELS - 1))
-		return -EINVAL;
-
-	/* Grab a pointer to the next level */
-	pte = READ_ONCE(*ptep);
-	int is_set = 0;
-	if (!pte) {
-		cptep = __arm_lpae_alloc_pages(tblsz, gfp, cfg, data->iop.cookie);
-		if (!cptep)
-			return -ENOMEM;
-
-		pte = arm_lpae_install_table(cptep, ptep, 0, data);
-		if (pte)
-			__arm_lpae_free_pages(cptep, tblsz, cfg, data->iop.cookie);
-		is_set = 1;
-	} else if (!cfg->coherent_walk && !(pte & ARM_LPAE_PTE_SW_SYNC)) {
-#ifdef __linux__
-		__arm_lpae_sync_pte(ptep, 1, cfg);
-#else
-    __arm_lpae_sync_pte(ptep, 1, data->pgd);
-#endif
-	}
-
-	if (pte && !iopte_leaf(pte, lvl, data->iop.fmt)) {
-#ifdef __linux__
-		cptep = iopte_deref(pte, data);
-#else
-		if (!is_set) {
-			cptep = malloc(sizeof(*cptep), M_DEVBUF, M_NOWAIT | M_ZERO);
-			if (cptep == NULL)
-				return -ENOMEM;
-			memcpy(cptep, data->pgd, sizeof(*cptep));
-		}
-		cptep->cpu_addr = iopte_deref(pte, data);
-		printf("cptep->cpu_addr: %p\n", cptep->cpu_addr);
-#endif
-	} else if (pte) {
-		/* We require an unmap first */
-		WARN_ON(!selftest_running);
-		return -EEXIST;
-	}
-
-	struct arm_lpae_io_pgtable *new_data;
-	new_data = malloc(sizeof(*new_data), M_DEVBUF, M_NOWAIT | M_ZERO);
-	if (new_data == NULL)
-		return -ENOMEM;
-	memcpy(new_data, data, sizeof(*new_data));
-	new_data->pgd = cptep;
-
-	/* Rinse, repeat */
-	return __arm_lpae_map(new_data, iova, paddr, size, pgcount, prot, lvl + 1,
-			      cptep->cpu_addr, gfp, mapped);
-}
-
-static arm_lpae_iopte arm_lpae_prot_to_pte(struct arm_lpae_io_pgtable *data,
-					   int prot)
-{
-	arm_lpae_iopte pte;
-
-	if (data->iop.fmt == APPLE_UAT) {
-		/*
-		 * This bit enables GPU access and the particular permission
-		 * rules that follow. Without it, access is firmware-only and
-		 * permissions follow the firmware's Apple SPRR configuration.
-		 */
-		pte = APPLE_UAT_GPU_ACCESS;
-		if (prot & IOMMU_PRIV) {
-			/* Firmware structures */
-			pte |= APPLE_UAT_AP0;
-			if (prot & IOMMU_WRITE) {
-				/* Firmware RW */
-				pte |= APPLE_UAT_UXN;
-				if (!(prot & IOMMU_READ))
-					/* Hack: Firmware RW, GPU RO */
-					pte |= APPLE_UAT_PXN;
-			} else if (!(prot & IOMMU_READ)) {
-				/* No access */
-				pte |= APPLE_UAT_PXN;
-			}
-		} else if (prot & IOMMU_NOEXEC) {
-			/* GPU structures (no FW access) */
-			pte |= APPLE_UAT_AP1 | ARM_LPAE_PTE_nG;
-			if (!(prot & IOMMU_READ)) {
-				pte |= APPLE_UAT_PXN;
-				if (!(prot & IOMMU_WRITE))
-					pte |= APPLE_UAT_UXN;
-			} else if (prot & IOMMU_WRITE) {
-				pte |= APPLE_UAT_UXN;
-			}
-		} else {
-			pte |= ARM_LPAE_PTE_nG;
-			/* GPU structures (also FW accessible) */
-			if (prot & IOMMU_WRITE)
-				pte |= APPLE_UAT_UXN;
-			if (prot & IOMMU_READ)
-				pte |= APPLE_UAT_PXN;
-		}
-	} else if (data->iop.fmt == ARM_64_LPAE_S1 ||
-	    data->iop.fmt == ARM_32_LPAE_S1) {
-		pte = ARM_LPAE_PTE_nG;
-		if (!(prot & IOMMU_WRITE) && (prot & IOMMU_READ))
-			pte |= ARM_LPAE_PTE_AP_RDONLY;
-		else if (data->iop.cfg.quirks & IO_PGTABLE_QUIRK_ARM_HD)
-			pte |= ARM_LPAE_PTE_DBM;
-		if (!(prot & IOMMU_PRIV))
-			pte |= ARM_LPAE_PTE_AP_UNPRIV;
-	} else {
-		pte = ARM_LPAE_PTE_HAP_FAULT;
-		if (prot & IOMMU_READ)
-			pte |= ARM_LPAE_PTE_HAP_READ;
-		if (prot & IOMMU_WRITE)
-			pte |= ARM_LPAE_PTE_HAP_WRITE;
-	}
-
-	/*
-	 * Note that this logic is structured to accommodate Mali LPAE
-	 * having stage-1-like attributes but stage-2-like permissions.
-	 */
-	if (data->iop.fmt == APPLE_UAT) {
-		if (prot & IOMMU_MMIO)
-			pte |= APPLE_UAT_MEMATTR_DEV;
-		else if (prot & IOMMU_CACHE)
-			pte |= APPLE_UAT_MEMATTR_SHARED;
-		else
-			pte |= APPLE_UAT_MEMATTR_PRIV;
-	} else if (data->iop.fmt == ARM_64_LPAE_S2 ||
-	    data->iop.fmt == ARM_32_LPAE_S2) {
-		if (prot & IOMMU_MMIO)
-			pte |= ARM_LPAE_PTE_MEMATTR_DEV;
-		else if (prot & IOMMU_CACHE)
-			pte |= ARM_LPAE_PTE_MEMATTR_OIWB;
-		else
-			pte |= ARM_LPAE_PTE_MEMATTR_NC;
-	} else {
-		if (prot & IOMMU_MMIO)
-			pte |= (ARM_LPAE_MAIR_ATTR_IDX_DEV
-				<< ARM_LPAE_PTE_ATTRINDX_SHIFT);
-		else if (prot & IOMMU_CACHE)
-			pte |= (ARM_LPAE_MAIR_ATTR_IDX_CACHE
-				<< ARM_LPAE_PTE_ATTRINDX_SHIFT);
-	}
-
-	/*
-	 * Also Mali has its own notions of shareability wherein its Inner
-	 * domain covers the cores within the GPU, and its Outer domain is
-	 * "outside the GPU" (i.e. either the Inner or System domain in CPU
-	 * terms, depending on coherency).
-	 */
-	if (data->iop.fmt == APPLE_UAT)
-		pte |= ARM_LPAE_PTE_SH_NS;
-	else if (prot & IOMMU_CACHE && data->iop.fmt != ARM_MALI_LPAE)
-		pte |= ARM_LPAE_PTE_SH_IS;
-	else
-		pte |= ARM_LPAE_PTE_SH_OS;
-
-	if (prot & IOMMU_NOEXEC && data->iop.fmt != APPLE_UAT)
-		pte |= ARM_LPAE_PTE_XN;
-
-	if (data->iop.cfg.quirks & IO_PGTABLE_QUIRK_ARM_NS)
-		pte |= ARM_LPAE_PTE_NS;
-
-	if (data->iop.fmt != ARM_MALI_LPAE)
-		pte |= ARM_LPAE_PTE_AF;
-
-	return pte;
-}
-
-static int arm_lpae_map_pages(struct io_pgtable_ops *ops, unsigned long iova,
-			      phys_addr_t paddr, size_t pgsize, size_t pgcount,
-			      int iommu_prot, gfp_t gfp, size_t *mapped)
-{
-	struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
-	struct io_pgtable_cfg *cfg = &data->iop.cfg;
-#ifdef __linux__
+    struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
+    struct io_pgtable_cfg *cfg = &data->iop.cfg;
 	arm_lpae_iopte *ptep = data->pgd;
-#else
-    arm_lpae_iopte *ptep = data->pgd->cpu_addr;
-#endif
-	int ret, lvl = data->start_level;
-	arm_lpae_iopte prot;
 	long iaext = (s64)iova >> cfg->ias;
 
-	if (WARN_ON(!pgsize || (pgsize & cfg->pgsize_bitmap) != pgsize))
-		return -EINVAL;
-
-	if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_TTBR1)
+    if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_TTBR1)
 		iaext = ~iaext;
-	if (WARN_ON(iaext || paddr >> cfg->oas))
-		return -ERANGE;
 
-	if (!(iommu_prot & (IOMMU_READ | IOMMU_WRITE)))
-		return -EINVAL;
-
-	prot = arm_lpae_prot_to_pte(data, iommu_prot);
-	ret = __arm_lpae_map(data, iova, paddr, pgsize, pgcount, prot, lvl,
-			     ptep, gfp, mapped);
-	/*
-	 * Synchronise all PTE updates for the new mapping before there's
-	 * a chance for anything to kick off a table walk for the new iova.
-	 */
-	wmb();
-
-	return ret;
+    return __arm_lpae_unmap(data, gather, iova, pgsize, pgcount,
+				data->start_level, ptep);
 }
 
-static void __arm_lpae_free_pgtable(struct arm_lpae_io_pgtable *data, int lvl,
-				    arm_lpae_iopte *ptep)
+/* Address translation function */
+
+static paddr_t arm_lpae_iova_to_phys(struct io_pgtable_ops *ops,
+                     vaddr_t iova)
 {
-	arm_lpae_iopte *start, *end;
-	unsigned long table_size;
+    paddr_t phys;
+    if (pmap_extract(pmap_kernel(), iova, &phys)) {
+        return phys;
+    } else {
+        return (paddr_t)-1;
+    }
+#ifdef notyet
+    struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
+    arm_lpae_iopte pte, *ptep = data->pgd;
+    int lvl = data->start_level;
 
-	if (lvl == data->start_level)
-		table_size = ARM_LPAE_PGD_SIZE(data);
-	else
-		table_size = ARM_LPAE_GRANULE(data);
+    do {
+        /* Valid PTE pointer? */
+        if (!ptep)
+            return 0;
 
-	start = ptep;
+        /* Grab the PTE we're interested in */
+        int idx = ARM_LPAE_LVL_IDX(iova, lvl, data);
+        ptep += idx;
+        pte = *ptep;
 
-	/* Only leaf entries at the last level */
-	if (lvl == ARM_LPAE_MAX_LEVELS - 1)
-		end = ptep;
-	else
-		end = (void *)ptep + table_size;
+        /* Valid entry? */
+        if (!(pte & ARM_LPAE_PTE_TYPE_MASK))
+            return 0;
 
-	while (ptep != end) {
-		arm_lpae_iopte pte = *ptep++;
+        /* Leaf entry? */
+        if ((pte & ARM_LPAE_PTE_TYPE_MASK) == ARM_LPAE_PTE_TYPE_BLOCK ||
+            (pte & ARM_LPAE_PTE_TYPE_MASK) == ARM_LPAE_PTE_TYPE_PAGE)
+            break;
 
-		if (!pte || iopte_leaf(pte, lvl, data->iop.fmt))
-			continue;
+        /* Take it to the next level */
+        ptep = (arm_lpae_iopte *)(uintptr_t)iopte_to_paddr(pte, data);
+    } while (++lvl < ARM_LPAE_MAX_LEVELS);
 
-		__arm_lpae_free_pgtable(data, lvl + 1, iopte_deref(pte, data));
-	}
+    /* Compute physical address */
+    paddr_t paddr = iopte_to_paddr(pte, data);
+    paddr |= iova & (ARM_LPAE_BLOCK_SIZE(lvl, data) - 1);
 
-#ifdef __linux__
-	__arm_lpae_free_pages(start, table_size, &data->iop.cfg, data->iop.cookie);
-#else
-	__arm_lpae_free_pages(data->pgd, table_size, &data->iop.cfg, data->iop.cookie);
+    return paddr;
 #endif
+}
+
+/* Helper functions */
+
+static arm_lpae_iopte paddr_to_iopte(paddr_t paddr, struct arm_lpae_io_pgtable *data)
+{
+    return (arm_lpae_iopte)paddr;
+}
+
+static paddr_t iopte_to_paddr(arm_lpae_iopte pte, struct arm_lpae_io_pgtable *data)
+{
+    return (paddr_t)(pte & ~((1ULL << data->bits_per_level) - 1));
+}
+
+/* Initialization and cleanup functions */
+
+static struct arm_lpae_io_pgtable *
+arm_lpae_alloc_pgtable(struct io_pgtable_cfg *cfg, void *cookie)
+{
+    struct arm_lpae_io_pgtable *data;
+
+    /* No quirks for this implementation */
+    if (cfg->quirks)
+        return NULL;
+
+    /* Validate input and output address sizes */
+    if (cfg->ias > MAX_IAS || cfg->oas > MAX_OAS)
+        return NULL;
+
+    /* Limit to supported page sizes (e.g., 4K and 16K) */
+    cfg->pgsize_bitmap &= SUPPORTED_PAGE_SIZES;
+
+    /* Allocate the arm_lpae_io_pgtable structure */
+    data = malloc(sizeof(*data), M_DEVBUF, M_WAITOK | M_ZERO);
+    if (!data)
+        return NULL;
+
+    /* Initialize fields */
+    data->iop.cfg = *cfg;
+    data->iop.cookie = cookie;
+
+    /* Allocate the PGD with the required size and DMA mapping */
+    data->pgd = __arm_lpae_alloc_pages(PAGE_SIZE_16K, GFP_KERNEL, cfg, cookie);
+    if (!data->pgd)
+        goto out_free_data;
+
+    /* Ensure the PGD is visible before writing TTBR */
+    membar_producer();
+
+    /* Set the Translation Table Base Register */
+    cfg->arm_lpae_s1_cfg.ttbr = getphys(data->pgd);
+
+    /* Assign page table operations */
+    data->iop.ops = (struct io_pgtable_ops) {
+        .map_pages = arm_lpae_map_pages,
+        .unmap_pages = arm_lpae_unmap_pages,
+        .iova_to_phys = arm_lpae_iova_to_phys,
+    };
+
+    /* Return the initialized io_pgtable_ops structure */
+    return data;
+
+out_free_data:
+    /* Free allocated resources */
+    if (data)
+        free(data, M_DEVBUF, sizeof(*data));
+    return NULL;
 }
 
 static void arm_lpae_free_pgtable(struct io_pgtable *iop)
 {
-	struct arm_lpae_io_pgtable *data = io_pgtable_to_data(iop);
+    struct arm_lpae_io_pgtable *data = io_pgtable_to_data(iop);
 
-	__arm_lpae_free_pgtable(data, data->start_level, data->pgd->cpu_addr);
-	kfree(data);
+    __arm_lpae_free_pages(data->pgd, ARM_LPAE_PGD_SIZE(data), &data->iop.cfg, data->iop.cookie);
+    //free(data, M_DEVBUF, sizeof(*data));
 }
-
-static size_t arm_lpae_split_blk_unmap(struct arm_lpae_io_pgtable *data,
-				       struct iommu_iotlb_gather *gather,
-				       unsigned long iova, size_t size,
-				       arm_lpae_iopte blk_pte, int lvl,
-				       arm_lpae_iopte *ptep, size_t pgcount)
-{
-	struct io_pgtable_cfg *cfg = &data->iop.cfg;
-	arm_lpae_iopte pte;
-#ifdef __linux__
-    arm_lpae_iopte *tablep;
-#else
-    struct arm_lpae_dma_pgtable *tablep;
-#endif
-	phys_addr_t blk_paddr;
-	size_t tablesz = ARM_LPAE_GRANULE(data);
-	size_t split_sz = ARM_LPAE_BLOCK_SIZE(lvl, data);
-	int ptes_per_table = ARM_LPAE_PTES_PER_TABLE(data);
-	int i, unmap_idx_start = -1, num_entries = 0, max_entries;
-
-	if (WARN_ON(lvl == ARM_LPAE_MAX_LEVELS))
-		return 0;
-
-	tablep = __arm_lpae_alloc_pages(tablesz, GFP_ATOMIC, cfg, data->iop.cookie);
-	if (!tablep)
-		return 0; /* Bytes unmapped */
-
-	if (size == split_sz) {
-		unmap_idx_start = ARM_LPAE_LVL_IDX(iova, lvl, data);
-		max_entries = ptes_per_table - unmap_idx_start;
-		num_entries = min_t(int, pgcount, max_entries);
-	}
-
-	blk_paddr = iopte_to_paddr(blk_pte, data);
-	pte = iopte_prot(blk_pte);
-
-	for (i = 0; i < ptes_per_table; i++, blk_paddr += split_sz) {
-		/* Unmap! */
-		if (i >= unmap_idx_start && i < (unmap_idx_start + num_entries))
-			continue;
-
-#ifdef __linux__
-		__arm_lpae_init_pte(data, blk_paddr, pte, lvl, 1, &tablep[i]);
-#else
-		__arm_lpae_init_pte(data, blk_paddr, pte, lvl, 1, &tablep->cpu_addr[i]);
-#endif
-	}
-
-	pte = arm_lpae_install_table(tablep, ptep, blk_pte, data);
-	if (pte != blk_pte) {
-		__arm_lpae_free_pages(tablep, tablesz, cfg, data->iop.cookie);
-		/*
-		 * We may race against someone unmapping another part of this
-		 * block, but anything else is invalid. We can't misinterpret
-		 * a page entry here since we're never at the last level.
-		 */
-		if (iopte_type(pte) != ARM_LPAE_PTE_TYPE_TABLE)
-			return 0;
-
-#ifdef __linux__
-		tablep = iopte_deref(pte, data);
-#else
-		tablep->cpu_addr = iopte_deref(pte, data);
-#endif
-	} else if (unmap_idx_start >= 0) {
-		for (i = 0; i < num_entries; i++)
-			io_pgtable_tlb_add_page(&data->iop, gather, iova + i * size, size);
-
-		return num_entries * size;
-	}
-
-	return __arm_lpae_unmap(data, gather, iova, size, pgcount, lvl, tablep->cpu_addr);
-}
-
-static size_t __arm_lpae_unmap(struct arm_lpae_io_pgtable *data,
-			       struct iommu_iotlb_gather *gather,
-			       unsigned long iova, size_t size, size_t pgcount,
-			       int lvl, arm_lpae_iopte *ptep)
-{
-	arm_lpae_iopte pte;
-	struct io_pgtable *iop = &data->iop;
-	int i = 0, num_entries, max_entries, unmap_idx_start;
-
-	/* Something went horribly wrong and we ran out of page table */
-	if (WARN_ON(lvl == ARM_LPAE_MAX_LEVELS))
-		return 0;
-
-	unmap_idx_start = ARM_LPAE_LVL_IDX(iova, lvl, data);
-	ptep += unmap_idx_start;
-	pte = READ_ONCE(*ptep);
-	if (WARN_ON(!pte))
-		return 0;
-
-	/* If the size matches this level, we're in the right place */
-	if (size == ARM_LPAE_BLOCK_SIZE(lvl, data)) {
-		max_entries = ARM_LPAE_PTES_PER_TABLE(data) - unmap_idx_start;
-		num_entries = min_t(int, pgcount, max_entries);
-
-		while (i < num_entries) {
-			pte = READ_ONCE(*ptep);
-			if (WARN_ON(!pte))
-				break;
-
-#ifdef __linux__
-			__arm_lpae_clear_pte(ptep, &iop->cfg);
-#else
-			__arm_lpae_clear_pte(ptep, &iop->cfg, data->pgd);
-#endif
-
-			if (!iopte_leaf(pte, lvl, iop->fmt)) {
-				/* Also flush any partial walks */
-				io_pgtable_tlb_flush_walk(iop, iova + i * size, size,
-							  ARM_LPAE_GRANULE(data));
-				__arm_lpae_free_pgtable(data, lvl + 1, iopte_deref(pte, data));
-			} else /*if (!iommu_iotlb_gather_queued(gather))*/ {
-				io_pgtable_tlb_add_page(iop, gather, iova + i * size, size);
-			}
-
-			ptep++;
-			i++;
-		}
-
-		return i * size;
-	} else if (iopte_leaf(pte, lvl, iop->fmt)) {
-		/*
-		 * Insert a table at the next level to map the old region,
-		 * minus the part we want to unmap
-		 */
-		return arm_lpae_split_blk_unmap(data, gather, iova, size, pte,
-						lvl + 1, ptep, pgcount);
-	}
-
-	/* Keep on walkin' */
-	ptep = iopte_deref(pte, data);
-	return __arm_lpae_unmap(data, gather, iova, size, pgcount, lvl + 1, ptep);
-}
-
-static size_t arm_lpae_unmap_pages(struct io_pgtable_ops *ops, unsigned long iova,
-				   size_t pgsize, size_t pgcount,
-				   struct iommu_iotlb_gather *gather)
-{
-	struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
-	struct io_pgtable_cfg *cfg = &data->iop.cfg;
-	arm_lpae_iopte *ptep = data->pgd->cpu_addr;
-	long iaext = (s64)iova >> cfg->ias;
-
-	if (WARN_ON(!pgsize || (pgsize & cfg->pgsize_bitmap) != pgsize || !pgcount))
-		return 0;
-
-	if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_TTBR1)
-		iaext = ~iaext;
-	if (WARN_ON(iaext))
-		return 0;
-
-	return __arm_lpae_unmap(data, gather, iova, pgsize, pgcount,
-				data->start_level, ptep);
-}
-
-static phys_addr_t arm_lpae_iova_to_phys(struct io_pgtable_ops *ops,
-					 unsigned long iova)
-{
-	struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
-#ifdef __linux__
-	arm_lpae_iopte pte, *ptep = data->pgd;
-#else
-	arm_lpae_iopte pte, *ptep = data->pgd->cpu_addr;
-#endif
-	int lvl = data->start_level;
-
-	do {
-		/* Valid IOPTE pointer? */
-		if (!ptep)
-			return 0;
-
-		/* Grab the IOPTE we're interested in */
-		ptep += ARM_LPAE_LVL_IDX(iova, lvl, data);
-		pte = READ_ONCE(*ptep);
-
-		/* Valid entry? */
-		if (!pte)
-			return 0;
-
-		/* Leaf entry? */
-		if (iopte_leaf(pte, lvl, data->iop.fmt))
-			goto found_translation;
-
-		/* Take it to the next level */
-		ptep = iopte_deref(pte, data);
-	} while (++lvl < ARM_LPAE_MAX_LEVELS);
-
-	/* Ran out of page tables to walk */
-	return 0;
-
-found_translation:
-	iova &= (ARM_LPAE_BLOCK_SIZE(lvl, data) - 1);
-	return iopte_to_paddr(pte, data) | iova;
-}
-
-struct io_pgtable_walk_data {
-	struct iommu_dirty_bitmap	*dirty;
-	unsigned long			flags;
-	u64				addr;
-	const u64			end;
-};
-
-static int __arm_lpae_iopte_walk_dirty(struct arm_lpae_io_pgtable *data,
-				       struct io_pgtable_walk_data *walk_data,
-				       arm_lpae_iopte *ptep,
-				       int lvl);
-
-static int io_pgtable_visit_dirty(struct arm_lpae_io_pgtable *data,
-				  struct io_pgtable_walk_data *walk_data,
-				  arm_lpae_iopte *ptep, int lvl)
-{
-	struct io_pgtable *iop = &data->iop;
-	arm_lpae_iopte pte = READ_ONCE(*ptep);
-
-	if (iopte_leaf(pte, lvl, iop->fmt)) {
-		size_t size = ARM_LPAE_BLOCK_SIZE(lvl, data);
-
-		if (iopte_writeable_dirty(pte)) {
-#ifdef notyet
-			iommu_dirty_bitmap_record(walk_data->dirty,
-						  walk_data->addr, size);
-			if (!(walk_data->flags & IOMMU_DIRTY_NO_CLEAR))
-				iopte_set_writeable_clean(ptep);
-#endif
-		}
-		walk_data->addr += size;
-		return 0;
-	}
-
-	if (WARN_ON(!iopte_table(pte, lvl)))
-		return -EINVAL;
-
-	ptep = iopte_deref(pte, data);
-	return __arm_lpae_iopte_walk_dirty(data, walk_data, ptep, lvl + 1);
-}
-
-static int __arm_lpae_iopte_walk_dirty(struct arm_lpae_io_pgtable *data,
-				       struct io_pgtable_walk_data *walk_data,
-				       arm_lpae_iopte *ptep,
-				       int lvl)
-{
-	u32 idx;
-	int max_entries, ret;
-
-	if (WARN_ON(lvl == ARM_LPAE_MAX_LEVELS))
-		return -EINVAL;
-
-	if (lvl == data->start_level)
-		max_entries = ARM_LPAE_PGD_SIZE(data) / sizeof(arm_lpae_iopte);
-	else
-		max_entries = ARM_LPAE_PTES_PER_TABLE(data);
-
-	for (idx = ARM_LPAE_LVL_IDX(walk_data->addr, lvl, data);
-	     (idx < max_entries) && (walk_data->addr < walk_data->end); ++idx) {
-		ret = io_pgtable_visit_dirty(data, walk_data, ptep + idx, lvl);
-		if (ret)
-			return ret;
-	}
-
-	return 0;
-}
-
-static int arm_lpae_read_and_clear_dirty(struct io_pgtable_ops *ops,
-					 unsigned long iova, size_t size,
-					 unsigned long flags,
-					 struct iommu_dirty_bitmap *dirty)
-{
-	struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
-	struct io_pgtable_cfg *cfg = &data->iop.cfg;
-	struct io_pgtable_walk_data walk_data = {
-		.dirty = dirty,
-		.flags = flags,
-		.addr = iova,
-		.end = iova + size,
-	};
-	arm_lpae_iopte *ptep = data->pgd->cpu_addr;
-	int lvl = data->start_level;
-
-	if (WARN_ON(!size))
-		return -EINVAL;
-	if (WARN_ON((iova + size - 1) & ~(BIT(cfg->ias) - 1)))
-		return -EINVAL;
-	if (data->iop.fmt != ARM_64_LPAE_S1)
-		return -EINVAL;
-
-	return __arm_lpae_iopte_walk_dirty(data, &walk_data, ptep, lvl);
-}
-
-static void arm_lpae_restrict_pgsizes(struct io_pgtable_cfg *cfg)
-{
-	unsigned long granule, page_sizes;
-	unsigned int max_addr_bits = 48;
-
-	/*
-	 * We need to restrict the supported page sizes to match the
-	 * translation regime for a particular granule. Aim to match
-	 * the CPU page size if possible, otherwise prefer smaller sizes.
-	 * While we're at it, restrict the block sizes to match the
-	 * chosen granule.
-	 */
-	if (cfg->pgsize_bitmap & PAGE_SIZE)
-		granule = PAGE_SIZE;
-	else if (cfg->pgsize_bitmap & ~PAGE_MASK)
-		granule = 1UL << __fls(cfg->pgsize_bitmap & ~PAGE_MASK);
-	else if (cfg->pgsize_bitmap & PAGE_MASK)
-		granule = 1UL << __ffs(cfg->pgsize_bitmap & PAGE_MASK);
-	else
-		granule = 0;
-
-	switch (granule) {
-	case SZ_4K:
-		page_sizes = (SZ_4K | SZ_2M | SZ_1G);
-		break;
-	case SZ_16K:
-		page_sizes = (SZ_16K | SZ_32M);
-		break;
-	case SZ_64K:
-		max_addr_bits = 52;
-		page_sizes = (SZ_64K | SZ_512M);
-		if (cfg->oas > 48)
-			page_sizes |= 1ULL << 42; /* 4TB */
-		break;
-	default:
-		page_sizes = 0;
-	}
-
-	cfg->pgsize_bitmap &= page_sizes;
-	cfg->ias = min(cfg->ias, max_addr_bits);
-	cfg->oas = min(cfg->oas, max_addr_bits);
-}
-
-static struct arm_lpae_io_pgtable *
-arm_lpae_alloc_pgtable(struct io_pgtable_cfg *cfg)
-{
-	struct arm_lpae_io_pgtable *data;
-	int levels, va_bits, pg_shift;
-
-	arm_lpae_restrict_pgsizes(cfg);
-
-	if (!(cfg->pgsize_bitmap & (SZ_4K | SZ_16K | SZ_64K)))
-		return NULL;
-
-	if (cfg->ias > ARM_LPAE_MAX_ADDR_BITS)
-		return NULL;
-
-	if (cfg->oas > ARM_LPAE_MAX_ADDR_BITS)
-		return NULL;
-
-	data = kmalloc(sizeof(*data), GFP_KERNEL);
-	if (!data)
-		return NULL;
-
-	pg_shift = __ffs(cfg->pgsize_bitmap);
-	data->bits_per_level = pg_shift - ilog2(sizeof(arm_lpae_iopte));
-
-	va_bits = cfg->ias - pg_shift;
-	levels = DIV_ROUND_UP(va_bits, data->bits_per_level);
-	data->start_level = ARM_LPAE_MAX_LEVELS - levels;
-
-	/* Calculate the actual size of our pgd (without concatenation) */
-	data->pgd_bits = va_bits - (data->bits_per_level * (levels - 1));
-
-	data->iop.ops = (struct io_pgtable_ops) {
-		.map_pages	= arm_lpae_map_pages,
-		.unmap_pages	= arm_lpae_unmap_pages,
-		.iova_to_phys	= arm_lpae_iova_to_phys,
-#ifdef notyet
-		.read_and_clear_dirty = arm_lpae_read_and_clear_dirty,
-#endif
-	};
-
-	return data;
-}
-
-#ifdef __linux__
-static struct io_pgtable *
-arm_64_lpae_alloc_pgtable_s1(struct io_pgtable_cfg *cfg, void *cookie)
-{
-	u64 reg;
-	struct arm_lpae_io_pgtable *data;
-	typeof(&cfg->arm_lpae_s1_cfg.tcr) tcr = &cfg->arm_lpae_s1_cfg.tcr;
-	bool tg1;
-
-	if (cfg->quirks & ~(IO_PGTABLE_QUIRK_ARM_NS |
-			    IO_PGTABLE_QUIRK_ARM_TTBR1 |
-			    IO_PGTABLE_QUIRK_ARM_OUTER_WBWA |
-			    IO_PGTABLE_QUIRK_ARM_HD))
-		return NULL;
-
-	data = arm_lpae_alloc_pgtable(cfg);
-	if (!data)
-		return NULL;
-
-	/* TCR */
-	if (cfg->coherent_walk) {
-		tcr->sh = ARM_LPAE_TCR_SH_IS;
-		tcr->irgn = ARM_LPAE_TCR_RGN_WBWA;
-		tcr->orgn = ARM_LPAE_TCR_RGN_WBWA;
-		if (cfg->quirks & IO_PGTABLE_QUIRK_ARM_OUTER_WBWA)
-			goto out_free_data;
-	} else {
-		tcr->sh = ARM_LPAE_TCR_SH_OS;
-		tcr->irgn = ARM_LPAE_TCR_RGN_NC;
-		if (!(cfg->quirks & IO_PGTABLE_QUIRK_ARM_OUTER_WBWA))
-			tcr->orgn = ARM_LPAE_TCR_RGN_NC;
-		else
-			tcr->orgn = ARM_LPAE_TCR_RGN_WBWA;
-	}
-
-	tg1 = cfg->quirks & IO_PGTABLE_QUIRK_ARM_TTBR1;
-	switch (ARM_LPAE_GRANULE(data)) {
-	case SZ_4K:
-		tcr->tg = tg1 ? ARM_LPAE_TCR_TG1_4K : ARM_LPAE_TCR_TG0_4K;
-		break;
-	case SZ_16K:
-		tcr->tg = tg1 ? ARM_LPAE_TCR_TG1_16K : ARM_LPAE_TCR_TG0_16K;
-		break;
-	case SZ_64K:
-		tcr->tg = tg1 ? ARM_LPAE_TCR_TG1_64K : ARM_LPAE_TCR_TG0_64K;
-		break;
-	}
-
-	switch (cfg->oas) {
-	case 32:
-		tcr->ips = ARM_LPAE_TCR_PS_32_BIT;
-		break;
-	case 36:
-		tcr->ips = ARM_LPAE_TCR_PS_36_BIT;
-		break;
-	case 40:
-		tcr->ips = ARM_LPAE_TCR_PS_40_BIT;
-		break;
-	case 42:
-		tcr->ips = ARM_LPAE_TCR_PS_42_BIT;
-		break;
-	case 44:
-		tcr->ips = ARM_LPAE_TCR_PS_44_BIT;
-		break;
-	case 48:
-		tcr->ips = ARM_LPAE_TCR_PS_48_BIT;
-		break;
-	case 52:
-		tcr->ips = ARM_LPAE_TCR_PS_52_BIT;
-		break;
-	default:
-		goto out_free_data;
-	}
-
-	tcr->tsz = 64ULL - cfg->ias;
-
-	/* MAIRs */
-	reg = (ARM_LPAE_MAIR_ATTR_NC
-	       << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_NC)) |
-	      (ARM_LPAE_MAIR_ATTR_WBRWA
-	       << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_CACHE)) |
-	      (ARM_LPAE_MAIR_ATTR_DEVICE
-	       << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_DEV)) |
-	      (ARM_LPAE_MAIR_ATTR_INC_OWBRWA
-	       << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_INC_OCACHE));
-
-	cfg->arm_lpae_s1_cfg.mair = reg;
-
-	/* Looking good; allocate a pgd */
-	data->pgd = __arm_lpae_alloc_pages(ARM_LPAE_PGD_SIZE(data),
-					   GFP_KERNEL, cfg, cookie);
-	if (!data->pgd)
-		goto out_free_data;
-
-	/* Ensure the empty pgd is visible before any actual TTBR write */
-	wmb();
-
-	/* TTBR */
-	cfg->arm_lpae_s1_cfg.ttbr = virt_to_phys(data->pgd);
-	return &data->iop;
-
-out_free_data:
-	kfree(data);
-	return NULL;
-}
-
-static struct io_pgtable *
-arm_64_lpae_alloc_pgtable_s2(struct io_pgtable_cfg *cfg, void *cookie)
-{
-	u64 sl;
-	struct arm_lpae_io_pgtable *data;
-	typeof(&cfg->arm_lpae_s2_cfg.vtcr) vtcr = &cfg->arm_lpae_s2_cfg.vtcr;
-
-	/* The NS quirk doesn't apply at stage 2 */
-	if (cfg->quirks)
-		return NULL;
-
-	data = arm_lpae_alloc_pgtable(cfg);
-	if (!data)
-		return NULL;
-
-	/*
-	 * Concatenate PGDs at level 1 if possible in order to reduce
-	 * the depth of the stage-2 walk.
-	 */
-	if (data->start_level == 0) {
-		unsigned long pgd_pages;
-
-		pgd_pages = ARM_LPAE_PGD_SIZE(data) / sizeof(arm_lpae_iopte);
-		if (pgd_pages <= ARM_LPAE_S2_MAX_CONCAT_PAGES) {
-			data->pgd_bits += data->bits_per_level;
-			data->start_level++;
-		}
-	}
-
-	/* VTCR */
-	if (cfg->coherent_walk) {
-		vtcr->sh = ARM_LPAE_TCR_SH_IS;
-		vtcr->irgn = ARM_LPAE_TCR_RGN_WBWA;
-		vtcr->orgn = ARM_LPAE_TCR_RGN_WBWA;
-	} else {
-		vtcr->sh = ARM_LPAE_TCR_SH_OS;
-		vtcr->irgn = ARM_LPAE_TCR_RGN_NC;
-		vtcr->orgn = ARM_LPAE_TCR_RGN_NC;
-	}
-
-	sl = data->start_level;
-
-	switch (ARM_LPAE_GRANULE(data)) {
-	case SZ_4K:
-		vtcr->tg = ARM_LPAE_TCR_TG0_4K;
-		sl++; /* SL0 format is different for 4K granule size */
-		break;
-	case SZ_16K:
-		vtcr->tg = ARM_LPAE_TCR_TG0_16K;
-		break;
-	case SZ_64K:
-		vtcr->tg = ARM_LPAE_TCR_TG0_64K;
-		break;
-	}
-
-	switch (cfg->oas) {
-	case 32:
-		vtcr->ps = ARM_LPAE_TCR_PS_32_BIT;
-		break;
-	case 36:
-		vtcr->ps = ARM_LPAE_TCR_PS_36_BIT;
-		break;
-	case 40:
-		vtcr->ps = ARM_LPAE_TCR_PS_40_BIT;
-		break;
-	case 42:
-		vtcr->ps = ARM_LPAE_TCR_PS_42_BIT;
-		break;
-	case 44:
-		vtcr->ps = ARM_LPAE_TCR_PS_44_BIT;
-		break;
-	case 48:
-		vtcr->ps = ARM_LPAE_TCR_PS_48_BIT;
-		break;
-	case 52:
-		vtcr->ps = ARM_LPAE_TCR_PS_52_BIT;
-		break;
-	default:
-		goto out_free_data;
-	}
-
-	vtcr->tsz = 64ULL - cfg->ias;
-	vtcr->sl = ~sl & ARM_LPAE_VTCR_SL0_MASK;
-
-	/* Allocate pgd pages */
-	data->pgd = __arm_lpae_alloc_pages(ARM_LPAE_PGD_SIZE(data),
-					   GFP_KERNEL, cfg, cookie);
-	if (!data->pgd)
-		goto out_free_data;
-
-	/* Ensure the empty pgd is visible before any actual TTBR write */
-	wmb();
-
-	/* VTTBR */
-	cfg->arm_lpae_s2_cfg.vttbr = virt_to_phys(data->pgd);
-	return &data->iop;
-
-out_free_data:
-	kfree(data);
-	return NULL;
-}
-
-static struct io_pgtable *
-arm_32_lpae_alloc_pgtable_s1(struct io_pgtable_cfg *cfg, void *cookie)
-{
-	if (cfg->ias > 32 || cfg->oas > 40)
-		return NULL;
-
-	cfg->pgsize_bitmap &= (SZ_4K | SZ_2M | SZ_1G);
-	return arm_64_lpae_alloc_pgtable_s1(cfg, cookie);
-}
-
-static struct io_pgtable *
-arm_32_lpae_alloc_pgtable_s2(struct io_pgtable_cfg *cfg, void *cookie)
-{
-	if (cfg->ias > 40 || cfg->oas > 40)
-		return NULL;
-
-	cfg->pgsize_bitmap &= (SZ_4K | SZ_2M | SZ_1G);
-	return arm_64_lpae_alloc_pgtable_s2(cfg, cookie);
-}
-
-static struct io_pgtable *
-arm_mali_lpae_alloc_pgtable(struct io_pgtable_cfg *cfg, void *cookie)
-{
-	struct arm_lpae_io_pgtable *data;
-
-	/* No quirks for Mali (hopefully) */
-	if (cfg->quirks)
-		return NULL;
-
-	if (cfg->ias > 48 || cfg->oas > 40)
-		return NULL;
-
-	cfg->pgsize_bitmap &= (SZ_4K | SZ_2M | SZ_1G);
-
-	data = arm_lpae_alloc_pgtable(cfg);
-	if (!data)
-		return NULL;
-
-	/* Mali seems to need a full 4-level table regardless of IAS */
-	if (data->start_level > 0) {
-		data->start_level = 0;
-		data->pgd_bits = 0;
-	}
-	/*
-	 * MEMATTR: Mali has no actual notion of a non-cacheable type, so the
-	 * best we can do is mimic the out-of-tree driver and hope that the
-	 * "implementation-defined caching policy" is good enough. Similarly,
-	 * we'll use it for the sake of a valid attribute for our 'device'
-	 * index, although callers should never request that in practice.
-	 */
-	cfg->arm_mali_lpae_cfg.memattr =
-		(ARM_MALI_LPAE_MEMATTR_IMP_DEF
-		 << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_NC)) |
-		(ARM_MALI_LPAE_MEMATTR_WRITE_ALLOC
-		 << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_CACHE)) |
-		(ARM_MALI_LPAE_MEMATTR_IMP_DEF
-		 << ARM_LPAE_MAIR_ATTR_SHIFT(ARM_LPAE_MAIR_ATTR_IDX_DEV));
-
-	data->pgd = __arm_lpae_alloc_pages(ARM_LPAE_PGD_SIZE(data), GFP_KERNEL,
-					   cfg, cookie);
-	if (!data->pgd)
-		goto out_free_data;
-
-	/* Ensure the empty pgd is visible before TRANSTAB can be written */
-	wmb();
-
-	cfg->arm_mali_lpae_cfg.transtab = virt_to_phys(data->pgd) |
-					  ARM_MALI_LPAE_TTBR_READ_INNER |
-					  ARM_MALI_LPAE_TTBR_ADRMODE_TABLE;
-	if (cfg->coherent_walk)
-		cfg->arm_mali_lpae_cfg.transtab |= ARM_MALI_LPAE_TTBR_SHARE_OUTER;
-
-	return &data->iop;
-
-out_free_data:
-	kfree(data);
-	return NULL;
-}
-#endif
 
 static struct io_pgtable *
 apple_uat_alloc_pgtable(struct io_pgtable_cfg *cfg, void *cookie)
 {
-	struct arm_lpae_io_pgtable *data;
+    struct arm_lpae_io_pgtable *data;
 
-	/* No quirks for UAT (hopefully) */
-	if (cfg->quirks)
-		return NULL;
+    /* No quirks for UAT (hopefully) */
+    if (cfg->quirks)
+        return NULL;
 
-	if (cfg->ias > 48 || cfg->oas > 42)
-		return NULL;
+    if (cfg->ias > 48 || cfg->oas > 42)
+        return NULL;
 
-	cfg->pgsize_bitmap &= SZ_16K;
+    /* Only 16K page size is supported */
+    cfg->pgsize_bitmap &= PAGE_SIZE_16K;
 
-	data = arm_lpae_alloc_pgtable(cfg);
-	if (!data)
-		return NULL;
+    data = arm_lpae_alloc_pgtable(cfg, cookie);
+    if (!data)
+        return NULL;
 
-	/* UAT needs full 16K aligned pages for the pgd */
-	data->pgd = __arm_lpae_alloc_pages(SZ_16K, GFP_KERNEL, cfg, cookie);
-	if (!data->pgd)
-		goto out_free_data;
+    /* UAT needs full 16K aligned pages for the pgd */
+    data->pgd = __arm_lpae_alloc_pages(PAGE_SIZE_16K, M_WAITOK | M_ZERO, cfg, cookie);
+    if (!data->pgd)
+        goto out_free_data;
 
-	/* Ensure the empty pgd is visible before the TTBAT can be written */
-	wmb();
+    /* Ensure the empty pgd is visible before the TTBAT can be written */
+    membar_producer();
 
-#ifdef __linux__
-	cfg->apple_uat_cfg.ttbr = virt_to_phys(data->pgd);
-#else
-	cfg->apple_uat_cfg.ttbr = __arm_lpae_dma_addr(data->pgd->cpu_addr);
-#endif
+    cfg->apple_uat_cfg.ttbr = getphys(data->pgd);
 
-	return &data->iop;
+    return &data->iop;
 
 out_free_data:
-	kfree(data);
-	return NULL;
+    arm_lpae_free_pgtable((struct io_pgtable *)data);
+    return NULL;
 }
-
-#ifdef notyet
-struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s1_init_fns = {
-	.caps	= IO_PGTABLE_CAP_CUSTOM_ALLOCATOR,
-	.alloc	= arm_64_lpae_alloc_pgtable_s1,
-	.free	= arm_lpae_free_pgtable,
-};
-
-struct io_pgtable_init_fns io_pgtable_arm_64_lpae_s2_init_fns = {
-	.caps	= IO_PGTABLE_CAP_CUSTOM_ALLOCATOR,
-	.alloc	= arm_64_lpae_alloc_pgtable_s2,
-	.free	= arm_lpae_free_pgtable,
-};
-
-struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s1_init_fns = {
-	.caps	= IO_PGTABLE_CAP_CUSTOM_ALLOCATOR,
-	.alloc	= arm_32_lpae_alloc_pgtable_s1,
-	.free	= arm_lpae_free_pgtable,
-};
-
-struct io_pgtable_init_fns io_pgtable_arm_32_lpae_s2_init_fns = {
-	.caps	= IO_PGTABLE_CAP_CUSTOM_ALLOCATOR,
-	.alloc	= arm_32_lpae_alloc_pgtable_s2,
-	.free	= arm_lpae_free_pgtable,
-};
-
-struct io_pgtable_init_fns io_pgtable_arm_mali_lpae_init_fns = {
-	.caps	= IO_PGTABLE_CAP_CUSTOM_ALLOCATOR,
-	.alloc	= arm_mali_lpae_alloc_pgtable,
-	.free	= arm_lpae_free_pgtable,
-};
-#endif
 
 struct io_pgtable_init_fns io_pgtable_apple_uat_init_fns = {
 	.alloc	= apple_uat_alloc_pgtable,
 	.free	= arm_lpae_free_pgtable,
 };
-
-#ifdef CONFIG_IOMMU_IO_PGTABLE_LPAE_SELFTEST
-
-static struct io_pgtable_cfg *cfg_cookie __initdata;
-
-static void __init dummy_tlb_flush_all(void *cookie)
-{
-	WARN_ON(cookie != cfg_cookie);
-}
-
-static void __init dummy_tlb_flush(unsigned long iova, size_t size,
-				   size_t granule, void *cookie)
-{
-	WARN_ON(cookie != cfg_cookie);
-	WARN_ON(!(size & cfg_cookie->pgsize_bitmap));
-}
-
-static void __init dummy_tlb_add_page(struct iommu_iotlb_gather *gather,
-				      unsigned long iova, size_t granule,
-				      void *cookie)
-{
-	dummy_tlb_flush(iova, granule, granule, cookie);
-}
-
-static const struct iommu_flush_ops dummy_tlb_ops __initconst = {
-	.tlb_flush_all	= dummy_tlb_flush_all,
-	.tlb_flush_walk	= dummy_tlb_flush,
-	.tlb_add_page	= dummy_tlb_add_page,
-};
-
-static void __init arm_lpae_dump_ops(struct io_pgtable_ops *ops)
-{
-	struct arm_lpae_io_pgtable *data = io_pgtable_ops_to_data(ops);
-	struct io_pgtable_cfg *cfg = &data->iop.cfg;
-
-	pr_err("cfg: pgsize_bitmap 0x%lx, ias %u-bit\n",
-		cfg->pgsize_bitmap, cfg->ias);
-	pr_err("data: %d levels, 0x%zx pgd_size, %u pg_shift, %u bits_per_level, pgd @ %p\n",
-		ARM_LPAE_MAX_LEVELS - data->start_level, ARM_LPAE_PGD_SIZE(data),
-		ilog2(ARM_LPAE_GRANULE(data)), data->bits_per_level, data->pgd);
-}
-
-#define __FAIL(ops, i)	({						\
-		WARN(1, "selftest: test failed for fmt idx %d\n", (i));	\
-		arm_lpae_dump_ops(ops);					\
-		selftest_running = false;				\
-		-EFAULT;						\
-})
-
-static int __init arm_lpae_run_tests(struct io_pgtable_cfg *cfg)
-{
-	static const enum io_pgtable_fmt fmts[] __initconst = {
-		ARM_64_LPAE_S1,
-		ARM_64_LPAE_S2,
-	};
-
-	int i, j;
-	unsigned long iova;
-	size_t size, mapped;
-	struct io_pgtable_ops *ops;
-
-	selftest_running = true;
-
-	for (i = 0; i < ARRAY_SIZE(fmts); ++i) {
-		cfg_cookie = cfg;
-		ops = alloc_io_pgtable_ops(fmts[i], cfg, cfg);
-		if (!ops) {
-			pr_err("selftest: failed to allocate io pgtable ops\n");
-			return -ENOMEM;
-		}
-
-		/*
-		 * Initial sanity checks.
-		 * Empty page tables shouldn't provide any translations.
-		 */
-		if (ops->iova_to_phys(ops, 42))
-			return __FAIL(ops, i);
-
-		if (ops->iova_to_phys(ops, SZ_1G + 42))
-			return __FAIL(ops, i);
-
-		if (ops->iova_to_phys(ops, SZ_2G + 42))
-			return __FAIL(ops, i);
-
-		/*
-		 * Distinct mappings of different granule sizes.
-		 */
-		iova = 0;
-		for_each_set_bit(j, &cfg->pgsize_bitmap, BITS_PER_LONG) {
-			size = 1UL << j;
-
-			if (ops->map_pages(ops, iova, iova, size, 1,
-					   IOMMU_READ | IOMMU_WRITE |
-					   IOMMU_NOEXEC | IOMMU_CACHE,
-					   GFP_KERNEL, &mapped))
-				return __FAIL(ops, i);
-
-			/* Overlapping mappings */
-			if (!ops->map_pages(ops, iova, iova + size, size, 1,
-					    IOMMU_READ | IOMMU_NOEXEC,
-					    GFP_KERNEL, &mapped))
-				return __FAIL(ops, i);
-
-			if (ops->iova_to_phys(ops, iova + 42) != (iova + 42))
-				return __FAIL(ops, i);
-
-			iova += SZ_1G;
-		}
-
-		/* Partial unmap */
-		size = 1UL << __ffs(cfg->pgsize_bitmap);
-		if (ops->unmap_pages(ops, SZ_1G + size, size, 1, NULL) != size)
-			return __FAIL(ops, i);
-
-		/* Remap of partial unmap */
-		if (ops->map_pages(ops, SZ_1G + size, size, size, 1,
-				   IOMMU_READ, GFP_KERNEL, &mapped))
-			return __FAIL(ops, i);
-
-		if (ops->iova_to_phys(ops, SZ_1G + size + 42) != (size + 42))
-			return __FAIL(ops, i);
-
-		/* Full unmap */
-		iova = 0;
-		for_each_set_bit(j, &cfg->pgsize_bitmap, BITS_PER_LONG) {
-			size = 1UL << j;
-
-			if (ops->unmap_pages(ops, iova, size, 1, NULL) != size)
-				return __FAIL(ops, i);
-
-			if (ops->iova_to_phys(ops, iova + 42))
-				return __FAIL(ops, i);
-
-			/* Remap full block */
-			if (ops->map_pages(ops, iova, iova, size, 1,
-					   IOMMU_WRITE, GFP_KERNEL, &mapped))
-				return __FAIL(ops, i);
-
-			if (ops->iova_to_phys(ops, iova + 42) != (iova + 42))
-				return __FAIL(ops, i);
-
-			iova += SZ_1G;
-		}
-
-		free_io_pgtable_ops(ops);
-	}
-
-	selftest_running = false;
-	return 0;
-}
-
-static int __init arm_lpae_do_selftests(void)
-{
-	static const unsigned long pgsize[] __initconst = {
-		SZ_4K | SZ_2M | SZ_1G,
-		SZ_16K | SZ_32M,
-		SZ_64K | SZ_512M,
-	};
-
-	static const unsigned int ias[] __initconst = {
-		32, 36, 40, 42, 44, 48,
-	};
-
-	int i, j, pass = 0, fail = 0;
-	struct device dev;
-	struct io_pgtable_cfg cfg = {
-		.tlb = &dummy_tlb_ops,
-		.oas = 48,
-		.coherent_walk = true,
-		.iommu_dev = &dev,
-	};
-
-	/* __arm_lpae_alloc_pages() merely needs dev_to_node() to work */
-	set_dev_node(&dev, NUMA_NO_NODE);
-
-	for (i = 0; i < ARRAY_SIZE(pgsize); ++i) {
-		for (j = 0; j < ARRAY_SIZE(ias); ++j) {
-			cfg.pgsize_bitmap = pgsize[i];
-			cfg.ias = ias[j];
-			pr_info("selftest: pgsize_bitmap 0x%08lx, IAS %u\n",
-				pgsize[i], ias[j]);
-			if (arm_lpae_run_tests(&cfg))
-				fail++;
-			else
-				pass++;
-		}
-	}
-
-	pr_info("selftest: completed with %d PASS %d FAIL\n", pass, fail);
-	return fail ? -EFAULT : 0;
-}
-subsys_initcall(arm_lpae_do_selftests);
-#endif

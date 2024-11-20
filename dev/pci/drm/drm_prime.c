@@ -30,6 +30,8 @@
 #include <linux/dma-buf.h>
 #include <linux/rbtree.h>
 #include <linux/module.h>
+#include <linux/sync_file.h>
+#include <linux/file.h>
 
 #include <drm/drm.h>
 #include <drm/drm_drv.h>
@@ -39,6 +41,10 @@
 #include <drm/drm_prime.h>
 
 #include "drm_internal.h"
+
+#define DMA_BUF_SYNC_RW 3
+#define DMA_BUF_SYNC_READ 1
+#define DMA_BUF_SYNC_WRITE 2
 
 MODULE_IMPORT_NS(DMA_BUF);
 
@@ -484,7 +490,6 @@ out_have_obj:
 	mutex_unlock(&dev->object_name_lock);
 	if (ret)
 		goto fail_put_dmabuf;
-
 out_have_handle:
 	ret = dma_buf_fd(dmabuf, flags);
 	/*
@@ -513,14 +518,74 @@ out_unlock:
 }
 EXPORT_SYMBOL(drm_gem_prime_handle_to_fd);
 
+static int drm_prime_export_sync_file(struct drm_file *file_priv,
+                                      int handle, int *p_fd, int flags)
+{
+	enum dma_resv_usage usage;
+	struct sync_file *sync_file;
+	struct dma_fence *fence = NULL;
+	int ret = 0;
+	struct dma_buf *dmabuf;
+	struct drm_gem_object *obj;
+	int fd = get_unused_fd_flags(O_CLOEXEC);
+
+	if (fd < 0)
+		return fd;
+
+	mutex_lock(&file_priv->prime.lock);
+	obj = drm_gem_object_lookup(file_priv, handle);
+		
+	dmabuf = drm_prime_lookup_buf_by_handle(&file_priv->prime, handle);
+	
+	if (obj->dma_buf) {
+		dmabuf = obj->dma_buf;
+	}
+	
+	if (!dmabuf) {
+		ret = -ENOENT;
+		goto err_put_fd;
+	}
+	
+	usage = dma_resv_usage_rw(flags & DMA_BUF_SYNC_WRITE);
+	ret = dma_resv_get_singleton(dmabuf->resv, usage, &fence);
+	if (ret)
+		goto err_put_fd;
+
+	if (!fence)
+		fence = dma_fence_get_stub();
+
+	sync_file = sync_file_create(fence);
+
+	dma_fence_put(fence);
+
+	if (!sync_file) {
+		ret = -ENOMEM;
+		goto err_put_fd;
+	}
+
+	fd_install(fd, sync_file->file);
+
+	mutex_unlock(&file_priv->prime.lock);
+
+	*p_fd = fd;
+	return 0;
+err_put_fd:
+	put_unused_fd(fd);
+	mutex_unlock(&file_priv->prime.lock);
+	printf("fark: %d\n", ret);
+	return ret;
+}
+
 int drm_prime_handle_to_fd_ioctl(struct drm_device *dev, void *data,
 				 struct drm_file *file_priv)
 {
 	struct drm_prime_handle *args = data;
 
 	/* check flags are valid */
-	if (args->flags & ~(DRM_CLOEXEC | DRM_RDWR))
+	if (args->flags & ~(DRM_CLOEXEC | DRM_RDWR | DMA_BUF_SYNC_RW | 0x4))
 		return -EINVAL;
+	if (args->flags & 0x4)
+		return drm_prime_export_sync_file(file_priv, args->handle, &args->fd, args->flags);
 
 	if (dev->driver->prime_handle_to_fd) {
 		return dev->driver->prime_handle_to_fd(dev, file_priv,

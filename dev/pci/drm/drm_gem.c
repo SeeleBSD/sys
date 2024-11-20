@@ -309,10 +309,7 @@ int drm_gem_object_init(struct drm_device *dev,
 		printf("%s size too big %lu\n", __func__, size);
 		return -ENOMEM;
 	}
-	
-	obj->uao = uao_create(size, 0);
-	uvm_obj_init(&obj->uobj, &drm_pgops, 1);
-	
+		
 	return 0;
 }
 
@@ -353,6 +350,9 @@ void drm_gem_private_object_init(struct drm_device *dev,
 
 	drm_vma_node_reset(&obj->vma_node);
 	INIT_LIST_HEAD(&obj->lru_node);
+	
+	obj->uao = uao_create(size, 0);
+	uvm_obj_init(&obj->uobj, &drm_pgops, 1);
 }
 EXPORT_SYMBOL(drm_gem_private_object_init);
 

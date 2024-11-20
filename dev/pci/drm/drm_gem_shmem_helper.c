@@ -24,6 +24,8 @@
 #include <drm/drm_prime.h>
 #include <drm/drm_print.h>
 
+#include <uvm/uvm.h>
+
 MODULE_IMPORT_NS(DMA_BUF);
 
 /**
@@ -138,6 +140,9 @@ EXPORT_SYMBOL_GPL(drm_gem_shmem_create);
  */
 void drm_gem_shmem_free(struct drm_gem_shmem_object *shmem)
 {
+	STUB();
+	return;
+	
 	struct drm_gem_object *obj = &shmem->base;
 
 	if (obj->import_attach) {
@@ -181,6 +186,264 @@ uvm_pageinsert(struct vm_page *pg)
 	atomic_setbits_int(&pg->pg_flags, PG_TABLED);
 	pg->uobject->uo_npages++;
 }
+
+void drm_unref(struct uvm_object *);
+void drm_ref(struct uvm_object *);
+boolean_t drm_flush(struct uvm_object *, voff_t, voff_t, int);
+
+static int
+drm_get(struct uvm_object *uobj, voff_t offset, struct vm_page **pps,
+    int *npagesp, int centeridx, vm_prot_t access_type, int advice, int flags)
+{
+	voff_t current_offset;
+	vm_page_t ptmp;
+	int lcv, gotpages, maxpages, swslot, rv, pageidx;
+	boolean_t done;
+
+	KASSERT(rw_write_held(uobj->vmobjlock));
+
+	/*
+ 	 * get number of pages
+ 	 */
+	maxpages = *npagesp;
+
+	if (flags & PGO_LOCKED) {
+		/*
+ 		 * step 1a: get pages that are already resident.   only do
+		 * this if the data structures are locked (i.e. the first
+		 * time through).
+ 		 */
+
+		done = TRUE;	/* be optimistic */
+		gotpages = 0;	/* # of pages we got so far */
+
+		for (lcv = 0, current_offset = offset ; lcv < maxpages ;
+		    lcv++, current_offset += PAGE_SIZE) {
+			/* do we care about this page?  if not, skip it */
+			if (pps[lcv] == PGO_DONTCARE)
+				continue;
+
+			ptmp = uvm_pagelookup(uobj, current_offset);
+
+			/*
+ 			 * if page is new, attempt to allocate the page,
+			 * zero-fill'd.
+ 			 */
+			if (ptmp == NULL /*&& uao_find_swslot(uobj,
+			    current_offset >> PAGE_SHIFT) == 0*/) {
+				ptmp = uvm_pagealloc(uobj, current_offset,
+				    NULL, UVM_PGA_ZERO);
+				if (ptmp) {
+					/* new page */
+					atomic_clearbits_int(&ptmp->pg_flags,
+					    PG_BUSY|PG_FAKE);
+					atomic_setbits_int(&ptmp->pg_flags,
+					    PQ_AOBJ);
+					UVM_PAGE_OWN(ptmp, NULL);
+				}
+			}
+
+			/*
+			 * to be useful must get a non-busy page
+			 */
+			if (ptmp == NULL ||
+			    (ptmp->pg_flags & PG_BUSY) != 0) {
+				if (lcv == centeridx ||
+				    (flags & PGO_ALLPAGES) != 0)
+					/* need to do a wait or I/O! */
+					done = FALSE;	
+				continue;
+			}
+
+			/*
+			 * useful page: plug it in our result array
+			 */
+			atomic_setbits_int(&ptmp->pg_flags, PG_BUSY);
+			UVM_PAGE_OWN(ptmp, "uao_get1");
+			pps[lcv] = ptmp;
+			gotpages++;
+
+		}
+
+		/*
+ 		 * step 1b: now we've either done everything needed or we
+		 * to unlock and do some waiting or I/O.
+ 		 */
+		*npagesp = gotpages;
+		if (done)
+			/* bingo! */
+			return VM_PAGER_OK;	
+		else
+			/* EEK!   Need to unlock and I/O */
+			return VM_PAGER_UNLOCK;
+	}
+
+	/*
+ 	 * step 2: get non-resident or busy pages.
+ 	 * data structures are unlocked.
+ 	 */
+	for (lcv = 0, current_offset = offset ; lcv < maxpages ;
+	    lcv++, current_offset += PAGE_SIZE) {
+		/*
+		 * - skip over pages we've already gotten or don't want
+		 * - skip over pages we don't _have_ to get
+		 */
+		if (pps[lcv] != NULL ||
+		    (lcv != centeridx && (flags & PGO_ALLPAGES) == 0))
+			continue;
+
+		pageidx = current_offset >> PAGE_SHIFT;
+
+		/*
+ 		 * we have yet to locate the current page (pps[lcv]).   we
+		 * first look for a page that is already at the current offset.
+		 * if we find a page, we check to see if it is busy or
+		 * released.  if that is the case, then we sleep on the page
+		 * until it is no longer busy or released and repeat the lookup.
+		 * if the page we found is neither busy nor released, then we
+		 * busy it (so we own it) and plug it into pps[lcv].   this
+		 * 'break's the following while loop and indicates we are
+		 * ready to move on to the next page in the "lcv" loop above.
+ 		 *
+ 		 * if we exit the while loop with pps[lcv] still set to NULL,
+		 * then it means that we allocated a new busy/fake/clean page
+		 * ptmp in the object and we need to do I/O to fill in the data.
+ 		 */
+
+		/* top of "pps" while loop */
+		while (pps[lcv] == NULL) {
+			/* look for a resident page */
+			ptmp = uvm_pagelookup(uobj, current_offset);
+
+			/* not resident?   allocate one now (if we can) */
+			if (ptmp == NULL) {
+
+				ptmp = uvm_pagealloc(uobj, current_offset,
+				    NULL, 0);
+
+				/* out of RAM? */
+				if (ptmp == NULL) {
+					rw_exit(uobj->vmobjlock);
+					uvm_wait("uao_getpage");
+					rw_enter(uobj->vmobjlock, RW_WRITE);
+					/* goto top of pps while loop */
+					continue;
+				}
+
+				/*
+				 * safe with PQ's unlocked: because we just
+				 * alloc'd the page
+				 */
+				atomic_setbits_int(&ptmp->pg_flags, PQ_AOBJ);
+
+				/* 
+				 * got new page ready for I/O.  break pps while
+				 * loop.  pps[lcv] is still NULL.
+				 */
+				break;
+			}
+
+			/* page is there, see if we need to wait on it */
+			if ((ptmp->pg_flags & PG_BUSY) != 0) {
+				uvm_pagewait(ptmp, uobj->vmobjlock, "uao_get");
+				rw_enter(uobj->vmobjlock, RW_WRITE);
+				continue;	/* goto top of pps while loop */
+			}
+
+			/*
+ 			 * if we get here then the page is resident and
+			 * unbusy.  we busy it now (so we own it).
+ 			 */
+			/* we own it, caller must un-busy */
+			atomic_setbits_int(&ptmp->pg_flags, PG_BUSY);
+			UVM_PAGE_OWN(ptmp, "uao_get2");
+			pps[lcv] = ptmp;
+		}
+
+		/*
+ 		 * if we own the valid page at the correct offset, pps[lcv] will
+ 		 * point to it.   nothing more to do except go to the next page.
+ 		 */
+		if (pps[lcv])
+			continue;			/* next lcv */
+
+		uvm_pagezero(ptmp);
+#ifdef notyet
+		/*
+ 		 * we have a "fake/busy/clean" page that we just allocated.  
+ 		 * do the needed "i/o", either reading from swap or zeroing.
+ 		 */
+		swslot = uao_find_swslot(uobj, pageidx);
+
+		/* just zero the page if there's nothing in swap.  */
+		if (swslot == 0) {
+			/* page hasn't existed before, just zero it. */
+			uvm_pagezero(ptmp);
+		} else {
+			/*
+			 * page in the swapped-out page.
+			 * unlock object for i/o, relock when done.
+			 */
+
+			rw_exit(uobj->vmobjlock);
+			rv = uvm_swap_get(ptmp, swslot, PGO_SYNCIO);
+			rw_enter(uobj->vmobjlock, RW_WRITE);
+
+			/*
+			 * I/O done.  check for errors.
+			 */
+			if (rv != VM_PAGER_OK) {
+				/*
+				 * remove the swap slot from the aobj
+				 * and mark the aobj as having no real slot.
+				 * don't free the swap slot, thus preventing
+				 * it from being used again.
+				 */
+				swslot = uao_set_swslot(&aobj->u_obj, pageidx,
+							SWSLOT_BAD);
+				uvm_swap_markbad(swslot, 1);
+
+				if (ptmp->pg_flags & PG_WANTED)
+					wakeup(ptmp);
+				atomic_clearbits_int(&ptmp->pg_flags,
+				    PG_WANTED|PG_BUSY);
+				UVM_PAGE_OWN(ptmp, NULL);
+				uvm_lock_pageq();
+				uvm_pagefree(ptmp);
+				uvm_unlock_pageq();
+				rw_exit(uobj->vmobjlock);
+
+				return rv;
+			}
+		}
+#endif
+
+		/*
+ 		 * we got the page!   clear the fake flag (indicates valid
+		 * data now in page) and plug into our result array.   note
+		 * that page is still busy.
+ 		 *
+ 		 * it is the callers job to:
+ 		 * => check if the page is released
+ 		 * => unbusy the page
+ 		 * => activate the page
+ 		 */
+		atomic_clearbits_int(&ptmp->pg_flags, PG_FAKE);
+		pmap_clear_modify(ptmp);		/* ... and clean */
+		pps[lcv] = ptmp;
+
+	}	/* lcv loop */
+
+	rw_exit(uobj->vmobjlock);
+	return VM_PAGER_OK;
+}
+
+struct uvm_pagerops drm_shmem_pager = {
+	.pgo_reference = drm_ref,
+	.pgo_detach = drm_unref,
+	.pgo_flush = drm_flush,
+	.pgo_get = drm_get,
+};
 
 static int drm_gem_shmem_get_pages(struct drm_gem_shmem_object *shmem)
 {
@@ -227,13 +490,10 @@ static int drm_gem_shmem_get_pages(struct drm_gem_shmem_object *shmem)
     sg = st->sgl;
     st->nents = 0;
     long i = 0;
-    struct uvm_object *uobj;
+    uvm_obj_init(&obj->uobj, &drm_shmem_pager, 1);
+    struct uvm_object *uobj = &obj->uobj;
 
-    uobj = uao_create(obj->size, 0);
-
-    obj->uobj = *uobj;
-
-    rw_enter(obj->uobj.vmobjlock, RW_WRITE | RW_DUPOK);
+    rw_enter(uobj->vmobjlock, RW_WRITE | RW_DUPOK);
     while (i < npages) {
         int j;
         for (j = 0; j < 4; j++) {
@@ -243,9 +503,9 @@ static int drm_gem_shmem_get_pages(struct drm_gem_shmem_object *shmem)
                 goto fail_unwire;
             }
             TAILQ_REMOVE(&plist, page, pageq);
-            page->uobject = &obj->uobj;
+            page->uobject = uobj;
             page->offset = (i * 4 + j)*PAGE_SIZE;
-		        if (uvm_pagelookup(&obj->uobj, page->offset) == NULL) {
+		        if (uvm_pagelookup(uobj, page->offset) == NULL) {
 	            uvm_pageinsert(page);
 		        }
 						pages[i * 4 + j] = page;
@@ -256,7 +516,7 @@ static int drm_gem_shmem_get_pages(struct drm_gem_shmem_object *shmem)
         st->nents++;
         i++;
     }
-    rw_exit(obj->uobj.vmobjlock);
+    rw_exit(uobj->vmobjlock);
 
     if (sg)
         sg_mark_end(sg);
