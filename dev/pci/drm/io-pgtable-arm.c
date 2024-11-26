@@ -247,7 +247,8 @@ __arm_lpae_iopte_deref(arm_lpae_iopte pte, struct arm_lpae_io_pgtable *data)
 {
 	paddr_t paddr = iopte_to_paddr(pte, data);
 	void *addr = km_alloc(ARM_LPAE_GRANULE(data), &kv_any, &kp_none, &kd_waitok);
-	pmap_kenter_pa((vaddr_t)addr, paddr, PROT_WRITE | PROT_READ);
+	for (voff_t offset = 0; offset < ARM_LPAE_GRANULE(data); offset += PAGE_SIZE)
+		pmap_kenter_pa((vaddr_t)addr + offset, paddr + offset, PROT_WRITE | PROT_READ);
 	return (arm_lpae_iopte *)addr;
 }
 
