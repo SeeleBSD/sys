@@ -344,6 +344,8 @@ __arm_lpae_alloc_pages(size_t size, int flags,
     if (error)
         goto out_destroy_dmamap;
 
+    memset(pgtable->cpu_addr, 0, pgtable->size);
+
     return pgtable;
 
 out_destroy_dmamap:
@@ -556,7 +558,7 @@ static int __arm_lpae_map(struct arm_lpae_io_pgtable *data, unsigned long iova,
 	map_idx_start = ARM_LPAE_LVL_IDX(iova, lvl, data);
 	ptep += map_idx_start;
 
-	printf("ptep: %p, paddr: 0x%lu\n", ptep, __arm_lpae_dma_addr(ptep));
+	// printf("ptep: %p, paddr: 0x%lu\n", ptep, __arm_lpae_dma_addr(ptep));
 
 	/* If we can install a leaf entry at this level, then do so */
 	if (size == block_size) {
@@ -592,7 +594,7 @@ static int __arm_lpae_map(struct arm_lpae_io_pgtable *data, unsigned long iova,
     	__arm_lpae_sync_pte(ptep, 1, data->pgd);
 #endif
 	}
-	
+
 	if (pte && !iopte_leaf(pte, lvl, data->iop.fmt)) {
 		cptep = iopte_deref(pte, data);
 	} else if (pte) {

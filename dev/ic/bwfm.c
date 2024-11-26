@@ -298,7 +298,7 @@ bwfm_preinit(struct bwfm_softc *sc)
 	if (bwfm_fwvar_var_get_data(sc, "join_ver", &join_ver, sizeof(join_ver))) {
 		sc->sc_join_ver = 0;
 		struct bwfm_wlc_version ver;
-		if (bwfm_fwvar_var_get_data(sc, "wlc_ver", &ver, sizeof(ver))) {
+		if (!bwfm_fwvar_var_get_data(sc, "wlc_ver", &ver, sizeof(ver))) {
 			uint16_t major = letoh16(ver.wlc_ver_major);
 			uint16_t minor = letoh16(ver.wlc_ver_minor);
 			if (((major == MIN_JOINEXT_V1_BR1_FW_MAJOR) &&
