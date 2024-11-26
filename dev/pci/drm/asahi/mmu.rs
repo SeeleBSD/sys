@@ -224,8 +224,8 @@ impl VmInner {
     fn map_iova(&self, iova: usize, size: usize) -> Result<usize> {
         if iova < self.min_va || (iova + size - 1) > self.max_va {
             Err(EINVAL)
-        // } else if self.is_kernel {
-            // Ok(iova - self.min_va)
+        } else if self.is_kernel {
+            Ok(iova - self.min_va)
         } else {
             Ok(iova)
         }
