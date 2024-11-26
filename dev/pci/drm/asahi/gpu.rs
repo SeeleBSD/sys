@@ -302,7 +302,7 @@ impl rtkit::Operations for GpuManager::ver {
 
     fn recv_message(data: <Self::Data as ForeignOwnable>::Borrowed<'_>, ep: u8, msg: u64) {
         let dev = &data.dev;
-        //dev_info!(dev, "RtKit message: {:#x}:{:#x}\n", ep, msg);
+        dev_info!(dev, "RtKit message: {:#x}:{:#x}\n", ep, msg);
 
         if ep != EP_FIRMWARE || msg != MSG_RX_DOORBELL {
             dev_err!(dev, "Unknown message: {:#x}:{:#x}\n", ep, msg);
@@ -1108,7 +1108,7 @@ impl GpuManager for GpuManager::ver {
         let rtk = guard.as_mut().unwrap();
         dbg!("guard2");
 
-        rtk.boot()?;
+        rtk.boot().ok();
         dbg!("boot");
         // coarse_sleep(Duration::from_secs(1));
         rtk.start_endpoint(EP_FIRMWARE)?;

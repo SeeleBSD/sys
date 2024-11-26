@@ -1,4 +1,4 @@
-/*	$OpenBSD: aplsmc.c,v 1.25 2023/07/16 16:11:11 kettenis Exp $	*/
+/*	$OpenBSD: aplsmc.c,v 1.28 2024/11/04 09:33:16 kettenis Exp $	*/
 /*
  * Copyright (c) 2021 Mark Kettenis <kettenis@openbsd.org>
  *
@@ -139,13 +139,11 @@ struct aplsmc_softc {
 	int			sc_nsensors;
 	struct ksensordev	sc_sensordev;
 	uint32_t		sc_suspend_pstr;
-
-	int sc_upd_avail;
-	int sc_remaining;
 };
 
 #define CH0I_DISCHARGE		(1 << 0)
 #define CH0C_INHIBIT		(1 << 0)
+#define CHLS_FORCE_DISCHARGE	(1 << 8)
 
 struct aplsmc_softc *aplsmc_sc;
 
@@ -153,10 +151,10 @@ struct aplsmc_softc *aplsmc_sc;
 
 struct aplsmc_sensor aplsmc_sensors[] = {
 	{ "ACDI", "ui16", SENSOR_INDICATOR, 1, "power supply" },
-	{ "B0RM", "ui16", SENSOR_AMPHOUR, 1000, "remaining capacity",
+	{ "B0RM", "ui16", SENSOR_AMPHOUR, 1000, "remaining battery capacity",
 	  APLSMC_BE },
-	{ "B0FC", "ui16", SENSOR_AMPHOUR, 1000, "last full capacity" },
-	{ "B0DC", "ui16", SENSOR_AMPHOUR, 1000, "design capacity" },
+	{ "B0FC", "ui16", SENSOR_AMPHOUR, 1000, "last full battery capacity" },
+	{ "B0DC", "ui16", SENSOR_AMPHOUR, 1000, "battery design capacity" },
 	{ "B0AV", "ui16", SENSOR_VOLTS_DC, 1000, "battery" },
 	{ "B0CT", "ui16", SENSOR_INTEGER, 1, "battery discharge cycles" },
 	{ "B0TF", "ui16", SENSOR_INTEGER, 1, "battery time-to-full",
@@ -207,7 +205,8 @@ void	aplsmc_reboot_attachhook(struct device *);
 void	aplsmc_battery_init(struct aplsmc_softc *);
 int	aplsmc_battery_setchargemode(int);
 int	aplsmc_battery_setchargestart(int);
-int	aplsmc_battery_setchargestop(int);
+int	aplsmc_battery_chls_setchargestop(int);
+int	aplsmc_battery_chwa_setchargestop(int);
 
 int
 aplsmc_match(struct device *parent, void *match, void *aux)
@@ -233,9 +232,6 @@ aplsmc_attach(struct device *parent, struct device *self, void *aux)
 		printf(": no registers\n");
 		return;
 	}
-
-	sc->sc_upd_avail = 0;
-	sc->sc_remaining = -1;
 
 	sc->sc_iot = faa->fa_iot;
 	if (bus_space_map(sc->sc_iot, faa->fa_reg[0].addr,
@@ -387,8 +383,6 @@ aplsmc_activate(struct device *self, int act)
 	return 0;
 }
 
-int aplsmc_evindex;
-
 void
 aplsmc_handle_notification(struct aplsmc_softc *sc, uint64_t data)
 {
@@ -422,8 +416,8 @@ aplsmc_handle_notification(struct aplsmc_softc *sc, uint64_t data)
 		return;
 	}
 #endif
-	uint64_t evt = SMC_EV_TYPE(data);
-	switch (evt) {
+
+	switch (SMC_EV_TYPE(data)) {
 	case SMC_EV_TYPE_BTN:
 		switch (SMC_EV_SUBTYPE(data)) {
 		case SMC_PWRBTN_SHORT:
@@ -479,19 +473,6 @@ aplsmc_handle_notification(struct aplsmc_softc *sc, uint64_t data)
 		    sc->sc_dev.dv_xname, data);
 #endif
 		break;
-	}
-
-	evt = data >> 32ULL;
-	if (((evt & 0xffffff00ULL) == 0x71010100ULL)
-		|| ((evt & 0xffff0000ULL) == 0x71060000ULL)
-		|| ((evt & 0xff000000ULL) == 0x71000000ULL)) {
-		// aplsmc_refresh_sensors(sc);
-		aplsmc_evindex++;
-#ifdef APLSMC_DEBUG
-		printf("%s: APM_POWER_CHANGE\n", sc->sc_dev.dv_xname);
-#endif
-		sc->sc_upd_avail = 1;
-		// apm_record_event(APM_POWER_CHANGE);
 	}
 }
 
@@ -617,7 +598,6 @@ aplsmc_refresh_sensors(void *arg)
 	int64_t value;
 	uint32_t key;
 	int i, error;
-	int remaining = -1;
 
 	for (i = 0; i < sc->sc_nsensors; i++) {
 		sensor = sc->sc_smcsensors[i];
@@ -657,15 +637,6 @@ aplsmc_refresh_sensors(void *arg)
 
 		if (strcmp(sensor->key, "ACDI") == 0)
 			hw_power = (value > 0);
-
-		if (strcmp(sensor->key, "B0RM") == 0)
-			remaining = value;
-	}
-
-	if (sc->sc_upd_avail || remaining != sc->sc_remaining) {
-		apm_record_event(APM_POWER_CHANGE);
-		sc->sc_upd_avail = 0;
-		sc->sc_remaining = remaining;
 	}
 }
 
@@ -840,11 +811,13 @@ aplsmc_powerdown(void)
 	aplsmc_write_key(sc, key, &off1, sizeof(off1));
 }
 
+#ifndef SMALL_KERNEL
+
 void
 aplsmc_battery_init(struct aplsmc_softc *sc)
 {
-	uint8_t ch0i, ch0c;
-	int error;
+	uint8_t ch0i, ch0c, chwa;
+	int error, stop;
 
 	error = aplsmc_read_key(sc, SMC_KEY("CH0I"), &ch0i, sizeof(ch0i));
 	if (error)
@@ -853,7 +826,6 @@ aplsmc_battery_init(struct aplsmc_softc *sc)
 	if (error)
 		return;
 
-#ifndef SMALL_KERNEL
 	if (ch0i & CH0I_DISCHARGE)
 		hw_battery_chargemode = -1;
 	else if (ch0c & CH0C_INHIBIT)
@@ -861,16 +833,37 @@ aplsmc_battery_init(struct aplsmc_softc *sc)
 	else
 		hw_battery_chargemode = 1;
 
-	hw_battery_chargestart = 0;
-	hw_battery_chargestop = 100;
-
 	hw_battery_setchargemode = aplsmc_battery_setchargemode;
+
+	/*
+	 * The system firmware for macOS 15 (Sequoia) introduced a new
+	 * CHLS key that allows setting the level at which to stop
+	 * charging, and dropped support for the old CHWA key that
+	 * only supports a fixed limit of 80%.  However, CHLS is
+	 * broken in some beta versions.  Those versions still support
+	 * CHWA so prefer that over CHLS.
+	 */
+	error = aplsmc_read_key(sc, SMC_KEY("CHWA"), &chwa, sizeof(chwa));
+	if (error) {
+		uint16_t chls;
+
+		error = aplsmc_read_key(sc, SMC_KEY("CHLS"),
+		    &chls, sizeof(chls));
+		if (error)
+			return;
+		stop = (chls & 0xff) ? (chls & 0xff) : 100;
+		hw_battery_setchargestop = aplsmc_battery_chls_setchargestop;
+	} else {
+		stop = chwa ? 80 : 100;
+		hw_battery_setchargestop = aplsmc_battery_chwa_setchargestop;
+	}
+
 	hw_battery_setchargestart = aplsmc_battery_setchargestart;
-	hw_battery_setchargestop = aplsmc_battery_setchargestop;
-#endif
+	
+	hw_battery_chargestart = stop - 5;
+	hw_battery_chargestop = stop;
 }
 
-#ifndef SMALL_KERNEL
 int
 aplsmc_battery_setchargemode(int mode)
 {
@@ -930,21 +923,54 @@ aplsmc_battery_setchargestart(int start)
 }
 
 int
-aplsmc_battery_setchargestop(int stop)
+aplsmc_battery_chls_setchargestop(int stop)
+{
+	struct aplsmc_softc *sc = aplsmc_sc;
+	uint16_t chls;
+	int error;
+
+	if (stop < 10)
+		stop = 10;
+
+	/*
+	 * Setting the CHLS_FORCE_DISCHARGE flags makes sure the
+	 * battery is discharged until the configured charge level is
+	 * reached when the limit is lowered.
+	 */
+	chls = (stop == 100 ? 0 : stop) | CHLS_FORCE_DISCHARGE;
+	error = aplsmc_write_key(sc, SMC_KEY("CHLS"), &chls, sizeof(chls));
+	if (error)
+		return error;
+
+	hw_battery_chargestart = stop - 5;
+	hw_battery_chargestop = stop;
+
+	return 0;
+}
+
+int
+aplsmc_battery_chwa_setchargestop(int stop)
 {
 	struct aplsmc_softc *sc = aplsmc_sc;
 	uint8_t chwa;
+	int error;
 
 	if (stop <= 80) {
-		hw_battery_chargestart = 75;
-		hw_battery_chargestop = 80;
+		stop = 80;
 		chwa = 1;
 	} else {
-		hw_battery_chargestart = 95;
-		hw_battery_chargestop = 100;
+		stop = 100;
 		chwa = 0;
 	}
 
-	return aplsmc_write_key(sc, SMC_KEY("CHWA"), &chwa, sizeof(chwa));
+	error = aplsmc_write_key(sc, SMC_KEY("CHWA"), &chwa, sizeof(chwa));
+	if (error)
+		return error;
+
+	hw_battery_chargestart = stop - 5;
+	hw_battery_chargestop = stop;
+
+	return 0;
 }
+
 #endif

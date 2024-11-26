@@ -32,6 +32,7 @@
 #include <linux/module.h>
 #include <linux/sync_file.h>
 #include <linux/file.h>
+#include <linux/dma-fence-unwrap.h>
 
 #include <drm/drm.h>
 #include <drm/drm_drv.h>
@@ -370,10 +371,54 @@ out_put:
 }
 EXPORT_SYMBOL(drm_gem_prime_fd_to_handle);
 
+static int drm_gem_prime_import_sync_file(struct drm_file *file_priv, int handle, int fd, int flags)
+{
+	struct drm_gem_object *obj;
+	struct dma_fence *fence, *f;
+	enum dma_resv_usage usage;
+	struct dma_fence_unwrap iter;
+	unsigned int num_fences;
+	int ret = 0;
+
+	obj = drm_gem_object_lookup(file_priv, handle);
+
+	if (!obj)
+		return -ENOENT;
+
+	fence = sync_file_get_fence(fd);
+	if (!fence)
+		return -EINVAL;
+
+	usage = (flags & DMA_BUF_SYNC_WRITE) ? DMA_RESV_USAGE_WRITE : DMA_RESV_USAGE_READ;
+	
+	num_fences = 0;
+	dma_fence_unwrap_for_each(f, &iter, fence)
+		++num_fences;
+
+	if (num_fences > 0) {
+		dma_resv_lock(obj->resv, NULL);
+
+		ret = dma_resv_reserve_fences(obj->resv, num_fences);
+		if (!ret) {
+			dma_fence_unwrap_for_each(f, &iter, fence)
+				dma_resv_add_fence(obj->resv, f, usage);
+		}
+
+		dma_resv_unlock(obj->resv);
+	}
+
+	dma_fence_put(fence);
+
+	return ret;
+}
+
 int drm_prime_fd_to_handle_ioctl(struct drm_device *dev, void *data,
 				 struct drm_file *file_priv)
 {
 	struct drm_prime_handle *args = data;
+
+	if (args->flags & 0x4)
+		return drm_gem_prime_import_sync_file(file_priv, args->handle, args->fd, args->flags);
 
 	if (dev->driver->prime_fd_to_handle) {
 		return dev->driver->prime_fd_to_handle(dev, file_priv, args->fd,
@@ -535,19 +580,19 @@ static int drm_prime_export_sync_file(struct drm_file *file_priv,
 	mutex_lock(&file_priv->prime.lock);
 	obj = drm_gem_object_lookup(file_priv, handle);
 		
-	dmabuf = drm_prime_lookup_buf_by_handle(&file_priv->prime, handle);
+	// dmabuf = drm_prime_lookup_buf_by_handle(&file_priv->prime, handle);
 	
-	if (obj->dma_buf) {
-		dmabuf = obj->dma_buf;
-	}
+	// if (obj->dma_buf) {
+		// dmabuf = obj->dma_buf;
+	// }
 	
-	if (!dmabuf) {
+	if (!obj) {
 		ret = -ENOENT;
 		goto err_put_fd;
 	}
 	
 	usage = dma_resv_usage_rw(flags & DMA_BUF_SYNC_WRITE);
-	ret = dma_resv_get_singleton(dmabuf->resv, usage, &fence);
+	ret = dma_resv_get_singleton(obj->resv, usage, &fence);
 	if (ret)
 		goto err_put_fd;
 

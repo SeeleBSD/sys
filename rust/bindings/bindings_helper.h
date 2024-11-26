@@ -57,6 +57,10 @@
 #include <linux/printk.h>
 #include <linux/gfp_types.h>
 
+#ifdef __arm64__
+#include <arm64/dev/rtkit.h>
+#endif
+
 int drm_gem_init(struct drm_device *);
 
 #define IS_ERR_VALUE(x) unlikely((x) >= (unsigned long)-ELAST)
