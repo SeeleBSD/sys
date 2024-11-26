@@ -60,6 +60,18 @@ static int bwfm_debug = 3;
 
 #define DEVNAME(sc)	((sc)->sc_dev.dv_xname)
 
+/* MIN branch version supporting join iovar versioning */
+#define MIN_JOINEXT_V1_FW_MAJOR 17u
+/* Branch/es supporting join iovar versioning prior to
+ * MIN_JOINEXT_V1_FW_MAJOR
+ */
+#define MIN_JOINEXT_V1_BR2_FW_MAJOR      16
+#define MIN_JOINEXT_V1_BR2_FW_MINOR      1
+
+#define MIN_JOINEXT_V1_BR1_FW_MAJOR      14
+#define MIN_JOINEXT_V1_BR1_FW_MINOR_2    2
+#define MIN_JOINEXT_V1_BR1_FW_MINOR_4    4
+
 void	 bwfm_start(struct ifnet *);
 void	 bwfm_init(struct ifnet *);
 void	 bwfm_stop(struct ifnet *);
@@ -284,7 +296,20 @@ bwfm_preinit(struct bwfm_softc *sc)
 		sc->sc_scan_ver = letoh16(scan_ver.scan_ver_major);
 	}
 	if (bwfm_fwvar_var_get_data(sc, "join_ver", &join_ver, sizeof(join_ver))) {
-		sc->sc_join_ver = 1;
+		sc->sc_join_ver = 0;
+		struct bwfm_wlc_version ver;
+		if (bwfm_fwvar_var_get_data(sc, "wlc_ver", &ver, sizeof(ver))) {
+			uint16_t major = letoh16(ver.wlc_ver_major);
+			uint16_t minor = letoh16(ver.wlc_ver_minor);
+			if (((major == MIN_JOINEXT_V1_BR1_FW_MAJOR) &&
+			     ((minor == MIN_JOINEXT_V1_BR1_FW_MINOR_2) ||
+			      (minor == MIN_JOINEXT_V1_BR1_FW_MINOR_4))) ||
+			    ((major == MIN_JOINEXT_V1_BR2_FW_MAJOR) &&
+			     (minor >= MIN_JOINEXT_V1_BR2_FW_MINOR)) ||
+			    (major >= MIN_JOINEXT_V1_FW_MAJOR)) {
+				sc->sc_join_ver = 1;
+			}
+		}
 	} else {
 		sc->sc_join_ver = letoh16(join_ver.join_ver_major);
 	}

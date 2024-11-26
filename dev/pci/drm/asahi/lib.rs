@@ -131,8 +131,8 @@ pub extern "C" fn asahidrm_attachhook(_self: *mut bindings::device) {
         unsafe { platform::Device::from_ptr(&mut (*sc).sc_dev as *mut bindings::platform_device) };
     let res = regs::Resources::new(&mut pdev).expect("Failed to create res");
 
-    res.init_mmio().ok();
-    res.start_cpu().ok();
+    res.init_mmio().unwrap();
+    res.start_cpu().unwrap();
 
     let node = of::Node::from_handle(unsafe { (*sc).sc_node }).unwrap();
     let compat: Vec<u32> = node

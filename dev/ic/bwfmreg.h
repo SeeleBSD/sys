@@ -891,3 +891,16 @@ struct bwfm_join_version {
 	uint16_t join_ver_major;
 	uint8_t pad[2];
 };
+
+struct bwfm_wlc_version {
+	uint16_t version;
+	uint16_t length;
+
+	uint16_t epi_ver_major;
+	uint16_t epi_ver_minor;
+	uint16_t epi_ver_rc;
+	uint16_t epi_ver_incr;
+
+	uint16_t wlc_ver_major;
+	uint16_t wlc_ver_minor;
+};
