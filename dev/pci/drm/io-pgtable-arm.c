@@ -17,6 +17,7 @@
 #include <sys/pool.h>
 #include <uvm/uvm_extern.h>
 #include <machine/pmap.h>
+#include <machine/cpu.h>
 
 #include <linux/atomic.h>
 #include <linux/bitops.h>
@@ -323,7 +324,7 @@ __arm_lpae_alloc_pages(size_t size, int flags,
     pgtable->dmat = dmat;
 
     error = bus_dmamem_alloc(dmat, size, cfg->pgsize_bitmap, 0, pgtable->segs, 1,
-                             &pgtable->nsegs, BUS_DMA_NOWAIT);
+                             &pgtable->nsegs, BUS_DMA_NOWAIT | BUS_DMA_COHERENT);
     if (error)
         goto out_free_pgtable;
 
@@ -332,13 +333,13 @@ __arm_lpae_alloc_pages(size_t size, int flags,
     if (error)
         goto out_free_dmamem;
 
-    error = bus_dmamap_create(dmat, size, 1, size, 0, BUS_DMA_NOWAIT,
+    error = bus_dmamap_create(dmat, size, 1, size, 0, BUS_DMA_NOWAIT | BUS_DMA_COHERENT,
                               &pgtable->dmamap);
     if (error)
         goto out_unmap;
 
     error = bus_dmamap_load_raw(dmat, pgtable->dmamap, pgtable->segs, 1, size,
-            										BUS_DMA_NOWAIT);
+            										BUS_DMA_NOWAIT | BUS_DMA_COHERENT);
     if (error)
         goto out_destroy_dmamap;
 
@@ -399,12 +400,18 @@ static void
 __arm_lpae_sync_pte(arm_lpae_iopte *ptep, int num_entries,
 		    struct arm_lpae_dma_pgtable *pgtable)
 {
-	bus_dma_tag_t dmat = pgtable->dmat;
-	bus_dmamap_t dmamap = pgtable->dmamap;
-	bus_size_t len = sizeof(*ptep) * num_entries;
-	bus_addr_t offset = (bus_addr_t)__arm_lpae_dma_addr(ptep) - (bus_addr_t)__arm_lpae_dma_addr(pgtable->cpu_addr);
+	#define CACHE_LINE_SIZE 64
 
-	bus_dmamap_sync(dmat, dmamap, offset, len, BUS_DMASYNC_PREWRITE);
+	size_t size = sizeof(*ptep) * num_entries;
+
+	vaddr_t vaddr = (vaddr_t)ptep;
+	vaddr_t va_start = vaddr & ~(CACHE_LINE_SIZE - 1);
+    vaddr_t va_end = (vaddr + size + CACHE_LINE_SIZE - 1) & ~(CACHE_LINE_SIZE - 1);
+    size_t sync_size = va_end - va_start;
+
+	cpu_dcache_wb_range(va_start, sync_size);
+
+	mb();
 }
 #endif
 
@@ -524,7 +531,7 @@ static arm_lpae_iopte arm_lpae_install_table(struct arm_lpae_dma_pgtable *table,
 #ifdef __linux__
 	__arm_lpae_sync_pte(ptep, 1, cfg);
 #else
-  __arm_lpae_sync_pte(ptep, 1, table);
+  	__arm_lpae_sync_pte(ptep, 1, table);
 #endif
 	if (old == curr)
 		WRITE_ONCE(*ptep, new | ARM_LPAE_PTE_SW_SYNC);
