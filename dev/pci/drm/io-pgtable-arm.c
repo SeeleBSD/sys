@@ -18,6 +18,7 @@
 #include <uvm/uvm_extern.h>
 #include <machine/pmap.h>
 #include <machine/cpu.h>
+#include <machine/cpufunc.h>
 
 #include <linux/atomic.h>
 #include <linux/bitops.h>
@@ -400,7 +401,7 @@ static void
 __arm_lpae_sync_pte(arm_lpae_iopte *ptep, int num_entries,
 		    struct arm_lpae_dma_pgtable *pgtable)
 {
-	#define CACHE_LINE_SIZE 64
+#define CACHE_LINE_SIZE 64
 
 	size_t size = sizeof(*ptep) * num_entries;
 
