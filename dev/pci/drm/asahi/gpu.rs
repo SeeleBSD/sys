@@ -1105,7 +1105,7 @@ impl GpuManager for GpuManager::ver {
         let mut guard = self.rtkit.lock();
         let rtk = guard.as_mut().unwrap();
 
-        rtk.boot()?;
+        rtk.boot().ok();
         rtk.start_endpoint(EP_FIRMWARE)?;
         rtk.start_endpoint(EP_DOORBELL)?;
         rtk.send_message(EP_FIRMWARE, MSG_INIT | (initdata & INIT_DATA_MASK))?;
