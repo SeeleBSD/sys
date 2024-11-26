@@ -923,13 +923,13 @@ impl Vm {
             return Err(EINVAL);
         }
 
-        /*dev_info!(
+        dev_info!(
             inner.dev,
             "MMU: IO map: {:#x}:{:#x} -> {:#x}\n",
             phys,
             size,
             iova
-        );*/
+        );
 
         let uat_inner = inner.uat_inner.clone();
         let node = inner.mm.reserve_node(
