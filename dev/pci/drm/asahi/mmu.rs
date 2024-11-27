@@ -795,7 +795,7 @@ impl Vm {
                 pgsize_bitmap: UAT_PGSZ,
                 ias: if is_kernel { UAT_IAS_KERN } else { UAT_IAS },
                 oas: cfg.uat_oas,
-                coherent_walk: true,
+                coherent_walk: false,
                 quirks: 0,
 
                 dmat: unsafe { crate::DMAT.expect("Uninitialized") },
