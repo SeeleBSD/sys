@@ -325,7 +325,7 @@ __arm_lpae_alloc_pages(size_t size, int flags,
     pgtable->dmat = dmat;
 
     error = bus_dmamem_alloc(dmat, size, cfg->pgsize_bitmap, 0, pgtable->segs, 1,
-                             &pgtable->nsegs, BUS_DMA_NOWAIT);
+                             &pgtable->nsegs, BUS_DMA_NOWAIT | BUS_DMA_COHERENT);
     if (error)
         goto out_free_pgtable;
 
@@ -341,8 +341,7 @@ __arm_lpae_alloc_pages(size_t size, int flags,
 
     error = bus_dmamap_load_raw(dmat, pgtable->dmamap, pgtable->segs, 1, size,
             										BUS_DMA_NOWAIT | BUS_DMA_COHERENT);
-	
-	if (error)
+    if (error)
         goto out_destroy_dmamap;
 
     memset(pgtable->cpu_addr, 0, pgtable->size);
