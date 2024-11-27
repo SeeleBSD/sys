@@ -344,6 +344,11 @@ __arm_lpae_alloc_pages(size_t size, int flags,
     if (error)
         goto out_destroy_dmamap;
 
+	for (voff_t offset = 0; offset < size; offset += PAGE_SIZE)
+		pmap_kenter_pa((vaddr_t)pgtable->cpu_addr + offset, pgtable->segs[0].ds_addr + offset,
+               		PROT_READ | PROT_WRITE);
+	pmap_update(pmap_kernel());
+
     memset(pgtable->cpu_addr, 0, pgtable->size);
 
     return pgtable;
