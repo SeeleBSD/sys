@@ -570,8 +570,8 @@ static int __arm_lpae_map(struct arm_lpae_io_pgtable *data, unsigned long iova,
 			*mapped += num_entries * size;
 
 		for (voff_t offset = 0; offset < num_entries * size; offset += PAGE_SIZE)
-			if (__arm_lpae_dma_addr(iova + offset) != paddr + offset)
-				panic("0x%lu -> 0x%lu, expected 0x%lu", iova + offset, __arm_lpae_dma_addr(iova + offset), paddr + offset);
+			if (__arm_lpae_dma_addr((void*)(iova + offset)) != paddr + offset)
+				panic("0x%llu -> 0x%llu, expected 0x%llu", iova + offset, __arm_lpae_dma_addr((void*)(iova + offset)), paddr + offset);
 
 		return ret;
 	}
