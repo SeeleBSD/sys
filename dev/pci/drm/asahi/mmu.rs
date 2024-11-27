@@ -10,7 +10,6 @@
 //!
 //! The actual page table management is delegated to the common kernel `io_pgtable` code.
 
-use core::arch::asm;
 use core::fmt::Debug;
 use core::mem::size_of;
 use core::ptr::NonNull;
@@ -253,19 +252,7 @@ impl VmInner {
             paddr += mapped;
             iova += mapped;
         }
-
-        unsafe {
-            asm!(
-                ".arch armv8.4-a",
-                "dmb ish");
-            asm!(
-                ".arch armv8.4-a",
-                "dsb ish");
-            asm!(
-                ".arch armv8.4-a",
-                "isb");
-        }
-
+        
         Ok(pgcount * pgsize)
     }
 
@@ -290,18 +277,6 @@ impl VmInner {
 
             left -= unmapped / pgsize;
             iova += unmapped;
-        }
-
-        unsafe {
-            asm!(
-                ".arch armv8.4-a",
-                "dmb ish");
-            asm!(
-                ".arch armv8.4-a",
-                "dsb ish");
-            asm!(
-                ".arch armv8.4-a",
-                "isb");
         }
 
         Ok(pgcount * pgsize)
