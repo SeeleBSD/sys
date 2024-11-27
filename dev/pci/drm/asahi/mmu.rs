@@ -256,8 +256,12 @@ impl VmInner {
         unsafe {
             asm!(
                 ".arch armv8.4-a",
-                "dmb ish", 
-                "dsb ish",
+                "dmb ish");
+            asm!(
+                ".arch armv8.4-a",
+                "dsb ish");
+            asm!(
+                ".arch armv8.4-a",
                 "isb");
         }
 
@@ -290,8 +294,12 @@ impl VmInner {
         unsafe {
             asm!(
                 ".arch armv8.4-a",
-                "dmb ish", 
-                "dsb ish",
+                "dmb ish");
+            asm!(
+                ".arch armv8.4-a",
+                "dsb ish");
+            asm!(
+                ".arch armv8.4-a",
                 "isb");
         }
 
