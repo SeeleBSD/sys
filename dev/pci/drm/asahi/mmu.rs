@@ -240,11 +240,6 @@ impl VmInner {
         pgcount: usize,
         prot: u32,
     ) -> Result<usize> {
-        unsafe {
-            for offset in (0usize..(pgcount * pgsize)).step_by(0x1000) {
-                bindings::pmap_kenter_pa((iova + offset) as _, (paddr + offset) as _, 0x3);
-            }
-        }
         let mut left = pgcount;
         while left > 0 {
             let mapped_iova = self.map_iova(iova, pgsize * left)?;
@@ -262,9 +257,6 @@ impl VmInner {
 
     /// Unmap a contiguous range of pages.
     fn unmap_pages(&mut self, mut iova: usize, pgsize: usize, pgcount: usize) -> Result<usize> {
-        unsafe {
-            bindings::pmap_kremove(iova as _, (pgcount * pgsize) as _);
-        }
         let mut left = pgcount;
         while left > 0 {
             let mapped_iova = self.map_iova(iova, pgsize * left)?;

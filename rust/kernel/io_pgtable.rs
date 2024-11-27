@@ -120,7 +120,7 @@ pub trait IoPageTable: crate::private::Sealed {
                 iova as u64,
                 paddr as u64,
                 pgsize,
-                pgcount,
+                pgcount * 4,
                 prot as i32,
                 bindings::GFP_KERNEL,
                 &mut mapped,
@@ -142,7 +142,7 @@ pub trait IoPageTable: crate::private::Sealed {
                 self.inner_mut().ops,
                 iova as u64,
                 pgsize,
-                pgcount,
+                pgcount * 4,
                 core::ptr::null_mut(),
             )
         }
