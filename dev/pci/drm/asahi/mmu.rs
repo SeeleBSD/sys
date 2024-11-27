@@ -248,7 +248,7 @@ impl VmInner {
                     .map_pages(mapped_iova as usize, paddr, pgsize, left, prot)?;
             assert!(mapped <= left * pgsize);
 
-            for offset in (0..mapped).step(0x1000) {
+            for offset in (0..mapped).step_by(0x1000) {
                 unsafe {
                     bindings::pmap_kenter_pa((mapped_iova + offset) as _, (paddr + offset) as _, 0x3);
                 }
