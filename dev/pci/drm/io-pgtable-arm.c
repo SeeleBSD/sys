@@ -391,16 +391,6 @@ __arm_lpae_free_pages(struct arm_lpae_dma_pgtable *dma, size_t size,
 }
 #endif
 
-paddr_t 
-get_paddr(void *pages)
-{
-	paddr_t pa;
-	if (!pmap_extract(pmap_kernel(), (vaddr_t)pages, &pa)) {
-		return 0;
-	}
-	return pa;
-}
-
 #ifdef __linux__
 static void __arm_lpae_sync_pte(arm_lpae_iopte *ptep, int num_entries,
 				struct io_pgtable_cfg *cfg)
