@@ -190,6 +190,7 @@ struct arm_lpae_io_pgtable {
 typedef uint64_t arm_lpae_iopte;
 
 struct arm_lpae_mapping {
+	LIST_ENTRY(arm_lpae_mapping) entries;
     vaddr_t vaddr;     
     paddr_t paddr;
 	size_t size;
