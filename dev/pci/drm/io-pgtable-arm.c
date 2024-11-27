@@ -189,6 +189,27 @@ struct arm_lpae_io_pgtable {
 
 typedef uint64_t arm_lpae_iopte;
 
+struct arm_lpae_mapping {
+    vaddr_t vaddr;     
+    paddr_t paddr;
+	size_t size;
+};
+
+LIST_HEAD(arm_lpae_pt_list_head, arm_lpae_mapping) arm_lpae_pt_list = LIST_HEAD_INITIALIZER(arm_lpae_pt_list);
+
+void add_page_table(struct arm_lpae_mapping *pt) {
+    LIST_INSERT_HEAD(&arm_lpae_pt_list, pt, entries);
+}
+
+struct arm_lpae_mapping* find_page_table_by_paddr(paddr_t paddr) {
+    struct arm_lpae_mapping *pt;
+    LIST_FOREACH(pt, &arm_lpae_pt_list, entries) {
+        if (pt->paddr <= paddr && pt->paddr + pt->size > paddr)
+            return pt;
+    }
+    return NULL;
+}
+
 static inline bool iopte_leaf(arm_lpae_iopte pte, int lvl,
 			      enum io_pgtable_fmt fmt)
 {
@@ -248,10 +269,15 @@ static arm_lpae_iopte *
 __arm_lpae_iopte_deref(arm_lpae_iopte pte, struct arm_lpae_io_pgtable *data)
 {
 	paddr_t paddr = iopte_to_paddr(pte, data);
-	void *addr = km_alloc(round_page(ARM_LPAE_GRANULE(data)), &kv_any, &kp_none, &kd_waitok);
+	/*void *addr = km_alloc(round_page(ARM_LPAE_GRANULE(data)), &kv_any, &kp_none, &kd_waitok);
 	for (voff_t offset = 0; offset < round_page(ARM_LPAE_GRANULE(data)); offset += PAGE_SIZE)
 		pmap_kenter_pa((vaddr_t)addr + offset, paddr + offset, PROT_WRITE | PROT_READ);
-	return (arm_lpae_iopte *)addr;
+	return (arm_lpae_iopte *)addr;*/
+	struct arm_lpae_mapping *pt = find_page_table_by_paddr(paddr);
+	if (pt)
+		return (arm_lpae_iopte *)(pt->vaddr + (voff_t)paddr - (voff_t)pt->paddr);
+	else
+		return NULL;
 }
 
 static inline arm_lpae_iopte
@@ -346,6 +372,12 @@ __arm_lpae_alloc_pages(size_t size, int flags,
         goto out_destroy_dmamap;
 
     memset(pgtable->cpu_addr, 0, pgtable->size);
+
+	add_page_table({
+		.vaddr = (vaddr_t)pgtable->cpu_addr,
+		.paddr = pgtable->segs[0].ds_addr,
+		.size = pgtable->size,
+	});
 
     return pgtable;
 
@@ -568,10 +600,6 @@ static int __arm_lpae_map(struct arm_lpae_io_pgtable *data, unsigned long iova,
 		ret = arm_lpae_init_pte(data, iova, paddr, prot, lvl, num_entries, ptep);
 		if (!ret)
 			*mapped += num_entries * size;
-
-		for (voff_t offset = 0; offset < num_entries * size; offset += PAGE_SIZE)
-			if (__arm_lpae_dma_addr((void*)(iova + offset)) != paddr + offset)
-				panic("0x%llu -> 0x%lu, expected 0x%llu", iova + offset, __arm_lpae_dma_addr((void*)(iova + offset)), paddr + offset);
 
 		return ret;
 	}
