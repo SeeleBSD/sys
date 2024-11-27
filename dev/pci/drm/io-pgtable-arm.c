@@ -234,9 +234,9 @@ static bus_addr_t __arm_lpae_dma_addr(void *pages)
 	return virt_to_phys(pages);
 }
 #else
-static bus_addr_t __arm_lpae_dma_addr(void *pages)
+static paddr_t __arm_lpae_dma_addr(void *pages)
 {
-	bus_addr_t pa;
+	paddr_t pa;
 	if (!pmap_extract(pmap_kernel(), (vaddr_t)pages, &pa)) {
 		return 0;
 	}
@@ -571,7 +571,7 @@ static int __arm_lpae_map(struct arm_lpae_io_pgtable *data, unsigned long iova,
 
 		for (voff_t offset = 0; offset < num_entries * size; offset += PAGE_SIZE)
 			if (__arm_lpae_dma_addr((void*)(iova + offset)) != paddr + offset)
-				panic("0x%llu -> 0x%llu, expected 0x%llu", iova + offset, __arm_lpae_dma_addr((void*)(iova + offset)), paddr + offset);
+				panic("0x%llu -> 0x%lu, expected 0x%llu", iova + offset, __arm_lpae_dma_addr((void*)(iova + offset)), paddr + offset);
 
 		return ret;
 	}
