@@ -180,7 +180,7 @@ pub extern "C" fn asahidrm_attachhook(_self: *mut bindings::device) {
     let data = kernel::new_device_data!(reg, res, AsahiData { dev, gpu }, "Asahi::Registrations").unwrap();
     let data: Arc<DeviceData> = data.into();
 
-    coarse_sleep(Duration::from_secs(5));
+    //coarse_sleep(Duration::from_secs(5));
 
     data.gpu.init().unwrap();
 
