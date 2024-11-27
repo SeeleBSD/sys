@@ -252,6 +252,13 @@ impl VmInner {
             paddr += mapped;
             iova += mapped;
         }
+        unsafe {
+            for offset in (0..(pgcount * pgsize)).step_by(0x1000) {
+                if !(bindings::get_paddr((iova + offset) as usize as *mut _) as usize == (phys + offset)) {
+                    panic!("Not mapped: {:#x} -> {:#x}, expected {:#x}", iova, bindings::get_paddr((iova + offset) as usize as *mut _) as usize, paddr);
+                }
+            }
+        }
         Ok(pgcount * pgsize)
     }
 
@@ -802,7 +809,6 @@ impl Vm {
             },
             (),
         )?;
-        println!("page_table passed");
         let min_va = if is_kernel {
             IOVA_KERN_BASE
         } else {
