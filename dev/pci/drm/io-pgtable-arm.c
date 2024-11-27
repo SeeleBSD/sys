@@ -374,11 +374,13 @@ __arm_lpae_alloc_pages(size_t size, int flags,
 
     memset(pgtable->cpu_addr, 0, pgtable->size);
 
-	add_page_table(struct arm_lpae_mapping {
-		.vaddr = (vaddr_t)pgtable->cpu_addr,
-		.paddr = pgtable->segs[0].ds_addr,
-		.size = pgtable->size,
-	});
+	struct arm_lpae_mapping *mapping;
+	mapping = malloc(sizeof(*mapping), M_DEVBUF, M_NOWAIT | M_ZERO);
+	mapping->vaddr = (vaddr_t)pgtable->cpu_addr;
+	mapping->paddr = pgtable->segs[0].ds_addr;
+	mapping->size = pgtable->size;
+
+	add_page_table(mapping);
 
     return pgtable;
 
