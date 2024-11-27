@@ -101,6 +101,8 @@ BINDING_PTR_ERR_OR_ZERO(const void *ptr)
 	return IS_ERR(ptr)? PTR_ERR(ptr) : 0;
 }
 
+paddr_t __arm_lpae_dma_addr(void *pages);
+
 struct proc* BINDING_curproc();
 
 int __init drm_sched_fence_slab_init(void);

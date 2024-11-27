@@ -248,11 +248,21 @@ impl VmInner {
                     .map_pages(mapped_iova as usize, paddr, pgsize, left, prot)?;
             assert!(mapped <= left * pgsize);
 
+            unsafe {
+                for offset in (0usize..mapped).step_by(0x1000) {
+                    let va = iova + offset;
+                    let pa = paddr + offset;
+                    if bindings::__arm_lpae_dma_addr(va as usize as *mut _) != pa as _ {
+                        panic!("Not mapped: {:#x} -> {:#x}, expected {:#x}", va, bindings::__arm_lpae_dma_addr(va as usize as *mut _), pa);
+                    }
+                }
+            }
+
             left -= mapped / pgsize;
             paddr += mapped;
             iova += mapped;
         }
-        
+
         Ok(pgcount * pgsize)
     }
 

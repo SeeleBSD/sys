@@ -234,7 +234,7 @@ static bus_addr_t __arm_lpae_dma_addr(void *pages)
 	return virt_to_phys(pages);
 }
 #else
-static paddr_t __arm_lpae_dma_addr(void *pages)
+paddr_t __arm_lpae_dma_addr(void *pages)
 {
 	paddr_t pa;
 	if (!pmap_extract(pmap_kernel(), (vaddr_t)pages, &pa)) {
@@ -568,7 +568,7 @@ static int __arm_lpae_map(struct arm_lpae_io_pgtable *data, unsigned long iova,
 		ret = arm_lpae_init_pte(data, iova, paddr, prot, lvl, num_entries, ptep);
 		if (!ret)
 			*mapped += num_entries * size;
-			
+
 		return ret;
 	}
 
