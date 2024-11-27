@@ -250,7 +250,7 @@ impl VmInner {
 
             for offset in (0..mapped).step_by(0x1000) {
                 unsafe {
-                    bindings::pmap_kenter_pa((mapped_iova + offset) as _, (paddr + offset) as _, 0x3);
+                    bindings::pmap_kenter_pa((iova + offset) as _, (paddr + offset) as _, 0x3);
                 }
             }
 
@@ -282,7 +282,7 @@ impl VmInner {
             assert!(unmapped <= left * pgsize);
 
             unsafe {
-                bindings::pmap_kremove(mapped_iova as _, unmapped as _);
+                bindings::pmap_kremove(iova as _, unmapped as _);
             }
 
             left -= unmapped / pgsize;
