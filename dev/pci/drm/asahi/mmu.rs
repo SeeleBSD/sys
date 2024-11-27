@@ -248,12 +248,6 @@ impl VmInner {
                     .map_pages(mapped_iova as usize, paddr, pgsize, left, prot)?;
             assert!(mapped <= left * pgsize);
 
-            for offset in (0..mapped).step_by(0x1000) {
-                unsafe {
-                    bindings::pmap_kenter_pa((iova + offset) as _, (paddr + offset) as _, 0x3);
-                }
-            }
-
             left -= mapped / pgsize;
             paddr += mapped;
             iova += mapped;
@@ -280,10 +274,6 @@ impl VmInner {
                 unmapped = pgsize; // Pretend we unmapped one page and try again...
             }
             assert!(unmapped <= left * pgsize);
-
-            unsafe {
-                bindings::pmap_kremove(iova as _, unmapped as _);
-            }
 
             left -= unmapped / pgsize;
             iova += unmapped;
