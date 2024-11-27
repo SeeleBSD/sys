@@ -248,9 +248,12 @@ impl VmInner {
                     .map_pages(mapped_iova as usize, paddr, pgsize, left, prot)?;
             assert!(mapped <= left * pgsize);
 
-            left -= mapped / pgsize;
-            paddr += mapped;
-            iova += mapped;
+            //left -= mapped / pgsize;
+            left -= 1;
+            //paddr += mapped;
+            //iova += mapped;
+            paddr += pgsize;
+            iova += pgsize;
         }
         Ok(pgcount * pgsize)
     }
@@ -274,8 +277,10 @@ impl VmInner {
             }
             assert!(unmapped <= left * pgsize);
 
-            left -= unmapped / pgsize;
-            iova += unmapped;
+            left -= 1;
+            iova += pgsize;
+            //left -= unmapped / pgsize;
+            //iova += unmapped;
         }
 
         Ok(pgcount * pgsize)
@@ -795,7 +800,7 @@ impl Vm {
                 pgsize_bitmap: UAT_PGSZ,
                 ias: if is_kernel { UAT_IAS_KERN } else { UAT_IAS },
                 oas: cfg.uat_oas,
-                coherent_walk: false,
+                coherent_walk: true,
                 quirks: 0,
 
                 dmat: unsafe { crate::DMAT.expect("Uninitialized") },
