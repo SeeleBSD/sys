@@ -374,7 +374,7 @@ __arm_lpae_alloc_pages(size_t size, int flags,
 
     memset(pgtable->cpu_addr, 0, pgtable->size);
 
-	add_page_table({
+	add_page_table(struct arm_lpae_mapping {
 		.vaddr = (vaddr_t)pgtable->cpu_addr,
 		.paddr = pgtable->segs[0].ds_addr,
 		.size = pgtable->size,
