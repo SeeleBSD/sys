@@ -101,14 +101,7 @@ BINDING_PTR_ERR_OR_ZERO(const void *ptr)
 	return IS_ERR(ptr)? PTR_ERR(ptr) : 0;
 }
 
-paddr_t get_paddr(void *pages)
-{
-	paddr_t pa;
-	if (!pmap_extract(pmap_kernel(), (vaddr_t)pages, &pa)) {
-		return 0;
-	}
-	return pa;
-}
+paddr_t get_paddr(void *pages);
 
 struct proc* BINDING_curproc();
 
