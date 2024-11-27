@@ -248,13 +248,19 @@ impl VmInner {
                     .map_pages(mapped_iova as usize, paddr, pgsize, left, prot)?;
             assert!(mapped <= left * pgsize);
 
-            //left -= mapped / pgsize;
-            left -= 1;
-            //paddr += mapped;
-            //iova += mapped;
-            paddr += pgsize;
-            iova += pgsize;
+            left -= mapped / pgsize;
+            paddr += mapped;
+            iova += mapped;
         }
+
+        unsafe {
+            asm!(
+                ".arch armv8.4-a",
+                "dmb ish", 
+                "dsb ish",
+                "isb");
+        }
+
         Ok(pgcount * pgsize)
     }
 
@@ -277,10 +283,16 @@ impl VmInner {
             }
             assert!(unmapped <= left * pgsize);
 
-            left -= 1;
-            iova += pgsize;
-            //left -= unmapped / pgsize;
-            //iova += unmapped;
+            left -= unmapped / pgsize;
+            iova += unmapped;
+        }
+
+        unsafe {
+            asm!(
+                ".arch armv8.4-a",
+                "dmb ish", 
+                "dsb ish",
+                "isb");
         }
 
         Ok(pgcount * pgsize)
