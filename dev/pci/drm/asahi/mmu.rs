@@ -10,6 +10,7 @@
 //!
 //! The actual page table management is delegated to the common kernel `io_pgtable` code.
 
+use core::arch::asm;
 use core::fmt::Debug;
 use core::mem::size_of;
 use core::ptr::NonNull;
