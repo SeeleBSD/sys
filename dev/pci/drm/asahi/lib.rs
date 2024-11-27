@@ -30,6 +30,8 @@ pub(crate) mod slotalloc;
 pub(crate) mod util;
 pub(crate) mod workqueue;
 
+use core::time::Duration;
+
 use kernel::{
     device::{Device, RawDevice},
     drm, of, platform,
