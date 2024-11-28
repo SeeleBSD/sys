@@ -34,7 +34,7 @@
 #include <arm64/dev/rtkit.h>
 
 struct apple_rtkit_shmem {
-	dma_addr_t iova;
+	uint64_t iova;
 	void *buffer;
 	size_t size;
 	int is_mapped;
