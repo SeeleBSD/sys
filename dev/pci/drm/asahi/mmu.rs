@@ -1280,7 +1280,7 @@ impl Uat {
 
         core::mem::drop(inner);
 
-        uat.kpt0()[2].store(ttb1 | PTE_TABLE, Ordering::Relaxed);
+        //uat.kpt0()[2].store(ttb1 | PTE_TABLE, Ordering::Relaxed);
 
         dev_info!(dev, "MMU: initialized\n");
 
