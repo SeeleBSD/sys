@@ -257,12 +257,13 @@ devm_apple_rtkit_init(struct device *dev, void *cookie,
 	rk->rk_cookie = rtk;
 	rk->rk_dmat = pdev->dmat;
 	rk->rk_logmap = apple_rtkit_logmap;
-	rk->is_linux = 1;
 
 	if (mbox_name)
 		rtk->state = rtkit_init(pdev->node, mbox_name, 0, rk);
-	else
+	else {
 		rtk->state = rtkit_init_by_idx(pdev->node, mbox_idx, RK_DEBUG, rk);
+		rk->is_linux = 1;
+	}
 	rtk->cookie = cookie;
 	rtk->pdev = pdev;
 	rtk->ops = ops;
