@@ -33,7 +33,33 @@
 #include <arm64/dev/aplmbox.h>
 #include <arm64/dev/rtkit.h>
 
-#include <linux/soc/apple/rtkit.h>
+struct apple_rtkit_shmem {
+	dma_addr_t iova;
+	void *buffer;
+	size_t size;
+	int is_mapped;
+};
+
+struct apple_rtkit_ep {
+	struct apple_rtkit *rtk;
+	uint8_t ep;
+};
+
+struct apple_rtkit_ops {
+	void (*crashed)(void *);
+	void (*recv_message)(void *, uint8_t, uint64_t);
+	bool (*recv_message_early)(void *, uint8_t, uint64_t);
+	int (*shmem_setup)(void *, struct apple_rtkit_shmem *);
+	void (*shmem_destroy)(void *, struct apple_rtkit_shmem *);
+};
+
+struct apple_rtkit {
+	void *state;
+	struct apple_rtkit_ep ep[64];
+	void *cookie;
+	void *pdev;
+	const struct apple_rtkit_ops *ops;
+};
 
 #define RTKIT_EP_MGMT			0
 #define RTKIT_EP_CRASHLOG		1
