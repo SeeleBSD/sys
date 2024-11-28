@@ -521,12 +521,12 @@ impl GpuManager::ver {
         #[ver(V >= V13_0B4)]
         if let Some(base) = cfg.sram_base {
             let size = cfg.sram_size.unwrap() as usize;
-            let iova = mgr.as_mut().alloc_mmio_iova(size);
+            //let iova = mgr.as_mut().alloc_mmio_iova(size);
 
             let mapping =
                 mgr.uat
                     .kernel_vm()
-                    .map_io(iova, base as usize, size, mmu::PROT_FW_SHARED_RW)?;
+                    .map_io(base as usize, size, mmu::PROT_FW_SHARED_RW)?;
 
             mgr.as_mut()
                 .initdata_mut()
@@ -821,6 +821,11 @@ impl GpuManager::ver {
         index: usize,
         map: &hw::IOMapping,
     ) -> Result {
+        let dies = if map.per_die {
+            cfg.num_dies as usize
+        } else {
+            1
+        };
         let off = map.base & mmu::UAT_PGMSK;
         let base = map.base - off;
         let end = (map.base + map.size + mmu::UAT_PGMSK) & !mmu::UAT_PGMSK;
@@ -837,13 +842,29 @@ impl GpuManager::ver {
             raw.io_mappings[index] = fw::initdata::raw::IOMapping {
                 phys_addr: U64(map.base as u64),
                 virt_addr: U64((mapping.iova() + off) as u64),
-                size: map.size as u32,
-                range_size: map.range_size as u32,
                 readwrite: U64(map.writable as u64),
             };
         });
 
-        this.as_mut().io_mappings.try_push(mapping)?;
+        let off = map.base & mmu::UAT_PGMSK;
+        let base = map.base - off;
+        let end = (map.base + map.size + mmu::UAT_PGMSK) & !mmu::UAT_PGMSK;
+        let mapping = this
+            .uat
+            .kernel_vm()
+            .map_io(base, end - base, map.writable)?;
+
+        this.as_mut().initdata.runtime_pointers.hwdata_b.with_mut(|raw, _| {
+            raw.io_mappings[index] = fw::initdata::raw::IOMapping {
+                phys_addr: U64(map.base as u64),
+                virt_addr: U64(iova + off as u64),
+                total_size: (map.size * map.count * dies) as u32,
+                element_size: map.size as u32,
+                readwrite: U64(map.writable as u64),
+            };
+        });
+
+        this.as_mut().io_mappings.push(mapping);
         Ok(())
     }
 
