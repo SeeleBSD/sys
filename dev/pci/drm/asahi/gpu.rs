@@ -521,12 +521,12 @@ impl GpuManager::ver {
         #[ver(V >= V13_0B4)]
         if let Some(base) = cfg.sram_base {
             let size = cfg.sram_size.unwrap() as usize;
-            //let iova = mgr.as_mut().alloc_mmio_iova(size);
+            let iova = mgr.as_mut().alloc_mmio_iova(size);
 
             let mapping =
                 mgr.uat
                     .kernel_vm()
-                    .map_io(base as usize, size, mmu::PROT_FW_SHARED_RW)?;
+                    .map_io(iova, base as usize, size, mmu::PROT_FW_SHARED_RW)?;
 
             mgr.as_mut()
                 .initdata_mut()
@@ -826,29 +826,53 @@ impl GpuManager::ver {
         } else {
             1
         };
+
         let off = map.base & mmu::UAT_PGMSK;
         let base = map.base - off;
         let end = (map.base + map.size + mmu::UAT_PGMSK) & !mmu::UAT_PGMSK;
-        let mapping = this
-            .uat
-            .kernel_vm()
-            .map_io(base, end - base, if map.writable {
-                mmu::PROT_FW_MMIO_RW
-            } else {
-                mmu::PROT_FW_MMIO_RO
-            })?;
+        let map_size = end - base;
 
-        this.as_mut().initdata.runtime_pointers.hwdata_b.with_mut(|raw, _| {
-            raw.io_mappings[index] = fw::initdata::raw::IOMapping {
-                phys_addr: U64(map.base as u64),
-                virt_addr: U64((mapping.iova() + off) as u64),
-                total_size: (map.size * map.count * dies) as u32,
-                element_size: map.size as u32,
-                readwrite: U64(map.writable as u64),
-            };
-        });
+        // Array mappings must be aligned
+        assert!((off == 0 && map_size == map.size) || (map.count == 1 && !map.per_die));
+        assert!(map.count > 0);
 
-        this.as_mut().io_mappings.push(mapping);
+        let iova = this.as_mut().alloc_mmio_iova(map_size * map.count * dies);
+        let mut cur_iova = iova;
+
+        for die in 0..dies {
+            for i in 0..map.count {
+                let phys_off = die * 0x20_0000_0000 + i * map.stride;
+
+                let mapping = this.uat.kernel_vm().map_io(
+                    cur_iova,
+                    base + phys_off,
+                    map_size,
+                    if map.writable {
+                        mmu::PROT_FW_MMIO_RW
+                    } else {
+                        mmu::PROT_FW_MMIO_RO
+                    },
+                )?;
+
+                this.as_mut().io_mappings_mut().push(mapping);
+                cur_iova += map_size as u64;
+            }
+        }
+
+        this.as_mut()
+            .initdata_mut()
+            .runtime_pointers
+            .hwdata_b
+            .with_mut(|raw, _| {
+                raw.io_mappings[index] = fw::initdata::raw::IOMapping {
+                    phys_addr: U64(map.base as u64),
+                    virt_addr: U64(iova + off as u64),
+                    total_size: (map.size * map.count * dies) as u32,
+                    element_size: map.size as u32,
+                    readwrite: U64(map.writable as u64),
+                };
+            });
+
         Ok(())
     }
 
@@ -1081,7 +1105,7 @@ impl GpuManager for GpuManager::ver {
         let mut guard = self.rtkit.lock();
         let rtk = guard.as_mut().unwrap();
 
-        rtk.boot().ok();
+        rtk.boot()?;
         rtk.start_endpoint(EP_FIRMWARE)?;
         rtk.start_endpoint(EP_DOORBELL)?;
         rtk.send_message(EP_FIRMWARE, MSG_INIT | (initdata & INIT_DATA_MASK))?;
