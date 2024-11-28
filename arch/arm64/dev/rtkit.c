@@ -644,6 +644,35 @@ rtkit_handle_syslog_buffer(void *arg)
 	bus_addr_t addr = state->syslog_addr;
 	bus_size_t size = state->syslog_size;
 
+	if (rk && rk->is_linux) {
+		int err;
+		struct apple_rtkit *rtk = rk->rk_cookie;
+		if (!rtk->ops->shmem_setup || !rtk->ops->shmem_destroy)
+			return;
+		
+		struct apple_rtkit_shmem *buffer;
+		buffer = malloc(sizeof(*buffer), M_DEVBUF, M_WAITOK | M_ZERO);
+
+		buffer->buffer = NULL;
+		buffer->size = size;
+		buffer->is_mapped = 0;
+		buffer->iova = addr;
+
+		err = rtk->ops->shmem_setup(rtk->cookie, buffer);
+
+		if (err)
+			return;
+		
+		state->syslog = buffer->buffer;
+
+		if (!buffer->is_mapped) {
+			rtkit_send(state, RTKIT_EP_SYSLOG, RTKIT_BUFFER_REQUEST,
+	    		(size << RTKIT_BUFFER_SIZE_SHIFT) | (buffer->iova & 0xfffffffffff));
+		}
+
+		return;
+	}
+
 	if (rk) {
 		addr = rtkit_alloc(state, size << PAGE_SHIFT,
 		    &state->syslog);
@@ -708,6 +737,35 @@ rtkit_handle_ioreport_buffer(void *arg)
 	bus_addr_t addr = state->ioreport_addr;
 	bus_size_t size = state->ioreport_size;
 
+	if (rk && rk->is_linux) {
+		int err;
+		struct apple_rtkit *rtk = rk->rk_cookie;
+		if (!rtk->ops->shmem_setup || !rtk->ops->shmem_destroy)
+			return;
+		
+		struct apple_rtkit_shmem *buffer;
+		buffer = malloc(sizeof(*buffer), M_DEVBUF, M_WAITOK | M_ZERO);
+
+		buffer->buffer = NULL;
+		buffer->size = size;
+		buffer->is_mapped = 0;
+		buffer->iova = addr;
+
+		err = rtk->ops->shmem_setup(rtk->cookie, buffer);
+
+		if (err)
+			return;
+		
+		state->ioreport = buffer->buffer;
+
+		if (!buffer->is_mapped) {
+			rtkit_send(state, RTKIT_EP_IOREPORT, RTKIT_BUFFER_REQUEST,
+	    		(size << RTKIT_BUFFER_SIZE_SHIFT) | (buffer->iova & 0xfffffffffff));
+		}
+
+		return;
+	}
+
 	if (rk) {
 		addr = rtkit_alloc(state, size << PAGE_SHIFT,
 		    &state->ioreport);
@@ -764,6 +822,34 @@ rtkit_handle_oslog_buffer(void *arg)
 	struct rtkit *rk = state->rk;
 	bus_addr_t addr = state->oslog_addr;
 	bus_size_t size = state->oslog_size;
+
+	if (rk && rk->is_linux) {
+		int err;
+		struct apple_rtkit *rtk = rk->rk_cookie;
+		if (!rtk->ops->shmem_setup || !rtk->ops->shmem_destroy)
+			return;
+		
+		struct apple_rtkit_shmem *buffer;
+		buffer = malloc(sizeof(*buffer), M_DEVBUF, M_WAITOK | M_ZERO);
+
+		buffer->buffer = NULL;
+		buffer->size = size;
+		buffer->is_mapped = 0;
+		buffer->iova = addr;
+
+		err = rtk->ops->shmem_setup(rtk->cookie, buffer);
+
+		if (err)
+			return;
+
+		if (!buffer->is_mapped) {
+			rtkit_send(state, RTKIT_EP_OSLOG,
+	    (RTKIT_OSLOG_BUFFER_REQUEST << RTKIT_OSLOG_TYPE_SHIFT),
+	    (size << RTKIT_OSLOG_BUFFER_SIZE_SHIFT) | ((addr >> PAGE_SHIFT) & 0xfffffffff));
+		}
+
+		return;
+	}
 
 	if (rk) {
 		addr = rtkit_alloc(state, size, &state->oslog);
