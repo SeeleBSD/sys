@@ -33,34 +33,6 @@
 #include <arm64/dev/aplmbox.h>
 #include <arm64/dev/rtkit.h>
 
-struct apple_rtkit_shmem {
-	uint64_t iova;
-	void *buffer;
-	size_t size;
-	int is_mapped;
-};
-
-struct apple_rtkit_ep {
-	struct apple_rtkit *rtk;
-	uint8_t ep;
-};
-
-struct apple_rtkit_ops {
-	void (*crashed)(void *);
-	void (*recv_message)(void *, uint8_t, uint64_t);
-	bool (*recv_message_early)(void *, uint8_t, uint64_t);
-	int (*shmem_setup)(void *, struct apple_rtkit_shmem *);
-	void (*shmem_destroy)(void *, struct apple_rtkit_shmem *);
-};
-
-struct apple_rtkit {
-	void *state;
-	struct apple_rtkit_ep ep[64];
-	void *cookie;
-	void *pdev;
-	const struct apple_rtkit_ops *ops;
-};
-
 #define RTKIT_EP_MGMT			0
 #define RTKIT_EP_CRASHLOG		1
 #define RTKIT_EP_SYSLOG			2
@@ -123,6 +95,34 @@ struct apple_rtkit {
 /* Versions we support. */
 #define RTKIT_MINVER			11
 #define RTKIT_MAXVER			12
+
+struct apple_rtkit_shmem {
+	uint64_t iova;
+	void *buffer;
+	size_t size;
+	int is_mapped;
+};
+
+struct apple_rtkit_ep {
+	struct apple_rtkit *rtk;
+	uint8_t ep;
+};
+
+struct apple_rtkit_ops {
+	void (*crashed)(void *);
+	void (*recv_message)(void *, uint8_t, uint64_t);
+	bool (*recv_message_early)(void *, uint8_t, uint64_t);
+	int (*shmem_setup)(void *, struct apple_rtkit_shmem *);
+	void (*shmem_destroy)(void *, struct apple_rtkit_shmem *);
+};
+
+struct apple_rtkit {
+	void *state;
+	struct apple_rtkit_ep ep[64];
+	void *cookie;
+	void *pdev;
+	const struct apple_rtkit_ops *ops;
+};
 
 struct rtkit_dmamem {
 	bus_dmamap_t		rdm_map;
@@ -495,7 +495,7 @@ rtkit_handle_crashlog_buffer(void *arg)
 	bus_addr_t addr = state->crashlog_addr;
 	bus_size_t size = state->crashlog_size;
 
-	if (addr && rk && rk->is_linux) {
+	if (rk && rk->is_linux) {
 		int err;
 		struct apple_rtkit *rtk = rk->rk_cookie;
 		if (!rtk->ops->shmem_setup || !rtk->ops->shmem_destroy)
@@ -506,7 +506,7 @@ rtkit_handle_crashlog_buffer(void *arg)
 
 		buffer->buffer = NULL;
 		buffer->size = size;
-		buffer->is_mapped = false;
+		buffer->is_mapped = 0;
 		buffer->iova = addr;
 
 		err = rtk->ops->shmem_setup(rtk->cookie, buffer);
@@ -522,7 +522,9 @@ rtkit_handle_crashlog_buffer(void *arg)
 		}
 
 		return;
-	} else if (addr) {
+	}
+	
+	if (addr) {
 		paddr_t pa = addr;
 		vaddr_t va;
 
