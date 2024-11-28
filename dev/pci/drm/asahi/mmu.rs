@@ -909,13 +909,28 @@ impl Vm {
     }
 
     /// Add a direct MMIO mapping to this Vm at a free address.
-    pub(crate) fn map_io(&self, iova: u64, phys: usize, size: usize, prot: u32) -> Result<Mapping> {
+    pub(crate) fn map_io(&self, phys: usize, size: usize, prot: u32) -> Result<Mapping> {
+        let prot = if rw { PROT_FW_MMIO_RW } else { PROT_FW_MMIO_RO };
         let mut inner = self.inner.lock();
 
-        if (iova as usize | phys | size) & UAT_PGMSK != 0 {
+        let uat_inner = inner.uat_inner.clone();
+        let node = inner.mm.insert_node(
+            MappingInner {
+                owner: self.inner.clone(),
+                uat_inner,
+                prot,
+                sgt: None,
+                mapped_size: size,
+            },
+            (size + UAT_PGSZ) as u64, // Add guard page
+        )?;
+
+        let iova = node.start() as usize;
+
+        if (phys | size | iova) & UAT_PGMSK != 0 {
             dev_err!(
                 inner.dev,
-                "MMU: Mapping {:#x}:{:#x} -> {:#x} is not page-aligned\n",
+                "MMU: Mapping {:#x}:{:#x} -> {:#x} is not page-aligned",
                 phys,
                 size,
                 iova
@@ -925,27 +940,13 @@ impl Vm {
 
         dev_info!(
             inner.dev,
-            "MMU: IO map: {:#x}:{:#x} -> {:#x}\n",
+            "MMU: IO map: {:#x}:{:#x} -> {:#x}",
             phys,
             size,
             iova
         );
 
-        let uat_inner = inner.uat_inner.clone();
-        let node = inner.mm.reserve_node(
-            MappingInner {
-                owner: self.inner.clone(),
-                uat_inner,
-                prot,
-                sgt: None,
-                mapped_size: size,
-            },
-            iova,
-            size as u64,
-            0,
-        )?;
-
-        inner.map_pages(iova as usize, phys, UAT_PGSZ, size >> UAT_PGBIT, prot)?;
+        inner.map_pages(iova, phys, UAT_PGSZ, size >> UAT_PGBIT, prot)?;
 
         Ok(Mapping(node))
     }
@@ -1280,7 +1281,7 @@ impl Uat {
 
         core::mem::drop(inner);
 
-        //uat.kpt0()[2].store(ttb1 | PTE_TABLE, Ordering::Relaxed);
+        uat.kpt0()[2].store(ttb1 | PTE_TABLE, Ordering::Relaxed);
 
         dev_info!(dev, "MMU: initialized\n");
 

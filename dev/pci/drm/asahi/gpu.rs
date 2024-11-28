@@ -821,58 +821,25 @@ impl GpuManager::ver {
         index: usize,
         map: &hw::IOMapping,
     ) -> Result {
-        let dies = if map.per_die {
-            cfg.num_dies as usize
-        } else {
-            1
-        };
-
         let off = map.base & mmu::UAT_PGMSK;
         let base = map.base - off;
         let end = (map.base + map.size + mmu::UAT_PGMSK) & !mmu::UAT_PGMSK;
-        let map_size = end - base;
+        let mapping = this
+            .uat
+            .kernel_vm()
+            .map_io(base, end - base, map.writable)?;
 
-        // Array mappings must be aligned
-        assert!((off == 0 && map_size == map.size) || (map.count == 1 && !map.per_die));
-        assert!(map.count > 0);
+        this.as_mut().initdata.runtime_pointers.hwdata_b.with_mut(|raw, _| {
+            raw.io_mappings[index] = fw::initdata::raw::IOMapping {
+                phys_addr: U64(map.base as u64),
+                virt_addr: U64((mapping.iova() + off) as u64),
+                size: map.size as u32,
+                range_size: map.range_size as u32,
+                readwrite: U64(map.writable as u64),
+            };
+        });
 
-        let iova = this.as_mut().alloc_mmio_iova(map_size * map.count * dies);
-        let mut cur_iova = iova;
-
-        for die in 0..dies {
-            for i in 0..map.count {
-                let phys_off = die * 0x20_0000_0000 + i * map.stride;
-
-                let mapping = this.uat.kernel_vm().map_io(
-                    cur_iova,
-                    base + phys_off,
-                    map_size,
-                    if map.writable {
-                        mmu::PROT_FW_MMIO_RW
-                    } else {
-                        mmu::PROT_FW_MMIO_RO
-                    },
-                )?;
-
-                this.as_mut().io_mappings_mut().push(mapping);
-                cur_iova += map_size as u64;
-            }
-        }
-
-        this.as_mut()
-            .initdata_mut()
-            .runtime_pointers
-            .hwdata_b
-            .with_mut(|raw, _| {
-                raw.io_mappings[index] = fw::initdata::raw::IOMapping {
-                    phys_addr: U64(map.base as u64),
-                    virt_addr: U64(iova + off as u64),
-                    total_size: (map.size * map.count * dies) as u32,
-                    element_size: map.size as u32,
-                    readwrite: U64(map.writable as u64),
-                };
-            });
-
+        this.as_mut().io_mappings.try_push(mapping)?;
         Ok(())
     }
 
