@@ -33,7 +33,7 @@
 #include <arm64/dev/aplmbox.h>
 #include <arm64/dev/rtkit.h>
 
-#include <linux/soc/rtkit.h>
+#include <linux/soc/apple/rtkit.h>
 
 #define RTKIT_EP_MGMT			0
 #define RTKIT_EP_CRASHLOG		1
