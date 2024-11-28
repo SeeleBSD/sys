@@ -841,7 +841,7 @@ impl GpuManager::ver {
         this.as_mut().initdata.runtime_pointers.hwdata_b.with_mut(|raw, _| {
             raw.io_mappings[index] = fw::initdata::raw::IOMapping {
                 phys_addr: U64(map.base as u64),
-                virt_addr: U64(iova + off as u64),
+                virt_addr: U64(map.iova() + off as u64),
                 total_size: (map.size * map.count * dies) as u32,
                 element_size: map.size as u32,
                 readwrite: U64(map.writable as u64),
