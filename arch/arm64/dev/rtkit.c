@@ -40,6 +40,7 @@
 #define RTKIT_EP_IOREPORT		4
 #define RTKIT_EP_OSLOG			8
 #define RTKIT_EP_UNKNOWN		10
+#define RTKIT_EP_APP			0x20
 
 #define RTKIT_MGMT_TYPE(x)		(((x) >> 52) & 0xff)
 #define RTKIT_MGMT_TYPE_SHIFT		52
@@ -942,6 +943,16 @@ rtkit_poll(struct rtkit_state *state)
 			return error;
 		break;
 	default:
+		if (endpoint >= RTKIT_EP_APP && endpoint <= 0xff) {
+			struct rtkit *rk = state->rk;
+			if (rk && rk->is_linux) {
+				struct apple_rtkit *rtk = rk->rk_cookie;
+				if (rtk->ops->recv_message) {
+					rtk->ops->recv_message(rtk->cookie, endpoint, msg.data0);
+					break;
+				}
+			}
+		}
 		if (endpoint >= 32 && endpoint < 64 && 
 		    state->callback[endpoint - 32]) {
 			callback = state->callback[endpoint - 32];
