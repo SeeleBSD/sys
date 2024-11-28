@@ -480,7 +480,7 @@ static int drm_gem_shmem_get_pages(struct drm_gem_shmem_object *shmem)
 
     TAILQ_INIT(&plist);
 
-    ret = uvm_pglistalloc(obj->size, (paddr_t)0, (paddr_t)(-1), (1 << 14), 0, &plist, 1, UVM_PLA_WAITOK);
+    ret = uvm_pglistalloc(obj->size, (paddr_t)0, (paddr_t)(-1), (1 << 14), 0, &plist, 1, UVM_PLA_WAITOK | UVM_PLA_ZERO);
     if (ret) {
         sg_free_table(st);
         ret = -ENOMEM;
