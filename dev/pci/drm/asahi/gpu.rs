@@ -827,7 +827,11 @@ impl GpuManager::ver {
         let mapping = this
             .uat
             .kernel_vm()
-            .map_io(base, end - base, map.writable)?;
+            .map_io(base, end - base, if map.writable {
+                mmu::PROT_FW_MMIO_RW
+            } else {
+                mmu::PROT_FW_MMIO_RO
+            })?;
 
         this.as_mut().initdata.runtime_pointers.hwdata_b.with_mut(|raw, _| {
             raw.io_mappings[index] = fw::initdata::raw::IOMapping {
