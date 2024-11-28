@@ -518,7 +518,7 @@ rtkit_handle_crashlog_buffer(void *arg)
 
 		if (!buffer->is_mapped) {
 			rtkit_send(state, RTKIT_EP_CRASHLOG, RTKIT_BUFFER_REQUEST,
-	    		(size << RTKIT_BUFFER_SIZE_SHIFT) | addr);
+	    		(size << RTKIT_BUFFER_SIZE_SHIFT) | buffer->iova);
 		}
 
 		return;
