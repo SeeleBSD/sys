@@ -467,7 +467,34 @@ rtkit_handle_crashlog_buffer(void *arg)
 	bus_addr_t addr = state->crashlog_addr;
 	bus_size_t size = state->crashlog_size;
 
-	if (addr) {
+	if (addr && rk->is_linux) {
+		int err;
+		struct apple_rtkit *rtk = rk->rk_cookie;
+		if (!rtk->ops->shmem_setup || !rtk->ops->shmem_destroy)
+			return;
+		
+		struct apple_rtkit_shmem *buffer;
+		buffer = malloc(sizeof(*buffer), M_DEVBUF, M_WAITOK | M_ZERO);
+
+		buffer->buffer = NULL;
+		buffer->size = size;
+		buffer->is_mapped = false;
+		buffer->iova = addr;
+
+		err = rtk->ops->shmem_setup(rtk->cookie, buffer);
+
+		if (err)
+			return;
+		
+		state->crashlog = buffer->buffer;
+
+		if (!buffer->is_mapped) {
+			rtkit_send(state, RTKIT_EP_CRASHLOG, RTKIT_BUFFER_REQUEST,
+	    		(size << RTKIT_BUFFER_SIZE_SHIFT) | addr);
+		}
+
+		return;
+	} else if (addr) {
 		paddr_t pa = addr;
 		vaddr_t va;
 

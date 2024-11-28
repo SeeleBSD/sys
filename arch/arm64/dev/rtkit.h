@@ -13,6 +13,7 @@ struct rtkit {
 	int (*rk_map)(void *, bus_addr_t, bus_size_t);
 	int (*rk_unmap)(void *, bus_addr_t, bus_size_t);
 	paddr_t (*rk_logmap)(void *, bus_addr_t);
+	int is_linux;
 };
 
 #define RK_WAKEUP	0x00000001

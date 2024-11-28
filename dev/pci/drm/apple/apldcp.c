@@ -257,6 +257,7 @@ devm_apple_rtkit_init(struct device *dev, void *cookie,
 	rk->rk_cookie = rtk;
 	rk->rk_dmat = pdev->dmat;
 	rk->rk_logmap = apple_rtkit_logmap;
+	rk->is_linux = 1;
 
 	if (mbox_name)
 		rtk->state = rtkit_init(pdev->node, mbox_name, 0, rk);
