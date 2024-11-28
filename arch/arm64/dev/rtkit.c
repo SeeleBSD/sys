@@ -495,7 +495,7 @@ rtkit_handle_crashlog_buffer(void *arg)
 	bus_addr_t addr = state->crashlog_addr;
 	bus_size_t size = state->crashlog_size;
 
-	if (addr && rk->is_linux) {
+	if (addr && rk && rk->is_linux) {
 		int err;
 		struct apple_rtkit *rtk = rk->rk_cookie;
 		if (!rtk->ops->shmem_setup || !rtk->ops->shmem_destroy)
