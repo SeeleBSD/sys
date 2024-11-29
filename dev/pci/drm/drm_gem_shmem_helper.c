@@ -755,9 +755,6 @@ int drm_gem_shmem_vmap(struct drm_gem_shmem_object *shmem,
 		goto err_put_pages;
 	}
 
-	if (!map->vaddr)
-		panic("asdf");
-
 	return 0;
 
 err_put_pages:
