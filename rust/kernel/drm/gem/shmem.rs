@@ -196,7 +196,7 @@ impl<T: DriverObject> Object<T> {
         // SAFETY: if drm_gem_shmem_vmap did not fail, map is initialized now
         let map = unsafe { map.assume_init() };
 
-        if map.vaddr == 0 {
+        if (map.vaddr as usize) == 0 {
             panic!("asdf");
         }
 
