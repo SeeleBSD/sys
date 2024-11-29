@@ -194,7 +194,7 @@ impl<T: DriverObject> Object<T> {
         })?;
 
         unsafe {
-            if map.vaddr.is_null() {
+            if map.__bindgen_anon_1.vaddr.is_null() {
                 panic!("asdf");
             }
         }
