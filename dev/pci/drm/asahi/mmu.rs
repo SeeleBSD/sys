@@ -91,36 +91,37 @@ const PTE_TABLE: u64 = 0x3; // BIT(0) | BIT(1)
 // Not having that flag means *cached noncoherent*.
 
 /// Firmware MMIO R/W
-pub(crate) const PROT_FW_MMIO_RW: u32 = 0 | prot::READ | prot::WRITE | 0 | 0;
+pub(crate) const PROT_FW_MMIO_RW: u32 =
+    prot::PRIV | prot::READ | prot::WRITE | prot::CACHE | prot::MMIO;
 /// Firmware MMIO R/O
-pub(crate) const PROT_FW_MMIO_RO: u32 = 0 | prot::READ | 0 | 0;
+pub(crate) const PROT_FW_MMIO_RO: u32 = prot::PRIV | prot::READ | prot::CACHE | prot::MMIO;
 /// Firmware shared (uncached) RW
-pub(crate) const PROT_FW_SHARED_RW: u32 = 0 | prot::READ | prot::WRITE | 0;
+pub(crate) const PROT_FW_SHARED_RW: u32 = prot::PRIV | prot::READ | prot::WRITE | prot::CACHE;
 /// Firmware shared (uncached) RO
-pub(crate) const PROT_FW_SHARED_RO: u32 = 0 | prot::READ | 0;
+pub(crate) const PROT_FW_SHARED_RO: u32 = prot::PRIV | prot::READ | prot::CACHE;
 /// Firmware private (cached) RW
-pub(crate) const PROT_FW_PRIV_RW: u32 = 0 | prot::READ | prot::WRITE;
+pub(crate) const PROT_FW_PRIV_RW: u32 = prot::PRIV | prot::READ | prot::WRITE;
 /*
 /// Firmware private (cached) RO
-pub(crate) const PROT_FW_PRIV_RO: u32 = 0 | prot::READ;
+pub(crate) const PROT_FW_PRIV_RO: u32 = prot::PRIV | prot::READ;
 */
 /// Firmware/GPU shared (uncached) RW
-pub(crate) const PROT_GPU_FW_SHARED_RW: u32 = prot::READ | prot::WRITE | 0;
+pub(crate) const PROT_GPU_FW_SHARED_RW: u32 = prot::READ | prot::WRITE | prot::CACHE;
 /// Firmware/GPU shared (private) RW
 pub(crate) const PROT_GPU_FW_PRIV_RW: u32 = prot::READ | prot::WRITE;
 /// Firmware-RW/GPU-RO shared (private) RW
-pub(crate) const PROT_GPU_RO_FW_PRIV_RW: u32 = 0 | prot::WRITE;
+pub(crate) const PROT_GPU_RO_FW_PRIV_RW: u32 = prot::PRIV | prot::WRITE;
 /// GPU shared/coherent RW
-pub(crate) const PROT_GPU_SHARED_RW: u32 = prot::READ | prot::WRITE | 0 | 0;
+pub(crate) const PROT_GPU_SHARED_RW: u32 = prot::READ | prot::WRITE | prot::CACHE | prot::NOEXEC;
 /// GPU shared/coherent RO
-pub(crate) const PROT_GPU_SHARED_RO: u32 = prot::READ | 0 | 0;
+pub(crate) const PROT_GPU_SHARED_RO: u32 = prot::READ | prot::CACHE | prot::NOEXEC;
 /// GPU shared/coherent WO
-pub(crate) const PROT_GPU_SHARED_WO: u32 = prot::WRITE | 0 | 0;
+pub(crate) const PROT_GPU_SHARED_WO: u32 = prot::WRITE | prot::CACHE | prot::NOEXEC;
 /*
 /// GPU private/noncoherent RW
-pub(crate) const PROT_GPU_PRIV_RW: u32 = prot::READ | prot::WRITE | 0;
+pub(crate) const PROT_GPU_PRIV_RW: u32 = prot::READ | prot::WRITE | prot::NOEXEC;
 /// GPU private/noncoherent RO
-pub(crate) const PROT_GPU_PRIV_RO: u32 = prot::READ | 0;
+pub(crate) const PROT_GPU_PRIV_RO: u32 = prot::READ | prot::NOEXEC;
 */
 
 type PhysAddr = bindings::phys_addr_t;

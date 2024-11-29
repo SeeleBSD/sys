@@ -12,9 +12,20 @@ use core::marker::PhantomData;
 use core::mem;
 use core::num::NonZeroU64;
 
+/// Protection flags used with IOMMU mappings.
 pub mod prot {
+    /// Read access.
     pub const READ: u32 = bindings::BINDINGS_IOMMU_READ;
+    /// Write access.
     pub const WRITE: u32 = bindings::BINDINGS_IOMMU_WRITE;
+    /// Request cache coherency.
+    pub const CACHE: u32 = bindings::BINDINGS_IOMMU_CACHE;
+    /// Request no-execute permission.
+    pub const NOEXEC: u32 = bindings::BINDINGS_IOMMU_NOEXEC;
+    /// MMIO peripheral mapping.
+    pub const MMIO: u32 = bindings::BINDINGS_IOMMU_MMIO;
+    /// Privileged mapping.
+    pub const PRIV: u32 = bindings::BINDINGS_IOMMU_PRIV;
 }
 
 pub struct Config {
