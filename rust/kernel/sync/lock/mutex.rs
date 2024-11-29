@@ -122,13 +122,11 @@ unsafe impl super::Backend for MutexBackend {
         // SAFETY: The safety requirements of this function ensure that `ptr` points to valid
         // memory, and that it has been initialised before.
         unsafe { bindings::rw_enter_write(ptr) };
-        unsafe { bindings::rw_enter_read(ptr) };
     }
 
     unsafe fn unlock(ptr: *mut Self::State, _guard_state: &Self::GuardState) {
         // SAFETY: The safety requirements of this function ensure that `ptr` is valid and that the
         // caller is the owner of the mutex.
-        unsafe { bindings::rw_exit_read(ptr) };
         unsafe { bindings::rw_exit_write(ptr) };
     }
 }
