@@ -53,11 +53,7 @@ fn coarse_sleep_conversion(duration: Duration) -> core::ffi::c_uint {
 /// ```
 pub fn coarse_sleep(duration: Duration) {
     let mut msecs = coarse_sleep_conversion(duration);
-    // SAFETY: `msleep` is safe for all values of its argument.
-    while msecs > 0 {
-        unsafe { bindings::delay(1000) };
-        msecs -= 1;
-    }
+    unsafe { bindings::delay(msecs * 1000); }
 }
 
 #[cfg(test)]
