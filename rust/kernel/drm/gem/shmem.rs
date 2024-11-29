@@ -188,7 +188,7 @@ impl<T: DriverObject> Object<T> {
         to_result(unsafe {
             let resv = self.obj.base.resv as *const _ as *mut _;
             bindings::BINDINGS_dma_resv_lock(resv, core::ptr::null_mut());
-            let ret = bindings::drm_gem_shmem_vmap(self.mut_shmem(), &mut map as *mut _);
+            let ret = bindings::drm_gem_shmem_vmap(self.mut_shmem(), unsafe { &mut map as *mut _ });
             bindings::BINDINGS_dma_resv_unlock(resv);
             ret
         })?;
