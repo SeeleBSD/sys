@@ -354,6 +354,7 @@ impl ResultWriter {
         // no padding and all bit patterns valid.
         let slice = unsafe { core::slice::from_raw_parts_mut(p, core::mem::size_of::<T>()) };
         let len = slice.len().min(self.len);
+        crate::kernel::info!("OK: {:p}\n", self.vmap.as_ptr());
         self.vmap.as_mut_slice()[self.offset..self.offset + len].copy_from_slice(&slice[..len]);
     }
 }
