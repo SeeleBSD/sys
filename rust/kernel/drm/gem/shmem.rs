@@ -182,22 +182,21 @@ impl<T: DriverObject> Object<T> {
 
     /// Creates and returns a virtual kernel memory mapping for this object.
     pub fn vmap(&self) -> Result<VMap<T>> {
-        let mut map: MaybeUninit<bindings::iosys_map> = MaybeUninit::uninit();
+        let mut map: bindings::iosys_map = bindings::iosys_map::default();
 
         // SAFETY: drm_gem_shmem_vmap can be called with the DMA reservation lock held
         to_result(unsafe {
             let resv = self.obj.base.resv as *const _ as *mut _;
             bindings::BINDINGS_dma_resv_lock(resv, core::ptr::null_mut());
-            let ret = bindings::drm_gem_shmem_vmap(self.mut_shmem(), map.as_mut_ptr());
+            let ret = bindings::drm_gem_shmem_vmap(self.mut_shmem(), &mut map as *mut _);
             bindings::BINDINGS_dma_resv_unlock(resv);
             ret
         })?;
 
-        // SAFETY: if drm_gem_shmem_vmap did not fail, map is initialized now
-        let map = unsafe { map.assume_init() };
-
-        if (map.vaddr as usize) == 0 {
-            panic!("asdf");
+        unsafe {
+            if map.vaddr.is_null() {
+                panic!("asdf");
+            }
         }
 
         Ok(VMap {
