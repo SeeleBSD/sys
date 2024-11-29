@@ -105,7 +105,7 @@ pub struct MutexBackend;
 
 // SAFETY: The underlying kernel `struct mutex` object ensures mutual exclusion.
 unsafe impl super::Backend for MutexBackend {
-    type State = bindings::rwlock;
+    type State = bindings::mutex;
     type GuardState = ();
 
     unsafe fn init(
