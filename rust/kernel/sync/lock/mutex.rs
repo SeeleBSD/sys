@@ -115,7 +115,7 @@ unsafe impl super::Backend for MutexBackend {
     ) {
         // SAFETY: The safety requirements ensure that `ptr` is valid for writes, and `name` and
         // `key` are valid for read indefinitely.
-        unsafe { bindings::__mtx_init(ptr, name) }
+        unsafe { bindings::__mtx_init(ptr, 0) }
     }
 
     unsafe fn lock(ptr: *mut Self::State) -> Self::GuardState {
