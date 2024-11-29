@@ -732,10 +732,10 @@ int drm_gem_shmem_vmap(struct drm_gem_shmem_object *shmem,
 
 		dma_resv_assert_held(shmem->base.resv);
 
-		if (shmem->vmap_use_count++ > 0) {
+		/*if (shmem->vmap_use_count++ > 0) {
 			iosys_map_set_vaddr(map, shmem->vaddr);
 			return 0;
-		}
+		}*/
 
 		ret = drm_gem_shmem_get_pages(shmem);
 		if (ret)
