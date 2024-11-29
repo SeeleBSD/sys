@@ -105,7 +105,7 @@ pub struct MutexBackend;
 
 // SAFETY: The underlying kernel `struct mutex` object ensures mutual exclusion.
 unsafe impl super::Backend for MutexBackend {
-    type State = bindings::mutex;
+    type State = bindings::rwlock;
     type GuardState = ();
 
     unsafe fn init(
@@ -115,18 +115,20 @@ unsafe impl super::Backend for MutexBackend {
     ) {
         // SAFETY: The safety requirements ensure that `ptr` is valid for writes, and `name` and
         // `key` are valid for read indefinitely.
-        unsafe { bindings::BINDINGS_mtx_init(ptr, 0) }
+        unsafe { bindings::BINDING_rw_init(ptr, name) }
     }
 
     unsafe fn lock(ptr: *mut Self::State) -> Self::GuardState {
         // SAFETY: The safety requirements of this function ensure that `ptr` points to valid
         // memory, and that it has been initialised before.
-        unsafe { bindings::mtx_enter(ptr) }
+        unsafe { bindings::rw_enter_write(ptr) };
+        unsafe { bindings::rw_enter_read(ptr) };
     }
 
     unsafe fn unlock(ptr: *mut Self::State, _guard_state: &Self::GuardState) {
         // SAFETY: The safety requirements of this function ensure that `ptr` is valid and that the
         // caller is the owner of the mutex.
-        unsafe { bindings::mtx_leave(ptr) }
+        unsafe { bindings::rw_exit_read(ptr) };
+        unsafe { bindings::rw_exit_write(ptr) };
     }
 }
