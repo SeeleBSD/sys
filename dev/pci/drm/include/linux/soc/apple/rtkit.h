@@ -12,6 +12,7 @@ struct apple_rtkit_shmem {
 	void *buffer;
 	size_t size;
 	int is_mapped;
+	void *private;
 };
 
 struct apple_rtkit_ops {

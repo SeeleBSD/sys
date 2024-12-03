@@ -261,7 +261,7 @@ devm_apple_rtkit_init(struct device *dev, void *cookie,
 	if (mbox_name)
 		rtk->state = rtkit_init(pdev->node, mbox_name, 0, rk);
 	else {
-		rtk->state = rtkit_init_by_idx(pdev->node, mbox_idx, RK_DEBUG, rk);
+		rtk->state = rtkit_init_by_idx(pdev->node, mbox_idx, 0, rk);
 		rk->is_linux = 1;
 	}
 	rtk->cookie = cookie;

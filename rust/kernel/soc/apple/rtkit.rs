@@ -146,7 +146,7 @@ unsafe extern "C" fn shmem_setup_callback<T: Operations>(
         // Now box the returned buffer type and stash it in the private pointer of the
         // `apple_rtkit_shmem` struct for safekeeping.
         let boxed = Box::try_new(buf)?;
-        //bfr_mut.private = Box::into_raw(boxed) as *mut _;
+        bfr_mut.private = Box::into_raw(boxed) as *mut _;
         Ok(0)
     })
 }
@@ -157,12 +157,12 @@ unsafe extern "C" fn shmem_destroy_callback<T: Operations>(
 ) {
     let bfr_mut = unsafe { &mut *bfr };
     // SAFETY: Per shmem_setup_callback, this has to be a pointer to a Buffer if it is set.
-    /*if !bfr_mut.private.is_null() {
+    if !bfr_mut.private.is_null() {
         unsafe {
             core::mem::drop(Box::from_raw(bfr_mut.private as *mut T::Buffer));
         }
         bfr_mut.private = core::ptr::null_mut();
-    }*/
+    }
 }
 
 impl<T: Operations> RtKit<T> {

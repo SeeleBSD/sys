@@ -39,6 +39,7 @@
 #include <drm/drm_file.h>
 #include <drm/drm_framebuffer.h>
 #include <drm/drm_gem.h>
+#include <drm/drm_gem_shmem_helper.h>
 #include <drm/drm_prime.h>
 
 #include "drm_internal.h"
@@ -1137,9 +1138,9 @@ struct drm_gem_object *drm_gem_prime_import_dev(struct drm_device *dev,
 	if (IS_ERR(attach))
 		return ERR_CAST(attach);
 
-#ifdef notyet
 	get_dma_buf(dma_buf);
 
+#ifdef notyet
 	sgt = dma_buf_map_attachment_unlocked(attach, DMA_BIDIRECTIONAL);
 	if (IS_ERR(sgt)) {
 		ret = PTR_ERR(sgt);
@@ -1165,8 +1166,12 @@ fail_detach:
 
 	return ERR_PTR(ret);
 #else
-	ret = 0;
-	panic(__func__);
+	struct drm_gem_shmem_object *shmem;
+
+	shmem = drm_gem_shmem_create(dev, dma_buf->size);
+	drm_gem_shmem_get_pages_sgt(shmem);
+	obj = &shmem->base;
+	return obj;
 #endif
 }
 EXPORT_SYMBOL(drm_gem_prime_import_dev);

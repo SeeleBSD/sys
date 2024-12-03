@@ -90,9 +90,9 @@ pub(crate) fn debug_enabled(flag: DebugFlags) -> bool {
 #[macro_export]
 macro_rules! debug {
     ($($arg:tt)*) => {
-        // if $crate::debug::debug_enabled(DEBUG_CLASS) {
+        if $crate::debug::debug_enabled(DEBUG_CLASS) {
             $($arg)*
-        // }
+        }
     };
 }
 
@@ -116,9 +116,9 @@ macro_rules! mod_dev_dbg (
 #[macro_export]
 macro_rules! cls_pr_debug (
     ($cls:ident, $($arg:tt)*) => (
-        // if $crate::debug::debug_enabled($crate::debug::DebugFlags::$cls) {
+        if $crate::debug::debug_enabled($crate::debug::DebugFlags::$cls) {
             ::kernel::pr_info! ( $($arg)* );
-        // }
+        }
     )
 );
 
@@ -126,8 +126,8 @@ macro_rules! cls_pr_debug (
 #[macro_export]
 macro_rules! cls_dev_dbg (
     ($cls:ident, $($arg:tt)*) => (
-        // if $crate::debug::debug_enabled($crate::debug::DebugFlags::$cls) {
+        if $crate::debug::debug_enabled($crate::debug::DebugFlags::$cls) {
             ::kernel::dev_info! ( $($arg)* );
-        // }
+        }
     )
 );
