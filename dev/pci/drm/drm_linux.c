@@ -4271,7 +4271,3 @@ EXPORT_SYMBOL_GPL(__dma_fence_unwrap_merge);
 void BINDINGS_mtx_init(struct mutex *m, int ipl) {
 	mtx_init(m, ipl);
 }
-
-int BINDINGS_spl0(void) {
-	return spl0();
-}

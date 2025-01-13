@@ -111,8 +111,6 @@ void __exit drm_sched_fence_slab_fini(void);
 
 void BINDINGS_mtx_init(struct mutex *, int);
 
-int BINDINGS_spl0(void);
-
 /* `bindgen` gets confused at certain things. */
 const size_t ARCH_SLAB_MINALIGN = 8;
 const gfp_t BINDINGS_GFP_KERNEL = GFP_KERNEL;
