@@ -457,7 +457,7 @@ static int drm_gem_shmem_get_pages(struct drm_gem_shmem_object *shmem)
     if (shmem->pages_use_count++ > 0)
         return 0;
 
-    pages = mallocarray((npages+1)*4, sizeof(struct vm_page *), M_DRM, M_NOWAIT | M_ZERO);
+    pages = mallocarray((npages+1)*4, sizeof(struct vm_page *), M_DRM, M_WAITOK | M_ZERO);
     if (pages == NULL) {
         ret = -ENOMEM;
         goto out;
@@ -466,21 +466,21 @@ static int drm_gem_shmem_get_pages(struct drm_gem_shmem_object *shmem)
     struct pglist plist;
     struct vm_page *page;
     struct scatterlist *sg;
-    struct sg_table *st = malloc(sizeof(struct sg_table), M_DRM, M_NOWAIT | M_ZERO);
+    struct sg_table *st = malloc(sizeof(struct sg_table), M_DRM, M_WAITOK | M_ZERO);
 
     if (!st) {
         ret = -ENOMEM;
         goto free_pages;
     }
 
-    if (sg_alloc_table(st, npages, M_NOWAIT)) {
+    if (sg_alloc_table(st, npages, M_WAITOK)) {
         ret = -ENOMEM;
         goto free_st;
     }
 
     TAILQ_INIT(&plist);
 
-    ret = uvm_pglistalloc(obj->size, (paddr_t)0, (paddr_t)(-1), (1 << 14), 0, &plist, 1, UVM_PLA_NOWAIT | UVM_PLA_ZERO);
+    ret = uvm_pglistalloc(obj->size, (paddr_t)0, (paddr_t)(-1), (1 << 14), 0, &plist, 1, UVM_PLA_WAITOK | UVM_PLA_ZERO);
     if (ret) {
         sg_free_table(st);
         ret = -ENOMEM;
@@ -645,12 +645,12 @@ int dma_buf_vmap(struct dma_buf *dmabuf, struct iosys_map *map)
 
     /* Simulate getting the pages backing the dma-buf */
     /* This step is where you would typically fill the plist with pages backing the DMA buffer */
-    ret = uvm_pglistalloc(size, 0, -1, PAGE_SIZE, 0, &plist, npages, UVM_PLA_NOWAIT);
+    ret = uvm_pglistalloc(size, 0, -1, PAGE_SIZE, 0, &plist, npages, UVM_PLA_WAITOK);
     if (ret) {
         return -ENOMEM;
     }
 
-	vaddr = (vaddr_t)km_alloc(round_page(size), &kv_any, &kp_none, &kd_nowait);
+	vaddr = (vaddr_t)km_alloc(round_page(size), &kv_any, &kp_none, &kd_waitok);
 
     for (size_t i = 0; i < npages; i++) {
         page = TAILQ_FIRST(&plist);
