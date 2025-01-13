@@ -714,7 +714,7 @@ impl File {
         file: &DrmFile,
     ) -> Result<u32> {
         unsafe {
-            bindings::spl0();
+            bindings::BINDINGS_spl0();
         }
 
         debug::update_debug_flags();
