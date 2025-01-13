@@ -9,7 +9,7 @@ unsafe impl GlobalAlloc for KernelAllocator {
             bindings::malloc(
                 layout.size(),
                 bindings::M_DRM as i32,
-                bindings::M_WAITOK as i32,
+                bindings::M_NOWAIT as i32,
             ) as *mut u8
         }
     }

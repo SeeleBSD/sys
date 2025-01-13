@@ -713,10 +713,6 @@ impl File {
         data: &mut uapi::drm_asahi_submit,
         file: &DrmFile,
     ) -> Result<u32> {
-        unsafe {
-            bindings::BINDINGS_spl0();
-        }
-
         debug::update_debug_flags();
 
         if data.extensions != 0 {
