@@ -18,7 +18,7 @@ RSFLAGS := 		$(rust_common_flags) -O \
 rustc_sysroot := $(shell $(RUSTC) --print sysroot)
 RUST_LIB_SRC ?= /usr/local/lib/rustlib/src/rust/library
 
-OBJS+=	core.o alloc.o bindings.o kernel.o build_error.o
+OBJS+=	core.o bindings.o kernel.o build_error.o
 
 bindgen_c_flags = ${CFLAGS} ${CPPFLAGS} ${PROF} -D__OpenBSD__ -D__BINDGEN__ -w --target=$(BINDGEN_TARGET)
 
