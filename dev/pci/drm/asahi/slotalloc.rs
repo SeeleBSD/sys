@@ -139,7 +139,7 @@ impl<T: SlotItem> SlotAllocator<T> {
 
         for i in 0..num_slots {
             slots
-                .try_push(Some(Entry {
+                .push(Some(Entry {
                     item: constructor(&mut data, i),
                     get_time: 0,
                     drop_time: 0,
@@ -159,7 +159,7 @@ impl<T: SlotItem> SlotAllocator<T> {
             inner <- Mutex::new_with_key(inner, name, lock_key1),
             // SAFETY: `condvar_init!` is called below.
             cond <- CondVar::new(name, lock_key2),
-        }))?;
+        }));
 
         Ok(SlotAllocator(alloc))
     }

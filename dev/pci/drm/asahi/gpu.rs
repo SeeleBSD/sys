@@ -487,11 +487,11 @@ impl GpuManager::ver {
             .zip(&mgr.pipes.frag)
             .zip(&mgr.pipes.comp)
         {
-            p_pipes.try_push(fw::initdata::raw::PipeChannels::ver {
+            p_pipes.push(fw::initdata::raw::PipeChannels::ver {
                 vtx: v.lock().to_raw(),
                 frag: f.lock().to_raw(),
                 comp: c.lock().to_raw(),
-            })?;
+            });
         }
 
         mgr.as_mut()
@@ -528,7 +528,7 @@ impl GpuManager::ver {
                     raw.sgx_sram_ptr = U64(mapping.iova() as u64);
                 });
 
-            mgr.as_mut().io_mappings_mut().try_push(mapping)?;
+            mgr.as_mut().io_mappings_mut().push(mapping);
         }
 
         let mgr = Arc::from(mgr);
@@ -613,18 +613,18 @@ impl GpuManager::ver {
         };
 
         for _i in 0..=NUM_PIPES - 1 {
-            pipes.vtx.try_push(Box::pin_init(Mutex::new_named(
+            pipes.vtx.push(Box::pin_init(Mutex::new_named(
                 channel::PipeChannel::ver::new(dev, &mut alloc)?,
                 c_str!("pipe_vtx"),
-            ))?)?;
-            pipes.frag.try_push(Box::pin_init(Mutex::new_named(
+            ))?);
+            pipes.frag.push(Box::pin_init(Mutex::new_named(
                 channel::PipeChannel::ver::new(dev, &mut alloc)?,
                 c_str!("pipe_frag"),
-            ))?)?;
-            pipes.comp.try_push(Box::pin_init(Mutex::new_named(
+            ))?);
+            pipes.comp.push(Box::pin_init(Mutex::new_named(
                 channel::PipeChannel::ver::new(dev, &mut alloc)?,
                 c_str!("pipe_comp"),
-            ))?)?;
+            ))?);
         }
 
         let fwctl_channel = channel::FwCtlChannel::new(dev, &mut alloc)?;
@@ -772,11 +772,11 @@ impl GpuManager::ver {
 
         let node = of::Node::from_handle(node).ok_or(EIO)?;
 
-        Ok(Box::try_new(hw::DynConfig {
+        Ok(Box::new(hw::DynConfig {
             pwr: pwr_cfg,
             uat_ttb_base: uat.ttb_base(),
             id: gpu_id,
-            firmware_version: node.get_property(c_str!("apple,firmware-version"))?,
+            firmware_version: node.get_property(c_str!("apple,firmware-version")),
         })?)
     }
 
@@ -819,7 +819,7 @@ impl GpuManager::ver {
                 };
             });
 
-        this.as_mut().io_mappings_mut().try_push(mapping)?;
+        this.as_mut().io_mappings_mut().push(mapping);
         Ok(())
     }
 
@@ -1148,7 +1148,7 @@ impl GpuManager for GpuManager::ver {
     ) -> Result<Box<dyn queue::Queue>> {
         let mut kalloc = self.alloc();
         let id = self.ids.queue.next();
-        Ok(Box::try_new(queue::Queue::ver::new(
+        Ok(Box::new(queue::Queue::ver::new(
             &self.dev,
             vm,
             &mut kalloc,
@@ -1158,8 +1158,7 @@ impl GpuManager for GpuManager::ver {
             &self.buffer_mgr,
             id,
             priority,
-            caps,
-        )?)?)
+            caps,))?)
     }
 
     fn kick_firmware(&self) -> Result {
