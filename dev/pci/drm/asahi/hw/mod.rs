@@ -531,7 +531,8 @@ impl PwrConfig {
                     .map_err(|e| {
                         dev_err!(dev, "Error reading property {}: {:?}\n", $prop, e);
                         e
-                    })?
+                    })
+                    .unwrap_or(None)
                     .unwrap_or($default)
             }};
             ($prop:expr) => {{
