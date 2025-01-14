@@ -119,7 +119,7 @@ impl GpuContext {
             data: Some(Box::new(alloc.shared.new_object(
                 fw::workqueue::GpuContextData { _buffer: buffer },
                 |_inner| Default::default(),
-            ))?),
+            )?)),
         })
     }
 

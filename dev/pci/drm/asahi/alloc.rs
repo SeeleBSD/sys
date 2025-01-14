@@ -1020,8 +1020,7 @@ impl Allocator for HeapAllocator {
                 for node in g.drain(0..count) {
                     inner.total_garbage -= node.size() as usize;
                     garbage
-                        .try_push(node)
-                        .expect("try_push() failed after reserve()");
+                        .push(node);
                 }
             }
         });

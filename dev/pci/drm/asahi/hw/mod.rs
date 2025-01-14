@@ -10,6 +10,7 @@ use alloc::vec::Vec;
 use kernel::c_str;
 use kernel::device::RawDevice;
 use kernel::prelude::*;
+use kernel::of;
 
 const MAX_POWERZONES: usize = 5;
 
@@ -572,8 +573,8 @@ impl PwrConfig {
 
         let csafr = if cfg.has_csafr {
             Some(CsAfrPwrConfig {
-                perf_states_cs: Self::load_opp(dev, c_str!("apple,cs-opp"), cfg, false)?,
-                perf_states_afr: Self::load_opp(dev, c_str!("apple,afr-opp"), cfg, false)?,
+                perf_states_cs: Self::load_opp(dev, c_str!("apple,cs-opp"), cfg, false, handle)?,
+                perf_states_afr: Self::load_opp(dev, c_str!("apple,afr-opp"), cfg, false, handle)?,
                 leak_coef_cs: prop!("apple,cs-leak-coef"),
                 leak_coef_afr: prop!("apple,afr-leak-coef"),
                 min_sram_microvolt: prop!("apple,csafr-min-sram-microvolt"),
