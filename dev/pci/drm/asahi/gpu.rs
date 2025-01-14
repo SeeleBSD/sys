@@ -772,7 +772,7 @@ impl GpuManager::ver {
 
         let node = of::Node::from_handle(node).ok_or(EIO)?;
 
-        Ok(Box::new(hw::DynConfig {
+        Ok(BBox::new(hw::DynConfig {
             pwr: pwr_cfg,
             uat_ttb_base: uat.ttb_base(),
             id: gpu_id,
@@ -1147,7 +1147,7 @@ impl GpuManager for GpuManager::ver {
     ) -> Result<Box<dyn queue::Queue>> {
         let mut kalloc = self.alloc();
         let id = self.ids.queue.next();
-        Ok(Box::new(queue::Queue::ver::new(
+        Ok(BBox::new(queue::Queue::ver::new(
             &self.dev,
             vm,
             &mut kalloc,

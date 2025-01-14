@@ -241,7 +241,7 @@ impl<T: Driver> Registration<T> {
     ///
     /// It is allowed to move.
     pub fn new(parent: &dyn device::RawDevice, raw: *mut bindings::drm_device) -> Result<Self> {
-        let vtable = Pin::new(Box::new(Self::VTABLE)?);
+        let vtable = Pin::new(BBox::new(Self::VTABLE)?);
         let raw_drm = NonNull::new(raw as *mut _).ok_or(ENOMEM);
 
         // The reference count is one, and now we take ownership of that reference as a

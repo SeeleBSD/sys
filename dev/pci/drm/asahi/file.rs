@@ -166,7 +166,7 @@ impl drm::file::DriverFile for File {
         let id = gpu.ids().file.next();
 
         mod_dev_dbg!(device, "[File {}]: DRM device opened\n", id);
-        Ok(Box::into_pin(Box::new(Self {
+        Ok(Box::into_pin(BBox::new(Self {
             id,
             vms: xarray::XArray::new(xarray::flags::ALLOC1),
             queues: xarray::XArray::new(xarray::flags::ALLOC1),
@@ -323,7 +323,7 @@ impl File {
         dummy_obj.map_at(&vm, VM_UNK_PAGE, mmu::PROT_GPU_SHARED_RW, true)?;
 
         mod_dev_dbg!(device, "[File {} VM {}]: VM created\n", file_id, id);
-        resv.store(Box::new(Vm {
+        resv.store(BBox::new(Vm {
             ualloc,
             ualloc_priv,
             vm,

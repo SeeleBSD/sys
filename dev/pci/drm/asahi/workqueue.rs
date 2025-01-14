@@ -116,7 +116,7 @@ impl GpuContext {
     ) -> Result<GpuContext> {
         Ok(GpuContext {
             dev: dev.into(),
-            data: Some(Box::new(alloc.shared.new_object(
+            data: Some(BBox::new(alloc.shared.new_object(
                 fw::workqueue::GpuContextData { _buffer: buffer },
                 |_inner| Default::default(),
             )?)?),
