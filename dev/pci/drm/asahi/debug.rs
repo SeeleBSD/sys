@@ -83,7 +83,8 @@ pub(crate) fn update_debug_flags() {
 /// Check whether debug is enabled for a given flag
 #[inline(always)]
 pub(crate) fn debug_enabled(flag: DebugFlags) -> bool {
-    DEBUG_FLAGS.load(Ordering::Relaxed) & 1 << (flag as usize) != 0
+    //DEBUG_FLAGS.load(Ordering::Relaxed) & 1 << (flag as usize) != 0
+    true
 }
 
 /// Run some code only if debug is enabled for the calling module
