@@ -598,7 +598,7 @@ impl Drop for HeapAllocation {
 
         alloc.with(|a| {
             if let Some(garbage) = a.garbage.as_mut() {
-                if garbage.try_push(node).is_err() {
+                if garbage.push(node).is_err() {
                     dev_err!(
                         &a.dev,
                         "HeapAllocation[{}]::drop: Failed to keep garbage\n",
@@ -715,7 +715,7 @@ impl HeapAllocator {
             cpu_maps = true;
         }
 
-        let name = CString::try_from_fmt(name)?;
+        let name = CString::try_from_fmt(name);
 
         let inner = HeapAllocatorInner {
             dev: dev.into(),
@@ -823,7 +823,7 @@ impl HeapAllocator {
                 }
             };
 
-            self.guard_nodes.try_push(node)?;
+            self.guard_nodes.push(((node)));
 
             new_top += guard as u64;
         }
@@ -835,7 +835,7 @@ impl HeapAllocator {
         );
 
         self.mm
-            .with_inner(|inner| inner.backing_objects.try_push((obj, gpu_ptr)))?;
+            .with_inner(|inner| inner.backing_objects.push((obj, gpu_ptr)));
 
         self.top = new_top;
 

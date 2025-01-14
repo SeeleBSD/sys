@@ -269,7 +269,7 @@ impl<T: GpuStruct, U: Allocation<T>> GpuObject<T, U> {
             raw: p,
             gpu_ptr,
             alloc,
-            inner: Box::try_new(inner)?,
+            inner: BBox::new(inner)?,
         })
     }
 
@@ -300,7 +300,7 @@ impl<T: GpuStruct, U: Allocation<T>> GpuObject<T, U> {
         );
         let p = alloc.ptr().ok_or(EINVAL)?.as_ptr() as *mut MaybeUninit<T::Raw<'_>>;
         // SAFETY: `p` is guaranteed to be valid per the Allocation invariant.
-        let raw = callback(&inner, unsafe { &mut *p })?;
+        let raw = callback(&inner, unsafe { &mut *p });
         if p as *mut T::Raw<'_> != raw as *mut _ {
             dev_err!(
                 alloc.device(),
@@ -331,7 +331,7 @@ impl<T: GpuStruct, U: Allocation<T>> GpuObject<T, U> {
             &'a mut MaybeUninit<T::Raw<'a>>,
         ) -> Result<&'a mut T::Raw<'a>>,
     ) -> Result<Self> {
-        GpuObject::<T, U>::new_boxed(alloc, Box::try_new(inner)?, callback)
+        GpuObject::<T, U>::new_boxed(alloc, BBox::new(inner)?, callback)
     }
 
     /// Create a new GpuObject given an allocator and the boxed inner data (a type implementing
@@ -507,7 +507,7 @@ impl<T, U: Allocation<T>> GpuOnlyArray<T, U> {
     /// Allocate a new GPU-only array with the given length.
     pub(crate) fn new(alloc: U, count: usize) -> Result<GpuOnlyArray<T, U>> {
         let bytes = count * mem::size_of::<T>();
-        let gpu_ptr = NonZeroU64::new(alloc.gpu_ptr()).ok_or(EINVAL)?;
+        let gpu_ptr = NonZeroU64::new(alloc.gpu_ptr()).ok_or(EINVAL);
         if alloc.size() < bytes {
             return Err(ENOMEM);
         }

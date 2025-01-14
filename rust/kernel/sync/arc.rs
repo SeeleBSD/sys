@@ -187,7 +187,7 @@ impl<T> Arc<T> {
             data: contents,
         };
 
-        let inner = Box::try_new(value)?;
+        let inner = BBox::new(value);
 
         // SAFETY: We just created `inner` with a reference count of 1, which is owned by the new
         // `Arc` object.

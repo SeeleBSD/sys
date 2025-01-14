@@ -305,7 +305,7 @@ macro_rules! stack_pin_init {
 ///
 /// stack_try_pin_init!(let foo: Result<Pin<&mut Foo>, AllocError> = pin_init!(Foo {
 ///     a <- Mutex::new(42),
-///     b: Box::try_new(Bar {
+///     b: BBox::new(Bar {
 ///         x: 64,
 ///     })?,
 /// }));
@@ -354,7 +354,7 @@ macro_rules! stack_try_pin_init {
     (let $var:ident $(: $t:ty)? =? $val:expr) => {
         let val = $val;
         let mut $var = ::core::pin::pin!($crate::init::__internal::StackInit$(::<$t>)?::uninit());
-        let mut $var = $crate::init::__internal::StackInit::init($var, val)?;
+        let mut $var = $crate::init::__internal::StackInit::init($var, val);
     };
 }
 
