@@ -333,11 +333,9 @@ macro_rules! stack_pin_init {
 ///
 /// stack_try_pin_init!(let foo: Pin<&mut Foo> =? pin_init!(Foo {
 ///     a <- Mutex::new(42),
-///     b: 
-    Box::new(Bar {
+///     b: Box::new(Bar {
 ///         x: 64,
-///     })
-,
+///     }),
 /// }));
 /// pr_info!("a: {}", &*foo.a.lock());
 /// # Ok::<_, AllocError>(())
