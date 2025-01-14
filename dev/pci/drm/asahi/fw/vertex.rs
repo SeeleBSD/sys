@@ -47,9 +47,9 @@ pub(crate) mod raw {
         pub(crate) utile_config: u32,
         pub(crate) unk_4c: u32,
         pub(crate) ppp_multisamplectl: U64,
-        pub(crate) tvb_layermeta: GpuPointer<'a, &'a [u8]>,
+        pub(crate) tvb_heapmeta_2: GpuPointer<'a, &'a [u8]>,
         #[ver(G < G14)]
-        pub(crate) tvb_cluster_layermeta: Option<GpuPointer<'a, &'a [u8]>>,
+        pub(crate) unk_60: U64,
         #[ver(G < G14)]
         pub(crate) core_mask: Array<2, u32>,
         pub(crate) preempt_buf1: GpuPointer<'a, &'a [u8]>,
@@ -72,10 +72,7 @@ pub(crate) mod raw {
         #[ver(G < G14)]
         pub(crate) unk_f0: U64,
         pub(crate) unk_f8: U64,
-        pub(crate) helper_program: u32,
-        pub(crate) unk_104: u32,
-        pub(crate) helper_arg: U64,
-        pub(crate) unk_110: U64,
+        pub(crate) unk_100: Array<3, U64>,
         pub(crate) unk_118: u32,
         #[ver(G >= G14)]
         pub(crate) __pad: Pad<{ 8 * 9 + 0x268 }>,
@@ -141,7 +138,7 @@ pub(crate) mod raw {
         pub(crate) unk_560: u32,
         pub(crate) sync_grow: u32,
         pub(crate) unk_568: u32,
-        pub(crate) spills: u32,
+        pub(crate) unk_56c: u32,
         pub(crate) meta: job::raw::JobMeta,
         pub(crate) unk_after_meta: u32,
         pub(crate) unk_buf_0: U64,

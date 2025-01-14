@@ -18,10 +18,8 @@ use core::time::Duration;
 use kernel::{
     c_str,
     delay::coarse_sleep,
-    device::RawDevice,
     error::code::*,
     macros::versions,
-    of, platform,
     prelude::*,
     soc::apple::rtkit,
     sync::{
@@ -93,10 +91,6 @@ const IOVA_KERN_GPU_TOP: u64 = 0xffffffadffffffff;
 const IOVA_KERN_RTKIT_BASE: u64 = 0xffffffae00000000;
 /// GPU/FW shared structure VA range top.
 const IOVA_KERN_RTKIT_TOP: u64 = 0xffffffae0fffffff;
-/// FW MMIO VA range base.
-const IOVA_KERN_MMIO_BASE: u64 = 0xffffffaf00000000;
-/// FW MMIO VA range top.
-const IOVA_KERN_MMIO_TOP: u64 = 0xffffffafffffffff;
 
 /// GPU/FW buffer manager control address (context 0 low)
 pub(crate) const IOVA_KERN_GPU_BUFMGR_LOW: u64 = 0x20_0000_0000;
@@ -208,7 +202,6 @@ pub(crate) struct GpuManager {
     #[pin]
     alloc: Mutex<KernelAllocators>,
     io_mappings: Vec<mmu::Mapping>,
-    next_mmio_iova: u64,
     #[pin]
     rtkit: Mutex<Option<rtkit::RtKit<GpuManager::ver>>>,
     #[pin]
@@ -302,7 +295,7 @@ impl rtkit::Operations for GpuManager::ver {
 
     fn recv_message(data: <Self::Data as ForeignOwnable>::Borrowed<'_>, ep: u8, msg: u64) {
         let dev = &data.dev;
-        dev_info!(dev, "RtKit message: {:#x}:{:#x}\n", ep, msg);
+        //dev_info!(dev, "RtKit message: {:#x}:{:#x}\n", ep, msg);
 
         if ep != EP_FIRMWARE || msg != MSG_RX_DOORBELL {
             dev_err!(dev, "Unknown message: {:#x}:{:#x}\n", ep, msg);
@@ -494,11 +487,11 @@ impl GpuManager::ver {
             .zip(&mgr.pipes.frag)
             .zip(&mgr.pipes.comp)
         {
-            p_pipes.push(fw::initdata::raw::PipeChannels::ver {
+            p_pipes.try_push(fw::initdata::raw::PipeChannels::ver {
                 vtx: v.lock().to_raw(),
                 frag: f.lock().to_raw(),
                 comp: c.lock().to_raw(),
-            });
+            })?;
         }
 
         mgr.as_mut()
@@ -514,19 +507,18 @@ impl GpuManager::ver {
 
         for (i, map) in cfg.io_mappings.iter().enumerate() {
             if let Some(map) = map.as_ref() {
-                Self::iomap(&mut mgr, cfg, i, map)?;
+                Self::iomap(&mut mgr, i, map)?;
             }
         }
 
         #[ver(V >= V13_0B4)]
         if let Some(base) = cfg.sram_base {
             let size = cfg.sram_size.unwrap() as usize;
-            let iova = mgr.as_mut().alloc_mmio_iova(size);
 
             let mapping =
                 mgr.uat
                     .kernel_vm()
-                    .map_io(iova, base as usize, size, mmu::PROT_FW_SHARED_RW)?;
+                    .map_io(base as usize, size, mmu::PROT_FW_SHARED_RW)?;
 
             mgr.as_mut()
                 .initdata_mut()
@@ -536,7 +528,7 @@ impl GpuManager::ver {
                     raw.sgx_sram_ptr = U64(mapping.iova() as u64);
                 });
 
-            mgr.as_mut().io_mappings_mut().push(mapping);
+            mgr.as_mut().io_mappings_mut().try_push(mapping)?;
         }
 
         let mgr = Arc::from(mgr);
@@ -567,21 +559,6 @@ impl GpuManager::ver {
         unsafe { &mut self.get_unchecked_mut().io_mappings }
     }
 
-    /// Allocate an MMIO iova range
-    fn alloc_mmio_iova(self: Pin<&mut Self>, size: usize) -> u64 {
-        // SAFETY: next_mmio_iova does not require structural pinning.
-        let next_ref = unsafe { &mut self.get_unchecked_mut().next_mmio_iova };
-
-        let addr = *next_ref;
-        let next = addr + (size + mmu::UAT_PGSZ) as u64;
-
-        assert!(next - 1 <= IOVA_KERN_MMIO_TOP);
-
-        *next_ref = next;
-
-        addr
-    }
-
     /// Build the entire GPU InitData structure tree and return it as a boxed GpuObject.
     fn make_initdata(
         dev: &AsahiDevice,
@@ -597,11 +574,7 @@ impl GpuManager::ver {
     ///
     /// Force disable inlining to avoid blowing up the stack.
     #[inline(never)]
-    fn make_uat(
-        dev: &AsahiDevice,
-        cfg: &'static hw::HwConfig,
-        softc: *mut bindings::asahidrm_softc,
-    ) -> Result<Box<mmu::Uat>> {
+    fn make_uat(dev: &AsahiDevice, cfg: &'static hw::HwConfig, softc: *mut bindings::asahidrm_softc) -> Result<Box<mmu::Uat>> {
         let bst = unsafe { (*softc).sc_iot };
         let node = unsafe { (*softc).sc_node };
         // G14X has a new thing in the Scene structure that unfortunately requires
@@ -640,18 +613,18 @@ impl GpuManager::ver {
         };
 
         for _i in 0..=NUM_PIPES - 1 {
-            pipes.vtx.push(Box::pin_init(Mutex::new_named(
+            pipes.vtx.try_push(Box::pin_init(Mutex::new_named(
                 channel::PipeChannel::ver::new(dev, &mut alloc)?,
                 c_str!("pipe_vtx"),
-            ))?);
-            pipes.frag.push(Box::pin_init(Mutex::new_named(
+            ))?)?;
+            pipes.frag.try_push(Box::pin_init(Mutex::new_named(
                 channel::PipeChannel::ver::new(dev, &mut alloc)?,
                 c_str!("pipe_frag"),
-            ))?);
-            pipes.comp.push(Box::pin_init(Mutex::new_named(
+            ))?)?;
+            pipes.comp.try_push(Box::pin_init(Mutex::new_named(
                 channel::PipeChannel::ver::new(dev, &mut alloc)?,
                 c_str!("pipe_comp"),
-            ))?);
+            ))?)?;
         }
 
         let fwctl_channel = channel::FwCtlChannel::new(dev, &mut alloc)?;
@@ -684,7 +657,6 @@ impl GpuManager::ver {
             initdata: *initdata,
             uat: *uat,
             io_mappings: Vec::new(),
-            next_mmio_iova: IOVA_KERN_MMIO_BASE,
             rtkit <- Mutex::new_named(None, c_str!("rtkit")),
             crashed: AtomicBool::new(false),
             event_manager,
@@ -800,12 +772,12 @@ impl GpuManager::ver {
 
         let node = of::Node::from_handle(node).ok_or(EIO)?;
 
-        Ok(Box::new(hw::DynConfig {
+        Ok(Box::try_new(hw::DynConfig {
             pwr: pwr_cfg,
             uat_ttb_base: uat.ttb_base(),
             id: gpu_id,
             firmware_version: node.get_property(c_str!("apple,firmware-version"))?,
-        }))
+        })?)
     }
 
     /// Create the global GPU event manager, and return an `Arc<>` to it.
@@ -817,47 +789,21 @@ impl GpuManager::ver {
     /// index.
     fn iomap(
         this: &mut Pin<UniqueArc<GpuManager::ver>>,
-        cfg: &'static hw::HwConfig,
         index: usize,
         map: &hw::IOMapping,
     ) -> Result {
-        let dies = if map.per_die {
-            cfg.num_dies as usize
-        } else {
-            1
-        };
-
         let off = map.base & mmu::UAT_PGMSK;
         let base = map.base - off;
         let end = (map.base + map.size + mmu::UAT_PGMSK) & !mmu::UAT_PGMSK;
-        let map_size = end - base;
-
-        // Array mappings must be aligned
-        assert!((off == 0 && map_size == map.size) || (map.count == 1 && !map.per_die));
-        assert!(map.count > 0);
-
-        let iova = this.as_mut().alloc_mmio_iova(map_size * map.count * dies);
-        let mut cur_iova = iova;
-
-        for die in 0..dies {
-            for i in 0..map.count {
-                let phys_off = die * 0x20_0000_0000 + i * map.stride;
-
-                let mapping = this.uat.kernel_vm().map_io(
-                    cur_iova,
-                    base + phys_off,
-                    map_size,
-                    if map.writable {
-                        mmu::PROT_FW_MMIO_RW
-                    } else {
-                        mmu::PROT_FW_MMIO_RO
-                    },
-                )?;
-
-                this.as_mut().io_mappings_mut().push(mapping);
-                cur_iova += map_size as u64;
-            }
-        }
+        let mapping = this.uat.kernel_vm().map_io(
+            base,
+            end - base,
+            if map.writable {
+                mmu::PROT_FW_MMIO_RW
+            } else {
+                mmu::PROT_FW_MMIO_RO
+            },
+        )?;
 
         this.as_mut()
             .initdata_mut()
@@ -866,13 +812,14 @@ impl GpuManager::ver {
             .with_mut(|raw, _| {
                 raw.io_mappings[index] = fw::initdata::raw::IOMapping {
                     phys_addr: U64(map.base as u64),
-                    virt_addr: U64(iova + off as u64),
-                    total_size: (map.size * map.count * dies) as u32,
-                    element_size: map.size as u32,
+                    virt_addr: U64((mapping.iova() + off) as u64),
+                    size: map.size as u32,
+                    range_size: map.range_size as u32,
                     readwrite: U64(map.writable as u64),
                 };
             });
 
+        this.as_mut().io_mappings_mut().try_push(mapping)?;
         Ok(())
     }
 
@@ -920,7 +867,7 @@ impl GpuManager::ver {
     fn get_fault_info(&self) -> Option<regs::FaultInfo> {
         let data = self.dev.data();
 
-        let res = match data.res() {
+        let res = match data.resources() {
             Some(res) => res,
             None => {
                 dev_err!(self.dev, "  Failed to acquire resources\n");
@@ -1201,7 +1148,7 @@ impl GpuManager for GpuManager::ver {
     ) -> Result<Box<dyn queue::Queue>> {
         let mut kalloc = self.alloc();
         let id = self.ids.queue.next();
-        Ok(Box::new(queue::Queue::ver::new(
+        Ok(Box::try_new(queue::Queue::ver::new(
             &self.dev,
             vm,
             &mut kalloc,
@@ -1212,7 +1159,7 @@ impl GpuManager for GpuManager::ver {
             id,
             priority,
             caps,
-        )?))
+        )?)?)
     }
 
     fn kick_firmware(&self) -> Result {
@@ -1385,14 +1332,21 @@ impl GpuManager for GpuManager::ver {
         }
 
         for i in work {
-            garbage.push(i);
+            garbage
+                .try_push(i)
+                .expect("try_push() failed after try_reserve()");
         }
     }
 
     fn free_context(&self, ctx: Box<fw::types::GpuObject<fw::workqueue::GpuContextData>>) {
         let mut garbage = self.garbage_contexts.lock();
 
-        garbage.push(ctx);
+        if garbage.try_push(ctx).is_err() {
+            dev_err!(
+                self.dev,
+                "Failed to reserve space for freed context, deadlock possible.\n"
+            );
+        }
     }
 
     fn is_crashed(&self) -> bool {

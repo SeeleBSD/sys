@@ -50,7 +50,7 @@ compile_kernel() {
   echo "Compiling the kernel inside the VM..."
   sshpass -p ${VM_PASS} ssh -p ${VM_PORT} -o StrictHostKeyChecking=no "${VM_USER}@localhost" << EOF
     pkg_add git rust rust-src rust-rustfmt llvm%17
-    cargo install bindgen-cli
+    cargo install bindgen-cli@1.69.5
     ln -s /root/.cargo/bin/bindgen /usr/bin/bindgen
     cd /usr/src/sys/arch/\$(machine)/conf
     config CUSTOM.MP

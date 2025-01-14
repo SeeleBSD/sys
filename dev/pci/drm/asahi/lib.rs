@@ -57,8 +57,7 @@ id_table! { ASAHI_ID_TABLE, &'static hw::HwConfig, [
     (c_str!("apple,agx-t6001"), Some(&hw::t600x::HWCONFIG_T6001)),
     (c_str!("apple,agx-t6002"), Some(&hw::t600x::HWCONFIG_T6002)),
     (c_str!("apple,agx-t6020"), Some(&hw::t602x::HWCONFIG_T6020)),
-    (c_str!("apple,agx-t6021"), Some(&hw::t602x::HWCONFIG_T6021)),
-    (c_str!("apple,agx-t6022"), Some(&hw::t602x::HWCONFIG_T6022))
+    (c_str!("apple,agx-t6021"), Some(&hw::t602x::HWCONFIG_T6021))
 ] }
 
 #[no_mangle]
@@ -179,8 +178,6 @@ pub extern "C" fn asahidrm_attachhook(_self: *mut bindings::device) {
 
     let data = kernel::new_device_data!(reg, res, AsahiData { dev, gpu }, "Asahi::Registrations").unwrap();
     let data: Arc<DeviceData> = data.into();
-
-    //coarse_sleep(Duration::from_secs(5));
 
     data.gpu.init().unwrap();
 

@@ -22,7 +22,6 @@ use kernel::{
     error::{to_result, Result},
     io_pgtable,
     io_pgtable::{prot, AppleUAT, IoPageTable},
-    platform,
     prelude::*,
     static_lock_class,
     sync::{
@@ -32,8 +31,6 @@ use kernel::{
     time::{clock, Now},
     types::ForeignOwnable,
 };
-
-use kernel::println;
 
 use crate::debug::*;
 use crate::no_debug;
@@ -79,6 +76,10 @@ const IOVA_KERN_BASE: usize = 0xffffffa000000000;
 /// Driver-managed kernel top VA
 const IOVA_KERN_TOP: usize = 0xffffffafffffffff;
 
+/// Range reserved for MMIO maps
+const IOVA_KERN_MMIO_BASE: usize = 0xffffffaf00000000;
+const IOVA_KERN_MMIO_TOP: usize = 0xffffffafffffffff;
+
 const TTBR_VALID: u64 = 0x1; // BIT(0)
 const TTBR_ASID_SHIFT: usize = 48;
 
@@ -86,7 +87,7 @@ const PTE_TABLE: u64 = 0x3; // BIT(0) | BIT(1)
 
 // Mapping protection types
 
-// Note: 0 means "cache coherency", which for UAT means *uncached*,
+// Note: prot::CACHE means "cache coherency", which for UAT means *uncached*,
 // since uncached mappings from the GFX ASC side are cache coherent with the AP cache.
 // Not having that flag means *cached noncoherent*.
 
@@ -244,16 +245,15 @@ impl VmInner {
         let mut left = pgcount;
         while left > 0 {
             let mapped_iova = self.map_iova(iova, pgsize * left)?;
-            let mapped =
-                self.page_table
-                    .map_pages(mapped_iova as usize, paddr, pgsize, left, prot)?;
+            let mapped = self
+                .page_table
+                .map_pages(mapped_iova, paddr, pgsize, left, prot)?;
             assert!(mapped <= left * pgsize);
 
             left -= mapped / pgsize;
             paddr += mapped;
             iova += mapped;
         }
-
         Ok(pgcount * pgsize)
     }
 
@@ -262,18 +262,7 @@ impl VmInner {
         let mut left = pgcount;
         while left > 0 {
             let mapped_iova = self.map_iova(iova, pgsize * left)?;
-            let mut unmapped = self
-                .page_table
-                .unmap_pages(mapped_iova as usize, pgsize, left);
-            if unmapped == 0 {
-                dev_err!(
-                    self.dev,
-                    "unmap_pages {:#x}:{:#x} returned 0\n",
-                    mapped_iova,
-                    left
-                );
-                unmapped = pgsize; // Pretend we unmapped one page and try again...
-            }
+            let unmapped = self.page_table.unmap_pages(mapped_iova, pgsize, left);
             assert!(unmapped <= left * pgsize);
 
             left -= unmapped / pgsize;
@@ -420,7 +409,7 @@ impl Mapping {
             );
         }
 
-        let prot = self.0.prot | 0;
+        let prot = self.0.prot | prot::CACHE;
         if owner.map_node(&self.0, prot).is_err() {
             dev_err!(
                 owner.dev,
@@ -544,8 +533,8 @@ impl Drop for Mapping {
         // 4. Unmap
         // 5. Flush the TLB range again
 
-        // 0 means "cache coherent" which means *uncached* here.
-        if self.0.prot & 0 == 0 {
+        // prot::CACHE means "cache coherent" which means *uncached* here.
+        if self.0.prot & prot::CACHE == 0 {
             self.remap_uncached_and_flush();
         }
 
@@ -645,7 +634,6 @@ pub(crate) struct Uat {
 impl Drop for UatRegion {
     fn drop(&mut self) {
         // SAFETY: the pointer is valid by the type invariant
-        // unsafe { bindings::memunmap(self.map.as_ptr()) };
         unsafe {
             (*(self.bst as *const bindings::bus_space))
                 ._space_unmap
@@ -799,8 +787,6 @@ impl Vm {
                 oas: cfg.uat_oas,
                 coherent_walk: true,
                 quirks: 0,
-
-                dmat: unsafe { crate::DMAT.expect("Uninitialized") },
             },
             (),
         )?;
@@ -910,10 +896,29 @@ impl Vm {
     }
 
     /// Add a direct MMIO mapping to this Vm at a free address.
-    pub(crate) fn map_io(&self, iova: u64, phys: usize, size: usize, prot: u32) -> Result<Mapping> {
+    pub(crate) fn map_io(&self, phys: usize, size: usize, prot: u32) -> Result<Mapping> {
         let mut inner = self.inner.lock();
 
-        if (iova as usize | phys | size) & UAT_PGMSK != 0 {
+        let uat_inner = inner.uat_inner.clone();
+        let node = inner.mm.insert_node_in_range(
+            MappingInner {
+                owner: self.inner.clone(),
+                uat_inner,
+                prot,
+                sgt: None,
+                mapped_size: size,
+            },
+            (size + UAT_PGSZ) as u64, // Add guard page
+            UAT_PGSZ as u64,
+            0,
+            IOVA_KERN_MMIO_BASE as u64,
+            IOVA_KERN_MMIO_TOP as u64,
+            mm::InsertMode::Best,
+        )?;
+
+        let iova = node.start() as usize;
+
+        if (phys | size | iova) & UAT_PGMSK != 0 {
             dev_err!(
                 inner.dev,
                 "MMU: Mapping {:#x}:{:#x} -> {:#x} is not page-aligned\n",
@@ -932,21 +937,7 @@ impl Vm {
             iova
         );
 
-        let uat_inner = inner.uat_inner.clone();
-        let node = inner.mm.reserve_node(
-            MappingInner {
-                owner: self.inner.clone(),
-                uat_inner,
-                prot,
-                sgt: None,
-                mapped_size: size,
-            },
-            iova,
-            size as u64,
-            0,
-        )?;
-
-        inner.map_pages(iova as usize, phys, UAT_PGSZ, size >> UAT_PGBIT, prot)?;
+        inner.map_pages(iova, phys, UAT_PGSZ, size >> UAT_PGBIT, prot)?;
 
         Ok(Mapping(node))
     }
@@ -1184,32 +1175,30 @@ impl Uat {
 
     /// Creates the reference-counted inner data for a new `Uat` instance.
     #[inline(never)]
-    fn make_inner(
-        dev: &driver::AsahiDevice,
+    fn make_inner(dev: &driver::AsahiDevice,
         bst: bindings::bus_space_tag_t,
-        node: i32,
-    ) -> Result<Arc<UatInner>> {
-        let handoff_rgn = Self::map_region(dev, c_str!("handoff"), HANDOFF_SIZE, false, bst, node)?;
-        let ttbs_rgn = Self::map_region(dev, c_str!("ttbs"), SLOTS_SIZE, false, bst, node)?;
-
-        let handoff = unsafe { &(handoff_rgn.map.as_ptr() as *mut Handoff).as_ref().unwrap() };
-
-        dev_info!(dev, "MMU: Initializing kernel page table\n");
-
-        Arc::pin_init(try_pin_init!(UatInner {
-            handoff_flush <- init::pin_init_array_from_fn(|i| {
-                Mutex::new_named(HandoffFlush(&handoff.flush[i]), c_str!("handoff_flush"))
-            }),
-            shared <- Mutex::new_named(
-                UatShared {
-                    kernel_ttb1: 0,
-                    map_kernel_to_user: false,
-                    handoff_rgn,
-                    ttbs_rgn,
-                },
-                c_str!("uat_shared")
-            ),
-        }))
+        node: i32) -> Result<Arc<UatInner>> {
+            let handoff_rgn = Self::map_region(dev, c_str!("handoff"), HANDOFF_SIZE, false, bst, node)?;
+            let ttbs_rgn = Self::map_region(dev, c_str!("ttbs"), SLOTS_SIZE, false, bst, node)?;
+    
+            let handoff = unsafe { &(handoff_rgn.map.as_ptr() as *mut Handoff).as_ref().unwrap() };
+    
+            dev_info!(dev, "MMU: Initializing kernel page table\n");
+    
+            Arc::pin_init(try_pin_init!(UatInner {
+                handoff_flush <- init::pin_init_array_from_fn(|i| {
+                    Mutex::new_named(HandoffFlush(&handoff.flush[i]), c_str!("handoff_flush"))
+                }),
+                shared <- Mutex::new_named(
+                    UatShared {
+                        kernel_ttb1: 0,
+                        map_kernel_to_user: false,
+                        handoff_rgn,
+                        ttbs_rgn,
+                    },
+                    c_str!("uat_shared")
+                ),
+            }))
     }
 
     /// Creates a new `Uat` instance given the relevant hardware config.

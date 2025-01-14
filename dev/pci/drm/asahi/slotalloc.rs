@@ -130,19 +130,21 @@ impl<T: SlotItem> SlotAllocator<T> {
     pub(crate) fn new(
         num_slots: u32,
         mut data: T::Data,
-        mut constructor: impl FnMut(&mut T::Data, u32) -> Option<T>,
+        mut constructor: impl FnMut(&mut T::Data, u32) -> T,
         name: &'static CStr,
         lock_key1: LockClassKey,
         lock_key2: LockClassKey,
     ) -> Result<SlotAllocator<T>> {
-        let mut slots = Vec::with_capacity(num_slots as usize);
+        let mut slots = Vec::try_with_capacity(num_slots as usize)?;
 
         for i in 0..num_slots {
-            slots.push(constructor(&mut data, i).map(|item| Entry {
-                item,
-                get_time: 0,
-                drop_time: 0,
-            }));
+            slots
+                .try_push(Some(Entry {
+                    item: constructor(&mut data, i),
+                    get_time: 0,
+                    drop_time: 0,
+                }))
+                .expect("try_push() failed after reservation");
         }
 
         let inner = SlotAllocatorInner {

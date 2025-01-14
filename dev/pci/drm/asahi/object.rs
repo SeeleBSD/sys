@@ -112,7 +112,7 @@ macro_rules! inner_ptr {
     ($gpuva:expr, $($f:tt)*) => ({
         // This mirrors kernel::offset_of(), except we use type inference to avoid having to know
         // the type of the pointer explicitly.
-        fn uninit_from<T: GpuStruct>(_: GpuPointer<'_, T>) -> core::mem::MaybeUninit<T::Raw<'static>> {
+        fn uninit_from<'a, T: GpuStruct>(_: GpuPointer<'a, T>) -> core::mem::MaybeUninit<T::Raw<'static>> {
             core::mem::MaybeUninit::uninit()
         }
         let tmp = uninit_from($gpuva);
@@ -269,7 +269,7 @@ impl<T: GpuStruct, U: Allocation<T>> GpuObject<T, U> {
             raw: p,
             gpu_ptr,
             alloc,
-            inner: Box::new(inner),
+            inner: Box::try_new(inner)?,
         })
     }
 
@@ -331,7 +331,7 @@ impl<T: GpuStruct, U: Allocation<T>> GpuObject<T, U> {
             &'a mut MaybeUninit<T::Raw<'a>>,
         ) -> Result<&'a mut T::Raw<'a>>,
     ) -> Result<Self> {
-        GpuObject::<T, U>::new_boxed(alloc, Box::new(inner), callback)
+        GpuObject::<T, U>::new_boxed(alloc, Box::try_new(inner)?, callback)
     }
 
     /// Create a new GpuObject given an allocator and the boxed inner data (a type implementing
@@ -635,10 +635,10 @@ impl<T: Copy, U: Allocation<T>> GpuArray<T, U> {
 impl<T: Default, U: Allocation<T>> GpuArray<T, U> {
     /// Allocate a new GPU array, initializing each element to its default.
     pub(crate) fn empty(alloc: U, count: usize) -> Result<GpuArray<T, U>> {
-        let p = alloc.ptr().ok_or(EINVAL)?.as_ptr();
+        let p = alloc.ptr().ok_or(EINVAL)?.as_ptr() as *mut T;
         let inner = GpuOnlyArray::new(alloc, count)?;
         let mut pi = p;
-        for i in 0..count {
+        for _i in 0..count {
             // SAFETY: `pi` is valid per the Allocation type invariant, and GpuOnlyArray guarantees
             // that it can never iterate beyond the buffer length.
             unsafe {

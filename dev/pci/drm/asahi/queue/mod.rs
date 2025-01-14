@@ -170,31 +170,13 @@ pub(crate) struct QueueJob {
 #[versions(AGX)]
 impl QueueJob::ver {
     fn get_vtx(&mut self) -> Result<&mut workqueue::Job::ver> {
-        self.sj_vtx
-            .as_mut()
-            .ok_or_else(|| {
-                cls_pr_debug!(Errors, "No vertex queue\n");
-                EINVAL
-            })?
-            .get()
+        self.sj_vtx.as_mut().ok_or(EINVAL)?.get()
     }
     fn get_frag(&mut self) -> Result<&mut workqueue::Job::ver> {
-        self.sj_frag
-            .as_mut()
-            .ok_or_else(|| {
-                cls_pr_debug!(Errors, "No fragment queue\n");
-                EINVAL
-            })?
-            .get()
+        self.sj_frag.as_mut().ok_or(EINVAL)?.get()
     }
     fn get_comp(&mut self) -> Result<&mut workqueue::Job::ver> {
-        self.sj_comp
-            .as_mut()
-            .ok_or_else(|| {
-                cls_pr_debug!(Errors, "No compute queue\n");
-                EINVAL
-            })?
-            .get()
+        self.sj_comp.as_mut().ok_or(EINVAL)?.get()
     }
 
     fn commit(&mut self) -> Result {
@@ -216,7 +198,7 @@ impl sched::JobImpl for QueueJob::ver {
 
         if let Some(sj) = job.sj_vtx.as_ref() {
             if let Some(fence) = sj.can_submit() {
-                mod_dev_dbg!(
+                dev_info!(
                     job.dev,
                     "QueueJob {}: Blocking due to vertex queue full\n",
                     job.id
@@ -226,7 +208,7 @@ impl sched::JobImpl for QueueJob::ver {
         }
         if let Some(sj) = job.sj_frag.as_ref() {
             if let Some(fence) = sj.can_submit() {
-                mod_dev_dbg!(
+                dev_info!(
                     job.dev,
                     "QueueJob {}: Blocking due to fragment queue full\n",
                     job.id
@@ -236,7 +218,7 @@ impl sched::JobImpl for QueueJob::ver {
         }
         if let Some(sj) = job.sj_comp.as_ref() {
             if let Some(fence) = sj.can_submit() {
-                mod_dev_dbg!(
+                dev_info!(
                     job.dev,
                     "QueueJob {}: Blocking due to compute queue full\n",
                     job.id
@@ -381,8 +363,7 @@ impl Queue::ver {
 
         let data = dev.data();
 
-        // Must be shared, no cache management on this one!
-        let mut notifier_list = alloc.shared.new_default::<fw::event::NotifierList>()?;
+        let mut notifier_list = alloc.private.new_default::<fw::event::NotifierList>()?;
 
         let self_ptr = notifier_list.weak_pointer();
         notifier_list.with_mut(|raw, _inner| {
@@ -447,11 +428,10 @@ impl Queue::ver {
 
         // Rendering structures
         if caps & uapi::drm_asahi_queue_cap_DRM_ASAHI_QUEUE_CAP_RENDER != 0 {
-            /*let tvb_blocks = {
+            let tvb_blocks = {
                 let lock = crate::THIS_MODULE.kernel_param_lock();
                 *crate::initial_tvb_size.read(&lock)
-            };*/
-            let tvb_blocks = crate::INITIAL_TVB_SIZE;
+            };
 
             ret.buffer.as_ref().unwrap().ensure_blocks(tvb_blocks)?;
 
@@ -554,7 +534,6 @@ impl Queue for Queue::ver {
 
         // Empty submissions are not legal
         if commands.is_empty() {
-            cls_pr_debug!(Errors, "Empty submission\n");
             return Err(EINVAL);
         }
 
@@ -567,8 +546,8 @@ impl Queue for Queue::ver {
         let mut events: [Vec<Option<workqueue::QueueEventInfo::ver>>; SQ_COUNT] =
             Default::default();
 
-        events[SQ_RENDER].push(self.q_frag.as_ref().and_then(|a| a.wq.event_info()));
-        events[SQ_COMPUTE].push(self.q_comp.as_ref().and_then(|a| a.wq.event_info()));
+        events[SQ_RENDER].try_push(self.q_frag.as_ref().and_then(|a| a.wq.event_info()))?;
+        events[SQ_COMPUTE].try_push(self.q_comp.as_ref().and_then(|a| a.wq.event_info()))?;
 
         let vm_bind = gpu.bind_vm(&self.vm)?;
         let vm_slot = vm_bind.slot();
@@ -624,10 +603,7 @@ impl Queue for Queue::ver {
             match cmd.cmd_type {
                 uapi::drm_asahi_cmd_type_DRM_ASAHI_CMD_RENDER => last_render = Some(i),
                 uapi::drm_asahi_cmd_type_DRM_ASAHI_CMD_COMPUTE => last_compute = Some(i),
-                _ => {
-                    cls_pr_debug!(Errors, "Unknown command type {}\n", cmd.cmd_type);
-                    return Err(EINVAL);
-                }
+                _ => return Err(EINVAL),
             }
         }
 
@@ -642,10 +618,7 @@ impl Queue for Queue::ver {
                 if *index == uapi::DRM_ASAHI_BARRIER_NONE as u32 {
                     continue;
                 }
-                if let Some(event) = events[queue_idx].get(*index as usize).ok_or_else(|| {
-                    cls_pr_debug!(Errors, "Invalid barrier #{}: {}\n", queue_idx, index);
-                    EINVAL
-                })? {
+                if let Some(event) = events[queue_idx].get(*index as usize).ok_or(EINVAL)? {
                     let mut alloc = gpu.alloc();
                     let queue_job = match cmd.cmd_type {
                         uapi::drm_asahi_cmd_type_DRM_ASAHI_CMD_RENDER => job.get_vtx()?,
@@ -679,29 +652,18 @@ impl Queue for Queue::ver {
             let result_writer = match result_buf.as_ref() {
                 None => {
                     if cmd.result_offset != 0 || cmd.result_size != 0 {
-                        cls_pr_debug!(Errors, "No result buffer but result requested\n");
                         return Err(EINVAL);
                     }
                     None
                 }
                 Some(buf) => {
                     if cmd.result_size != 0 {
-                        let end_offset = cmd
+                        if cmd
                             .result_offset
                             .checked_add(cmd.result_size)
-                            .ok_or_else(|| {
-                                cls_pr_debug!(Errors, "result_offset + result_size overflow\n");
-                                EINVAL
-                            })?;
-                        if end_offset > buf.size() as u64 {
-                            cls_pr_debug!(
-                                Errors,
-                                "Result buffer overflow ({} + {} > {})\n",
-                                cmd.result_offset,
-                                cmd.result_size,
-                                buf.size()
-                            );
-
+                            .ok_or(EINVAL)?
+                            > buf.size() as u64
+                        {
                             return Err(EINVAL);
                         }
                         Some(ResultWriter {
@@ -724,7 +686,7 @@ impl Queue for Queue::ver {
                         id,
                         last_render.unwrap() == i,
                     )?;
-                    events[SQ_RENDER].push(Some(
+                    events[SQ_RENDER].try_push(Some(
                         job.sj_frag
                             .as_ref()
                             .expect("No frag queue?")
@@ -732,7 +694,7 @@ impl Queue for Queue::ver {
                             .as_ref()
                             .expect("No frag job?")
                             .event_info(),
-                    ));
+                    ))?;
                 }
                 uapi::drm_asahi_cmd_type_DRM_ASAHI_CMD_COMPUTE => {
                     self.submit_compute(
@@ -742,7 +704,7 @@ impl Queue for Queue::ver {
                         id,
                         last_compute.unwrap() == i,
                     )?;
-                    events[SQ_COMPUTE].push(Some(
+                    events[SQ_COMPUTE].try_push(Some(
                         job.sj_comp
                             .as_ref()
                             .expect("No comp queue?")
@@ -750,7 +712,7 @@ impl Queue for Queue::ver {
                             .as_ref()
                             .expect("No comp job?")
                             .event_info(),
-                    ));
+                    ))?;
                 }
                 _ => return Err(EINVAL),
             }

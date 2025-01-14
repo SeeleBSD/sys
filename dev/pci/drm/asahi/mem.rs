@@ -82,6 +82,7 @@ pub(crate) fn tlbi_range(asid: Asid, va: usize, len: usize) {
 
     // Guess? It's possible that the page count is in terms of 4K pages
     // when the CPU is in 4K mode...
+    #[cfg(CONFIG_ARM64_4K_PAGES)]
     let pages = 4 * pages;
 
     if pages == 1 {

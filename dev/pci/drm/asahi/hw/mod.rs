@@ -9,7 +9,6 @@ use crate::fw::types::*;
 use alloc::vec::Vec;
 use kernel::c_str;
 use kernel::device::RawDevice;
-use kernel::of;
 use kernel::prelude::*;
 
 const MAX_POWERZONES: usize = 5;
@@ -72,7 +71,9 @@ pub(crate) enum GpuCore {
     G14G = 15,
     G14S = 16,
     G14C = 17,
-    G14D = 18, // Split out, unlike G13D
+    // G15M = 18,
+    // G15P_AGX2 = 19,
+    // G15P = 20,
 }
 
 /// GPU revision ID. Note: Part of the firmware ABI.
@@ -134,14 +135,10 @@ pub(crate) struct PowerZone {
 pub(crate) struct IOMapping {
     /// Base physical address of the mapping.
     pub(crate) base: usize,
-    /// Whether this mapping should be replicated to all dies
-    pub(crate) per_die: bool,
-    /// Number of mappings.
-    pub(crate) count: usize,
-    /// Size of one mapping.
+    /// Size of the mapping.
     pub(crate) size: usize,
-    /// Stride between mappings.
-    pub(crate) stride: usize,
+    /// Range size of the mapping (for arrays?)
+    pub(crate) range_size: usize,
     /// Whether the mapping should be writable.
     pub(crate) writable: bool,
 }
@@ -150,18 +147,14 @@ impl IOMapping {
     /// Convenience constructor for a new IOMapping.
     pub(crate) const fn new(
         base: usize,
-        per_die: bool,
-        count: usize,
         size: usize,
-        stride: usize,
+        range_size: usize,
         writable: bool,
     ) -> IOMapping {
         IOMapping {
             base,
-            per_die,
-            count,
             size,
-            stride,
+            range_size,
             writable,
         }
     }
@@ -279,8 +272,8 @@ pub(crate) struct HwConfig {
     /// HwDataShared3.table.
     pub(crate) shared3_tab: &'static [u32],
 
-    /// Globals.idle_off_standby_timer.
-    pub(crate) idle_off_standby_timer_default: u32,
+    /// Globals.unk_hws2_0.
+    pub(crate) unk_hws2_0: u32,
     /// Globals.unk_hws2_4.
     pub(crate) unk_hws2_4: Option<[F32; 8]>,
     /// Globals.unk_hws2_24.
@@ -322,8 +315,6 @@ pub(crate) struct DynConfig {
     pub(crate) id: GpuIdConfig,
     /// Power calibration configuration for this specific chip/device.
     pub(crate) pwr: PwrConfig,
-    /// Firmware version.
-    pub(crate) firmware_version: Vec<u32>,
 }
 
 /// Specific GPU ID configuration fetched from SGX MMIO registers.
@@ -421,8 +412,6 @@ pub(crate) struct PwrConfig {
     pub(crate) fw_early_wake_timeout_ms: u32,
     /// Delay from the GPU becoming idle to powerdown
     pub(crate) idle_off_delay_ms: u32,
-    /// Related to the above?
-    pub(crate) idle_off_standby_timer: u32,
     /// Percent?
     pub(crate) perf_boost_ce_step: u32,
     /// Minimum utilization before performance state is increased in %.
@@ -473,22 +462,19 @@ pub(crate) struct PwrConfig {
     pub(crate) se_reset_criteria: u32,
 }
 
-use kernel::bindings;
-
 impl PwrConfig {
     fn load_opp(
         dev: &AsahiDevice,
         name: &CStr,
         cfg: &HwConfig,
         is_main: bool,
-        node: i32,
     ) -> Result<Vec<PState>> {
         let mut perf_states = Vec::new();
 
-        let node = of::Node::from_handle(node).ok_or(EIO)?;
+        let node = dev.of_node().ok_or(EIO)?;
         let opps = node.parse_phandle(name, 0).ok_or(EIO)?;
 
-        for opp in opps.child() {
+        for opp in opps.children() {
             let freq_hz: u64 = opp.get_property(c_str!("opp-hz"))?;
             let mut volt_uv: Vec<u32> = opp.get_property(c_str!("opp-microvolt"))?;
             let pwr_uw: u32 = if is_main {
@@ -518,11 +504,11 @@ impl PwrConfig {
 
             let pwr_mw = pwr_uw / 1000;
 
-            perf_states.push(PState {
+            perf_states.try_push(PState {
                 freq_hz: freq_hz.try_into()?,
                 volt_mv,
                 pwr_mw,
-            });
+            })?;
         }
 
         if perf_states.is_empty() {
@@ -533,23 +519,20 @@ impl PwrConfig {
     }
 
     /// Load the GPU power configuration from the device tree.
-    pub(crate) fn load(dev: &AsahiDevice, cfg: &HwConfig, handle: i32) -> Result<PwrConfig> {
-        let perf_states = Self::load_opp(dev, c_str!("operating-points-v2"), cfg, true, handle)?;
-        let node = of::Node::from_handle(handle).ok_or(EIO)?;
+    pub(crate) fn load(dev: &AsahiDevice, cfg: &HwConfig) -> Result<PwrConfig> {
+        let perf_states = Self::load_opp(dev, c_str!("operating-points-v2"), cfg, true)?;
+        let node = dev.of_node().ok_or(EIO)?;
 
         macro_rules! prop {
             ($prop:expr, $default:expr) => {{
-                dbg!("Getting {}...", $prop);
                 node.get_opt_property(c_str!($prop))
                     .map_err(|e| {
-                        dev_err!(dev, "Error reading property {}: {:?}\n", $prop, e,);
+                        dev_err!(dev, "Error reading property {}: {:?}\n", $prop, e);
                         e
-                    })
-                    .unwrap_or(None)
+                    })?
                     .unwrap_or($default)
             }};
             ($prop:expr) => {{
-                dbg!("Getting {}...", $prop);
                 node.get_property(c_str!($prop)).map_err(|e| {
                     dev_err!(dev, "Error reading property {}: {:?}\n", $prop, e);
                     e
@@ -567,11 +550,11 @@ impl PwrConfig {
         let pz_count = pz_data.len() / 3;
         let mut power_zones = Vec::new();
         for i in (0..pz_count).step_by(3) {
-            power_zones.push(PowerZone {
+            power_zones.try_push(PowerZone {
                 target: pz_data[i],
                 target_offset: pz_data[i + 1],
                 filter_tc: pz_data[i + 2],
-            });
+            })?;
         }
 
         let core_leak_coef: Vec<F32> = prop!("apple,core-leak-coef");
@@ -588,8 +571,8 @@ impl PwrConfig {
 
         let csafr = if cfg.has_csafr {
             Some(CsAfrPwrConfig {
-                perf_states_cs: Self::load_opp(dev, c_str!("apple,cs-opp"), cfg, false, handle)?,
-                perf_states_afr: Self::load_opp(dev, c_str!("apple,afr-opp"), cfg, false, handle)?,
+                perf_states_cs: Self::load_opp(dev, c_str!("apple,cs-opp"), cfg, false)?,
+                perf_states_afr: Self::load_opp(dev, c_str!("apple,afr-opp"), cfg, false)?,
                 leak_coef_cs: prop!("apple,cs-leak-coef"),
                 leak_coef_afr: prop!("apple,afr-leak-coef"),
                 min_sram_microvolt: prop!("apple,csafr-min-sram-microvolt"),
@@ -600,7 +583,6 @@ impl PwrConfig {
 
         let power_sample_period: u32 = prop!("apple,power-sample-period");
 
-        dbg!("end");
         Ok(PwrConfig {
             core_leak_coef,
             sram_leak_coef,
@@ -624,10 +606,6 @@ impl PwrConfig {
             fender_idle_off_delay_ms: prop!("apple,fender-idle-off-delay-ms", 40),
             fw_early_wake_timeout_ms: prop!("apple,fw-early-wake-timeout-ms", 5),
             idle_off_delay_ms: prop!("apple,idle-off-delay-ms", 2),
-            idle_off_standby_timer: prop!(
-                "apple,idleoff-standby-timer",
-                cfg.idle_off_standby_timer_default
-            ),
             perf_boost_ce_step: prop!("apple,perf-boost-ce-step", 25),
             perf_boost_min_util: prop!("apple,perf-boost-min-util", 100),
             perf_filter_drop_threshold: prop!("apple,perf-filter-drop-threshold"),
