@@ -5,7 +5,8 @@
 //! C header: [`include/linux/drm/drm_device.h`](../../../../include/linux/drm/drm_device.h)
 
 use crate::{
-    bindings, device, drm, of::Node,
+    bindings, device, drm,
+    of::Node,
     types::{AlwaysRefCounted, ForeignOwnable},
 };
 use core::cell::UnsafeCell;
@@ -34,7 +35,11 @@ impl<T: drm::drv::Driver> Device<T> {
     /// Returns a borrowed reference to the user data associated with this Device.
     pub fn data(&self) -> <T::Data as ForeignOwnable>::Borrowed<'_> {
         // Device objects exposed to users.
-        unsafe { T::Data::borrow(bindings::dev_get_drvdata(self.drm.get() as *mut _ as *mut bindings::device)) }
+        unsafe {
+            T::Data::borrow(bindings::dev_get_drvdata(
+                self.drm.get() as *mut _ as *mut bindings::device
+            ))
+        }
     }
 }
 
@@ -65,7 +70,7 @@ unsafe impl<T: drm::drv::Driver> device::RawDevice for Device<T> {
         // SAFETY: dev is initialized by C for all Device objects
         unsafe { (*self.drm.get()).dev }
     }
-    
+
     fn of_node(&self) -> Option<Node> {
         // let rdev = self.raw_device();
         // let rnode = unsafe { (*(*(rdev as *mut bindings::drm_device)).pdev).node as usize as *mut bindings::device_node };

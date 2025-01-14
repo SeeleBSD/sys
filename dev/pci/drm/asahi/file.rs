@@ -101,7 +101,7 @@ impl SyncItem {
     }
 
     fn parse_array(file: &DrmFile, ptr: u64, count: u32, out: bool) -> Result<Vec<SyncItem>> {
-        let mut vec = Vec::try_with_capacity(count as usize)?;
+        let mut vec = Vec::with_capacity(count as usize);
 
         const STRIDE: usize = core::mem::size_of::<uapi::drm_asahi_sync>();
         let size = STRIDE * count as usize;
@@ -118,9 +118,7 @@ impl SyncItem {
             // SAFETY: All bit patterns in the struct are valid
             let sync = unsafe { sync.assume_init() };
 
-            vec
-    .push(SyncItem::parse_one(file, sync, out)?)
-;
+            vec.push(SyncItem::parse_one(file, sync, out)?);
         }
 
         Ok(vec)
@@ -168,13 +166,11 @@ impl drm::file::DriverFile for File {
         let id = gpu.ids().file.next();
 
         mod_dev_dbg!(device, "[File {}]: DRM device opened\n", id);
-        Ok(Box::into_pin(
-    Box::new(Self {
+        Ok(Box::into_pin(Box::new(Self {
             id,
             vms: xarray::XArray::new(xarray::flags::ALLOC1),
             queues: xarray::XArray::new(xarray::flags::ALLOC1),
-        })
-))
+        })))
     }
 }
 
@@ -327,14 +323,12 @@ impl File {
         dummy_obj.map_at(&vm, VM_UNK_PAGE, mmu::PROT_GPU_SHARED_RW, true)?;
 
         mod_dev_dbg!(device, "[File {} VM {}]: VM created\n", file_id, id);
-        resv.store(
-    Box::new(Vm {
+        resv.store(Box::new(Vm {
             ualloc,
             ualloc_priv,
             vm,
             dummy_obj,
-        })
-)?;
+        }))?;
 
         data.vm_id = id;
 
@@ -714,7 +708,7 @@ impl File {
             data.queue_id,
             id
         );
-        let mut commands = Vec::try_with_capacity(data.command_count as usize)?;
+        let mut commands = Vec::with_capacity(data.command_count as usize);
 
         const STRIDE: usize = core::mem::size_of::<uapi::drm_asahi_command>();
         let size = STRIDE * data.command_count as usize;
@@ -730,9 +724,7 @@ impl File {
             unsafe { reader.read_raw(cmd.as_mut_ptr() as *mut u8, STRIDE)? };
 
             // SAFETY: All bit patterns in the struct are valid
-            commands
-    .push(unsafe { cmd.assume_init() })
-;
+            commands.push(unsafe { cmd.assume_init() });
         }
 
         let ret = queue

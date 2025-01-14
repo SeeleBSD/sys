@@ -20,6 +20,7 @@ use kernel::{
     delay::coarse_sleep,
     error::code::*,
     macros::versions,
+    of, platform,
     prelude::*,
     soc::apple::rtkit,
     sync::{
@@ -487,13 +488,11 @@ impl GpuManager::ver {
             .zip(&mgr.pipes.frag)
             .zip(&mgr.pipes.comp)
         {
-            p_pipes
-    .push(fw::initdata::raw::PipeChannels::ver {
+            p_pipes.push(fw::initdata::raw::PipeChannels::ver {
                 vtx: v.lock().to_raw(),
                 frag: f.lock().to_raw(),
                 comp: c.lock().to_raw(),
-            })
-;
+            });
         }
 
         mgr.as_mut()
@@ -530,14 +529,19 @@ impl GpuManager::ver {
                     raw.sgx_sram_ptr = U64(mapping.iova() as u64);
                 });
 
-            mgr.as_mut().io_mappings_mut()
-    .push(mapping)
-;
+            mgr.as_mut().io_mappings_mut().push(mapping);
         }
 
         let mgr = Arc::from(mgr);
 
-        let rtkit = rtkit::RtKit::<GpuManager::ver>::new(unsafe { &platform::Device::from_ptr(&mut (*softc).sc_dev as *mut _) }, None, 0, mgr.clone(), c_str!("agxrtk"), c_str!("asahi_rtkit"))?;
+        let rtkit = rtkit::RtKit::<GpuManager::ver>::new(
+            unsafe { &platform::Device::from_ptr(&mut (*softc).sc_dev as *mut _) },
+            None,
+            0,
+            mgr.clone(),
+            c_str!("agxrtk"),
+            c_str!("asahi_rtkit"),
+        )?;
 
         *mgr.rtkit.lock() = Some(rtkit);
 
@@ -578,7 +582,11 @@ impl GpuManager::ver {
     ///
     /// Force disable inlining to avoid blowing up the stack.
     #[inline(never)]
-    fn make_uat(dev: &AsahiDevice, cfg: &'static hw::HwConfig, softc: *mut bindings::asahidrm_softc) -> Result<Box<mmu::Uat>> {
+    fn make_uat(
+        dev: &AsahiDevice,
+        cfg: &'static hw::HwConfig,
+        softc: *mut bindings::asahidrm_softc,
+    ) -> Result<Box<mmu::Uat>> {
         let bst = unsafe { (*softc).sc_iot };
         let node = unsafe { (*softc).sc_node };
         // G14X has a new thing in the Scene structure that unfortunately requires
@@ -617,24 +625,18 @@ impl GpuManager::ver {
         };
 
         for _i in 0..=NUM_PIPES - 1 {
-            pipes.vtx
-    .push(Box::pin_init(Mutex::new_named(
+            pipes.vtx.push(Box::pin_init(Mutex::new_named(
                 channel::PipeChannel::ver::new(dev, &mut alloc)?,
                 c_str!("pipe_vtx"),
-            ))?)
-;
-            pipes.frag
-    .push(Box::pin_init(Mutex::new_named(
+            ))?);
+            pipes.frag.push(Box::pin_init(Mutex::new_named(
                 channel::PipeChannel::ver::new(dev, &mut alloc)?,
                 c_str!("pipe_frag"),
-            ))?)
-;
-            pipes.comp
-    .push(Box::pin_init(Mutex::new_named(
+            ))?);
+            pipes.comp.push(Box::pin_init(Mutex::new_named(
                 channel::PipeChannel::ver::new(dev, &mut alloc)?,
                 c_str!("pipe_comp"),
-            ))?)
-;
+            ))?);
         }
 
         let fwctl_channel = channel::FwCtlChannel::new(dev, &mut alloc)?;
@@ -782,14 +784,11 @@ impl GpuManager::ver {
 
         let node = of::Node::from_handle(node).ok_or(EIO)?;
 
-        Ok(
-    Box::new(hw::DynConfig {
+        Ok(Box::new(hw::DynConfig {
             pwr: pwr_cfg,
             uat_ttb_base: uat.ttb_base(),
             id: gpu_id,
-            firmware_version: node.get_property(c_str!("apple,firmware-version"))
-,
-        })?)
+        }))
     }
 
     /// Create the global GPU event manager, and return an `Arc<>` to it.
@@ -831,9 +830,7 @@ impl GpuManager::ver {
                 };
             });
 
-        this.as_mut().io_mappings_mut()
-    .push(mapping)
-;
+        this.as_mut().io_mappings_mut().push(mapping);
         Ok(())
     }
 
@@ -1162,8 +1159,7 @@ impl GpuManager for GpuManager::ver {
     ) -> Result<Box<dyn queue::Queue>> {
         let mut kalloc = self.alloc();
         let id = self.ids.queue.next();
-        Ok(
-    Box::new(queue::Queue::ver::new(
+        Ok(Box::new(queue::Queue::ver::new(
             &self.dev,
             vm,
             &mut kalloc,
@@ -1173,8 +1169,8 @@ impl GpuManager for GpuManager::ver {
             &self.buffer_mgr,
             id,
             priority,
-            caps,)
-)?)
+            caps,
+        )?))
     }
 
     fn kick_firmware(&self) -> Result {
@@ -1347,21 +1343,14 @@ impl GpuManager for GpuManager::ver {
         }
 
         for i in work {
-            garbage
-                .try_push(i)
-                .expect("try_push() failed after try_reserve()");
+            garbage.push(i);
         }
     }
 
     fn free_context(&self, ctx: Box<fw::types::GpuObject<fw::workqueue::GpuContextData>>) {
         let mut garbage = self.garbage_contexts.lock();
 
-        if garbage.try_push(ctx).is_err() {
-            dev_err!(
-                self.dev,
-                "Failed to reserve space for freed context, deadlock possible.\n"
-            );
-        }
+        garbage.push(ctx);
     }
 
     fn is_crashed(&self) -> bool {

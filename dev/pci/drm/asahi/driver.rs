@@ -18,7 +18,8 @@ pub(crate) struct AsahiData {
     pub gpu: Arc<dyn gpu::GpuManager>,
 }
 
-pub(crate) type DeviceData = device::Data<drv::Registration<AsahiDriver>, regs::Resources, AsahiData>;
+pub(crate) type DeviceData =
+    device::Data<drv::Registration<AsahiDriver>, regs::Resources, AsahiData>;
 
 pub(crate) struct AsahiDriver;
 pub(crate) type AsahiDevice = drm::device::Device<AsahiDriver>;
@@ -27,7 +28,7 @@ pub(crate) type AsahiDevRef = ARef<AsahiDevice>;
 #[vtable]
 impl drv::Driver for AsahiDriver {
     type Data = Arc<DeviceData>;
-    type File = file::File;
+    type File = crate::file::File;
     type Object = gem::Object;
 
     const INFO: drv::DriverInfo = INFO;
@@ -36,22 +37,22 @@ impl drv::Driver for AsahiDriver {
 
     kernel::declare_drm_ioctls! {
                 (ASAHI_GET_PARAMS,      drm_asahi_get_params,
-                          ioctl::RENDER_ALLOW, file::File::get_params),
+                          ioctl::RENDER_ALLOW, crate::file::File::get_params),
         (ASAHI_VM_CREATE,       drm_asahi_vm_create,
-            ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::vm_create),
+            ioctl::AUTH | ioctl::RENDER_ALLOW, crate::file::File::vm_create),
         (ASAHI_VM_DESTROY,      drm_asahi_vm_destroy,
-            ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::vm_destroy),
+            ioctl::AUTH | ioctl::RENDER_ALLOW, crate::file::File::vm_destroy),
         (ASAHI_GEM_CREATE,      drm_asahi_gem_create,
-            ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::gem_create),
+            ioctl::AUTH | ioctl::RENDER_ALLOW, crate::file::File::gem_create),
         (ASAHI_GEM_MMAP_OFFSET, drm_asahi_gem_mmap_offset,
-            ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::gem_mmap_offset),
+            ioctl::AUTH | ioctl::RENDER_ALLOW, crate::file::File::gem_mmap_offset),
         (ASAHI_GEM_BIND,        drm_asahi_gem_bind,
-            ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::gem_bind),
+            ioctl::AUTH | ioctl::RENDER_ALLOW, crate::file::File::gem_bind),
         (ASAHI_QUEUE_CREATE,    drm_asahi_queue_create,
-            ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::queue_create),
+            ioctl::AUTH | ioctl::RENDER_ALLOW, crate::file::File::queue_create),
         (ASAHI_QUEUE_DESTROY,   drm_asahi_queue_destroy,
-            ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::queue_destroy),
+            ioctl::AUTH | ioctl::RENDER_ALLOW, crate::file::File::queue_destroy),
         (ASAHI_SUBMIT,          drm_asahi_submit,
-            ioctl::AUTH | ioctl::RENDER_ALLOW, file::File::submit),
+            ioctl::AUTH | ioctl::RENDER_ALLOW, crate::file::File::submit),
     }
 }

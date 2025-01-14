@@ -135,16 +135,14 @@ impl<T: SlotItem> SlotAllocator<T> {
         lock_key1: LockClassKey,
         lock_key2: LockClassKey,
     ) -> Result<SlotAllocator<T>> {
-        let mut slots = Vec::try_with_capacity(num_slots as usize)?;
+        let mut slots = Vec::with_capacity(num_slots as usize);
 
         for i in 0..num_slots {
-            slots
-                .try_push(Some(Entry {
-                    item: constructor(&mut data, i),
-                    get_time: 0,
-                    drop_time: 0,
-                }))
-                .expect("try_push() failed after reservation");
+            slots.push(Some(Entry {
+                item: constructor(&mut data, i),
+                get_time: 0,
+                drop_time: 0,
+            }));
         }
 
         let inner = SlotAllocatorInner {

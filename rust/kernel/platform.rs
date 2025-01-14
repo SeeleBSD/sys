@@ -121,7 +121,9 @@ unsafe impl device::RawDevice for Device {
 
     fn of_node(&self) -> Option<Node> {
         let rdev = self.raw_device();
-        let rnode = unsafe { (*(rdev as *mut bindings::platform_device)).node as usize as *mut bindings::device_node };
+        let rnode = unsafe {
+            (*(rdev as *mut bindings::platform_device)).node as usize as *mut bindings::device_node
+        };
         unsafe { Node::from_raw(rnode) }
     }
 }

@@ -163,22 +163,22 @@ impl Resources {
     }
 
     fn sgx_read32(&self, off: usize) -> u32 {
-        self.sgx.readl_relaxed(off)
+        self.sgx.readl(off)
     }
 
     /* Not yet used
     fn sgx_write32(&self, off: usize, val: u32) {
-        self.sgx.writel_relaxed(val, off)
+        self.sgx.writel(val, off)
     }
     */
 
     fn sgx_read64(&self, off: usize) -> u64 {
-        self.sgx.readq_relaxed(off)
+        self.sgx.readq(off)
     }
 
     /* Not yet used
     fn sgx_write64(&self, off: usize, val: u64) {
-        self.sgx.writeq_relaxed(val, off)
+        self.sgx.writeq(val, off)
     }
     */
 
@@ -191,9 +191,9 @@ impl Resources {
 
     /// Start the ASC coprocessor CPU.
     pub(crate) fn start_cpu(&self) -> Result {
-        let val = self.asc.readl_relaxed(CPU_CONTROL);
+        let val = self.asc.readl(CPU_CONTROL);
 
-        self.asc.writel_relaxed(val | CPU_RUN, CPU_CONTROL);
+        self.asc.writel(val | CPU_RUN, CPU_CONTROL);
 
         Ok(())
     }
@@ -227,25 +227,15 @@ impl Resources {
         let num_clusters = match gpu_gen {
             4 | 5 => {
                 // G13 | G14G
-                core_mask_regs
-    .push(self.sgx_read32(CORE_MASK_0))
-;
-                core_mask_regs
-    .push(self.sgx_read32(CORE_MASK_1))
-;
+                core_mask_regs.push(self.sgx_read32(CORE_MASK_0));
+                core_mask_regs.push(self.sgx_read32(CORE_MASK_1));
                 (id_clusters >> 12) & 0xff
             }
             6 => {
                 // G14X
-                core_mask_regs
-    .push(self.sgx_read32(CORE_MASKS_G14X))
-;
-                core_mask_regs
-    .push(self.sgx_read32(CORE_MASKS_G14X + 4))
-;
-                core_mask_regs
-    .push(self.sgx_read32(CORE_MASKS_G14X + 8))
-;
+                core_mask_regs.push(self.sgx_read32(CORE_MASKS_G14X));
+                core_mask_regs.push(self.sgx_read32(CORE_MASKS_G14X + 4));
+                core_mask_regs.push(self.sgx_read32(CORE_MASKS_G14X + 8));
                 (id_counts_1 >> 8) & 0xff
             }
             a => {
@@ -255,7 +245,7 @@ impl Resources {
         };
 
         let mut core_masks_packed = Vec::new();
-        core_masks_packed.try_extend_from_slice(&core_mask_regs)?;
+        core_masks_packed.extend_from_slice(&core_mask_regs);
 
         dev_info!(self.dev, "Core masks: {:#x?}\n", core_masks_packed);
 
@@ -287,9 +277,7 @@ impl Resources {
         let max_core_mask = ((1u64 << num_cores) - 1) as u32;
         for _ in 0..num_clusters {
             let mask = core_mask_regs[0] & max_core_mask;
-            core_masks
-    .push(mask)
-;
+            core_masks.push(mask);
             for i in 0..core_mask_regs.len() {
                 core_mask_regs[i] >>= num_cores;
                 if i < (core_mask_regs.len() - 1) {

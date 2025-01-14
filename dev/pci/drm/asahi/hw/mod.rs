@@ -468,13 +468,14 @@ impl PwrConfig {
         name: &CStr,
         cfg: &HwConfig,
         is_main: bool,
+        node: i32,
     ) -> Result<Vec<PState>> {
         let mut perf_states = Vec::new();
 
-        let node = dev.of_node().ok_or(EIO)?;
+        let node = of::Node::from_handle(node).ok_or(EIO)?;
         let opps = node.parse_phandle(name, 0).ok_or(EIO)?;
 
-        for opp in opps.children() {
+        for opp in opps.child() {
             let freq_hz: u64 = opp.get_property(c_str!("opp-hz"))?;
             let mut volt_uv: Vec<u32> = opp.get_property(c_str!("opp-microvolt"))?;
             let pwr_uw: u32 = if is_main {
@@ -504,13 +505,11 @@ impl PwrConfig {
 
             let pwr_mw = pwr_uw / 1000;
 
-            perf_states
-    .push(PState {
+            perf_states.push(PState {
                 freq_hz: freq_hz.try_into()?,
                 volt_mv,
                 pwr_mw,
-            })
-;
+            });
         }
 
         if perf_states.is_empty() {
@@ -521,9 +520,9 @@ impl PwrConfig {
     }
 
     /// Load the GPU power configuration from the device tree.
-    pub(crate) fn load(dev: &AsahiDevice, cfg: &HwConfig) -> Result<PwrConfig> {
-        let perf_states = Self::load_opp(dev, c_str!("operating-points-v2"), cfg, true)?;
-        let node = dev.of_node().ok_or(EIO)?;
+    pub(crate) fn load(dev: &AsahiDevice, cfg: &HwConfig, handle: i32) -> Result<PwrConfig> {
+        let perf_states = Self::load_opp(dev, c_str!("operating-points-v2"), cfg, true, handle)?;
+        let node = of::Node::from_handle(handle).ok_or(EIO)?;
 
         macro_rules! prop {
             ($prop:expr, $default:expr) => {{
@@ -552,13 +551,11 @@ impl PwrConfig {
         let pz_count = pz_data.len() / 3;
         let mut power_zones = Vec::new();
         for i in (0..pz_count).step_by(3) {
-            power_zones
-    .push(PowerZone {
+            power_zones.push(PowerZone {
                 target: pz_data[i],
                 target_offset: pz_data[i + 1],
                 filter_tc: pz_data[i + 2],
-            })
-;
+            });
         }
 
         let core_leak_coef: Vec<F32> = prop!("apple,core-leak-coef");
