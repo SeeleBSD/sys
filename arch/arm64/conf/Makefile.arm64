@@ -180,23 +180,20 @@ compiler_builtins.o: core.o
 build_error.o: compiler_builtins.o
 	$(rust_common_cmd) --emit=obj=$@ --emit=metadata=libbuild_error.rmeta --crate-name build_error $S/rust/build_error.rs
 
-alloc.o: compiler_builtins.o
-	$(rust_common_cmd) --cfg no_rc --cfg no_sync --emit=obj=$@ --extern core --extern compiler_builtins --emit=metadata=liballoc.rmeta --crate-name alloc $S/rust/alloc/lib.rs
-
 bindings.o: compiler_builtins.o \
     bindings/bindings_generated.rs \
     bindings/bindings_helpers_generated.rs
-	O=${.OBJDIR} $(rust_common_cmd) --extern core --extern alloc --extern compiler_builtins --emit=obj=$@ --emit=metadata=libbindings.rmeta --crate-name bindings $S/rust/bindings/lib.rs
+	O=${.OBJDIR} $(rust_common_cmd) --extern core --extern compiler_builtins --emit=obj=$@ --emit=metadata=libbindings.rmeta --crate-name bindings $S/rust/bindings/lib.rs
 
 uapi.o: compiler_builtins.o \
     uapi/uapi_generated.rs
-	O=${.OBJDIR} $(rust_common_cmd) --extern core --extern alloc --extern compiler_builtins --emit=obj=$@ --emit=metadata=libuapi.rmeta --crate-name uapi $S/rust/uapi/lib.rs
+	O=${.OBJDIR} $(rust_common_cmd) --extern core --extern compiler_builtins --emit=obj=$@ --emit=metadata=libuapi.rmeta --crate-name uapi $S/rust/uapi/lib.rs
 
-kernel.o: alloc.o bindings.o libmacros.so build_error.o uapi.o
-	$(rust_common_cmd) --extern build_error --extern core --extern alloc --extern compiler_builtins --extern bindings --extern uapi --extern macros --emit=obj=$@ --emit=metadata=libkernel.rmeta --crate-name kernel $S/rust/kernel/lib.rs
+kernel.o: bindings.o libmacros.so build_error.o uapi.o
+	$(rust_common_cmd) --extern build_error --extern core --extern compiler_builtins --extern bindings --extern uapi --extern macros --emit=obj=$@ --emit=metadata=libkernel.rmeta --crate-name kernel $S/rust/kernel/lib.rs
 
 libmacros.so: core.o
-	$(RUSTC) $(rust_common_flags) --extern core --extern alloc --extern compiler_builtins --emit=link=$@ --extern proc_macro \
+	$(RUSTC) $(rust_common_flags) --extern core --extern compiler_builtins --emit=link=$@ --extern proc_macro \
 	--crate-type proc-macro \
 	--crate-name macros $S/rust/macros/lib.rs
 
