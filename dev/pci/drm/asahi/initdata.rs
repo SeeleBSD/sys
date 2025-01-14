@@ -111,15 +111,15 @@ impl<'a> InitDataBuilder::ver<'a> {
                 let mut t3 = Vec::new();
 
                 for _ in 0..curve_cfg.t3_scales.len() {
-                    t3.push(Vec::new());
+                    t3.try_push(Vec::new())?;
                 }
 
                 for (i, ps) in dyncfg.pwr.perf_states.iter().enumerate() {
                     let t3_coef = curve_cfg.t3_coefs[i];
                     if t3_coef == 0 {
-                        t1.push(((0xffff)));
+                        t1.try_push(0xffff)?;
                         for j in t3.iter_mut() {
-                            j.push(((0x3ffffff)));
+                            j.try_push(0x3ffffff)?;
                         }
                         continue;
                     }
@@ -127,14 +127,18 @@ impl<'a> InitDataBuilder::ver<'a> {
                     let f_mhz = (ps.freq_hz / 1000) as u64;
                     let v_max = ps.max_volt_mv() as u64;
 
-                    t1.push((1000000000 * (curve_cfg.t1_coef as u64) / (f_mhz * v_max))
+                    t1.try_push(
+                        (1000000000 * (curve_cfg.t1_coef as u64) / (f_mhz * v_max))
                             .try_into()
-                            .unwrap(),);
+                            .unwrap(),
+                    )?;
 
                     for (j, scale) in curve_cfg.t3_scales.iter().enumerate() {
-                        t3[j].push((t3_coef as u64 * 1000000000 * *scale as u64 / (f_mhz * v_max * 6))
+                        t3[j].try_push(
+                            (t3_coef as u64 * 1000000000 * *scale as u64 / (f_mhz * v_max * 6))
                                 .try_into()
-                                .unwrap(),);
+                                .unwrap(),
+                        )?;
                     }
                 }
 

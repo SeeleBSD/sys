@@ -135,11 +135,11 @@ impl ForeignOwnable for () {
 ///     let mut vec =
 ///         ScopeGuard::new_with_data(Vec::new(), |v| pr_info!("vec had {} elements\n", v.len()));
 ///
-///     vec.push(((10u8)));
+///     vec.try_push(10u8)?;
 ///     if arg {
 ///         return Ok(());
 ///     }
-///     vec.push(((20u8)));
+///     vec.try_push(20u8)?;
 ///     Ok(())
 /// }
 ///
