@@ -154,17 +154,21 @@ fn caller_lock_class_inner() -> Result<&'static DynLockClassKey> {
     }
 
     // We immediately leak the class, so it becomes 'static
-    let new_class = Box::leak(Box::try_new(DynLockClassKey {
+    let new_class = Box::leak(
+    Box::new(DynLockClassKey {
         key: Opaque::zeroed(),
         loc: loc_key,
         name: CString::try_from_fmt(fmt!("{}:{}:{}", loc.file(), loc.line(), loc.column()))?,
-    })?);
+    })
+  );
 
     // SAFETY: This is safe to call with a pointer to a dynamically allocated lockdep key,
     // and we never free the objects so it is safe to never unregister the key.
     unsafe { bindings::lockdep_register_key(new_class.key.get()) };
 
-    guard.try_push(new_class)?;
+    guard
+    .push(new_class)
+;
 
     Ok(new_class)
 }

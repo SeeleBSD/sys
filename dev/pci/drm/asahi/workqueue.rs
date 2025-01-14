@@ -116,10 +116,11 @@ impl GpuContext {
     ) -> Result<GpuContext> {
         Ok(GpuContext {
             dev: dev.into(),
-            data: Some(Box::try_new(alloc.shared.new_object(
+            data: Some(
+    Box::new(alloc.shared.new_object(
                 fw::workqueue::GpuContextData { _buffer: buffer },
-                |_inner| Default::default(),
-            )?)?),
+                |_inner| Default::default(),)
+)?),
         })
     }
 
@@ -308,7 +309,9 @@ impl Job::ver {
             return Err(EINVAL);
         }
 
-        self.pending.try_push(Box::try_new(SubmittedWork::<_, _> {
+        self.pending
+    .push(
+    Box::new(SubmittedWork::<_, _> {
             object: command,
             value: self.event_info.value.next(),
             error: None,
@@ -316,7 +319,9 @@ impl Job::ver {
             wptr: 0,
             vm_slot,
             fence: self.fence.clone(),
-        })?)?;
+        })
+)
+;
 
         Ok(())
     }
