@@ -148,7 +148,7 @@ impl ObjectRef {
             vm.map_in_range(self.gem.size(), sgt, alignment, start, end, prot, guard)?;
 
         let iova = new_mapping.iova();
-        mappings.try_push((vm.file_id(), vm_id, new_mapping))?;
+        mappings.push((vm.file_id(), vm_id, new_mapping));
         Ok(iova)
     }
 
@@ -181,7 +181,7 @@ impl ObjectRef {
 
         let iova = new_mapping.iova();
         assert!(iova == addr as usize);
-        mappings.try_push((vm.file_id(), vm_id, new_mapping))?;
+        mappings.push((vm.file_id(), vm_id, new_mapping));
         Ok(())
     }
 
