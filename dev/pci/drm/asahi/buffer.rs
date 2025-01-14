@@ -478,7 +478,7 @@ impl Buffer::ver {
         // Allocate the new blocks first, so if it fails they will be dropped
         let mut ualloc = inner.ualloc.lock();
         for _i in 0..add_blocks {
-            new_blocks.push(ualloc.array_gpuonly(BLOCK_SIZE))?;
+            new_blocks.try_push(ualloc.array_gpuonly(BLOCK_SIZE)?)?;
         }
         core::mem::drop(ualloc);
 
@@ -490,7 +490,7 @@ impl Buffer::ver {
 
             inner
                 .blocks
-                .push(block)
+                .try_push(block)
                 .expect("try_push() failed after try_reserve()");
             inner.info.block_list[2 * (cur_count + i)] = page_num;
             for j in 0..PAGES_PER_BLOCK {
@@ -539,7 +539,7 @@ impl Buffer::ver {
             0x10080
         } else {
             0x80
-        });
+        })?;
 
         let tvb_heapmeta = inner.ualloc.lock().array_empty(0x200)?;
         let tvb_tilemap = inner.ualloc.lock().array_empty(tilemap_size)?;
@@ -729,7 +729,7 @@ impl BufferManager::ver {
     pub(crate) fn new() -> Result<BufferManager::ver> {
         let mut owners = Vec::new();
         for _i in 0..(NUM_BUFFERS as usize) {
-            owners.push(None);
+            owners.try_push(None)?;
         }
         Ok(BufferManager::ver(slotalloc::SlotAllocator::new(
             NUM_BUFFERS,
