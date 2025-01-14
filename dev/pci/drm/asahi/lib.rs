@@ -33,12 +33,12 @@ pub(crate) mod workqueue;
 use core::time::Duration;
 
 use kernel::{
-    delay::coarse_sleep,
     device::{Device, RawDevice},
     drm, of, platform,
     prelude::*,
     str::CStr,
     sync::Arc,
+    delay::coarse_sleep
 };
 
 use crate::driver::{AsahiData, AsahiDriver, DeviceData};
@@ -105,7 +105,7 @@ pub extern "C" fn asahidrm_attach(
             _self,
             &mut (*sc).sc_ddev as *mut _,
         );
-        bindings::config_defer(_self, Some(asahidrm_attachhook));
+        bindings::config_defer(_self, Some(asahidrm_attachhook));        
     }
 }
 
@@ -176,8 +176,7 @@ pub extern "C" fn asahidrm_attachhook(_self: *mut bindings::device) {
         }
     };
 
-    let data =
-        kernel::new_device_data!(reg, res, AsahiData { dev, gpu }, "Asahi::Registrations").unwrap();
+    let data = kernel::new_device_data!(reg, res, AsahiData { dev, gpu }, "Asahi::Registrations").unwrap();
     let data: Arc<DeviceData> = data.into();
 
     data.gpu.init().unwrap();
@@ -185,12 +184,12 @@ pub extern "C" fn asahidrm_attachhook(_self: *mut bindings::device) {
     kernel::drm_device_register!(
         unsafe { Pin::new_unchecked(&mut *data.registrations().unwrap()) },
         data.clone(),
-        0
-    )
-    .unwrap();
+        0).unwrap();
 }
 
 #[no_mangle]
 pub extern "C" fn asahidrm_activate(_self: *mut bindings::device, act: i32) -> i32 {
-    unsafe { bindings::config_activate_children(_self, act) }
+    unsafe {
+        bindings::config_activate_children(_self, act)
+    }
 }

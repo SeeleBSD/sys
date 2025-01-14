@@ -227,15 +227,25 @@ impl Resources {
         let num_clusters = match gpu_gen {
             4 | 5 => {
                 // G13 | G14G
-                core_mask_regs.push(self.sgx_read32(CORE_MASK_0));
-                core_mask_regs.push(self.sgx_read32(CORE_MASK_1));
+                core_mask_regs
+    .push(self.sgx_read32(CORE_MASK_0))
+;
+                core_mask_regs
+    .push(self.sgx_read32(CORE_MASK_1))
+;
                 (id_clusters >> 12) & 0xff
             }
             6 => {
                 // G14X
-                core_mask_regs.push(self.sgx_read32(CORE_MASKS_G14X));
-                core_mask_regs.push(self.sgx_read32(CORE_MASKS_G14X + 4));
-                core_mask_regs.push(self.sgx_read32(CORE_MASKS_G14X + 8));
+                core_mask_regs
+    .push(self.sgx_read32(CORE_MASKS_G14X))
+;
+                core_mask_regs
+    .push(self.sgx_read32(CORE_MASKS_G14X + 4))
+;
+                core_mask_regs
+    .push(self.sgx_read32(CORE_MASKS_G14X + 8))
+;
                 (id_counts_1 >> 8) & 0xff
             }
             a => {
@@ -277,7 +287,9 @@ impl Resources {
         let max_core_mask = ((1u64 << num_cores) - 1) as u32;
         for _ in 0..num_clusters {
             let mask = core_mask_regs[0] & max_core_mask;
-            core_masks.push(mask);
+            core_masks
+    .push(mask)
+;
             for i in 0..core_mask_regs.len() {
                 core_mask_regs[i] >>= num_cores;
                 if i < (core_mask_regs.len() - 1) {

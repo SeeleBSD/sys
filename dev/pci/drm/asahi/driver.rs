@@ -18,8 +18,7 @@ pub(crate) struct AsahiData {
     pub gpu: Arc<dyn gpu::GpuManager>,
 }
 
-pub(crate) type DeviceData =
-    device::Data<drv::Registration<AsahiDriver>, regs::Resources, AsahiData>;
+pub(crate) type DeviceData = device::Data<drv::Registration<AsahiDriver>, regs::Resources, AsahiData>;
 
 pub(crate) struct AsahiDriver;
 pub(crate) type AsahiDevice = drm::device::Device<AsahiDriver>;

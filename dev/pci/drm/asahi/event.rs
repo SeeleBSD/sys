@@ -142,7 +142,9 @@ impl EventManager {
     pub(crate) fn new(alloc: &mut gpu::KernelAllocators) -> Result<EventManager> {
         let mut owners = Vec::new();
         for _i in 0..(NUM_EVENTS as usize) {
-            owners.push(None);
+            owners
+    .push(None)
+;
         }
         let inner = EventManagerInner {
             stamps: alloc.shared.array_empty(NUM_EVENTS as usize)?,

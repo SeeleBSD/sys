@@ -269,7 +269,9 @@ impl<T: GpuStruct, U: Allocation<T>> GpuObject<T, U> {
             raw: p,
             gpu_ptr,
             alloc,
-            inner: Box::new(inner),
+            inner: 
+    Box::new(inner)
+,
         })
     }
 
@@ -331,7 +333,9 @@ impl<T: GpuStruct, U: Allocation<T>> GpuObject<T, U> {
             &'a mut MaybeUninit<T::Raw<'a>>,
         ) -> Result<&'a mut T::Raw<'a>>,
     ) -> Result<Self> {
-        GpuObject::<T, U>::new_boxed(alloc, Box::new(inner), callback)
+        GpuObject::<T, U>::new_boxed(alloc, 
+    Box::new(inner)
+, callback)
     }
 
     /// Create a new GpuObject given an allocator and the boxed inner data (a type implementing

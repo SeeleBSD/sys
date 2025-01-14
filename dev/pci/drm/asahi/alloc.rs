@@ -823,7 +823,9 @@ impl HeapAllocator {
                 }
             };
 
-            self.guard_nodes.push(node);
+            self.guard_nodes
+    .push(node)
+;
 
             new_top += guard as u64;
         }
