@@ -217,7 +217,7 @@ impl<A: AllocInner<T>, T> Allocator<A, T> {
         end: u64,
         mode: InsertMode,
     ) -> Result<Node<A, T>> {
-        let mut mm_node = BBox::new(NodeData {
+        let mut mm_node = Box::new(NodeData {
             // SAFETY: This C struct should be zero-initialized.
             node: unsafe { core::mem::zeroed() },
             valid: false,
@@ -256,7 +256,7 @@ impl<A: AllocInner<T>, T> Allocator<A, T> {
         size: u64,
         color: usize,
     ) -> Result<Node<A, T>> {
-        let mut mm_node = BBox::new(NodeData {
+        let mut mm_node = Box::new(NodeData {
             // SAFETY: This C struct should be zero-initialized.
             node: unsafe { core::mem::zeroed() },
             valid: false,

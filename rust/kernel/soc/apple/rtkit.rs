@@ -145,7 +145,7 @@ unsafe extern "C" fn shmem_setup_callback<T: Operations>(
 
         // Now box the returned buffer type and stash it in the private pointer of the
         // `apple_rtkit_shmem` struct for safekeeping.
-        let boxed = BBox::new(buf);
+        let boxed = Box::new(buf);
         bfr_mut.private = Box::into_raw(boxed) as *mut _;
         Ok(0)
     })

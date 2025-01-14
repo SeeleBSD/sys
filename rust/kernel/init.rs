@@ -305,7 +305,7 @@ macro_rules! stack_pin_init {
 ///
 /// stack_try_pin_init!(let foo: Result<Pin<&mut Foo>, AllocError> = pin_init!(Foo {
 ///     a <- Mutex::new(42),
-///     b: BBox::new(Bar {
+///     b: Box::new(Bar {
 ///         x: 64,
 ///     })?,
 /// }));
