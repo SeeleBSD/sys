@@ -118,7 +118,7 @@ impl SyncItem {
             // SAFETY: All bit patterns in the struct are valid
             let sync = unsafe { sync.assume_init() };
 
-            vec.push(SyncItem::parse_one(file, sync, out)?);
+            vec.try_push(SyncItem::parse_one(file, sync, out)?)?;
         }
 
         Ok(vec)
@@ -724,7 +724,7 @@ impl File {
             unsafe { reader.read_raw(cmd.as_mut_ptr() as *mut u8, STRIDE)? };
 
             // SAFETY: All bit patterns in the struct are valid
-            commands.push(unsafe { cmd.assume_init() });
+            commands.try_push(unsafe { cmd.assume_init() })?;
         }
 
         let ret = queue

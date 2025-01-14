@@ -164,7 +164,7 @@ fn caller_lock_class_inner() -> Result<&'static DynLockClassKey> {
     // and we never free the objects so it is safe to never unregister the key.
     unsafe { bindings::lockdep_register_key(new_class.key.get()) };
 
-    guard.push(new_class);
+    guard.try_push(new_class)?;
 
     Ok(new_class)
 }
