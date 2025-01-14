@@ -504,13 +504,11 @@ impl PwrConfig {
 
             let pwr_mw = pwr_uw / 1000;
 
-            perf_states
-    .push(PState {
+            perf_states.push(PState {
                 freq_hz: freq_hz.try_into()?,
                 volt_mv,
                 pwr_mw,
-            })
-;
+            });
         }
 
         if perf_states.is_empty() {
@@ -552,13 +550,11 @@ impl PwrConfig {
         let pz_count = pz_data.len() / 3;
         let mut power_zones = Vec::new();
         for i in (0..pz_count).step_by(3) {
-            power_zones
-    .push(PowerZone {
+            power_zones.push(PowerZone {
                 target: pz_data[i],
                 target_offset: pz_data[i + 1],
                 filter_tc: pz_data[i + 2],
-            })
-;
+            });
         }
 
         let core_leak_coef: Vec<F32> = prop!("apple,core-leak-coef");

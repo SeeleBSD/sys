@@ -1175,30 +1175,32 @@ impl Uat {
 
     /// Creates the reference-counted inner data for a new `Uat` instance.
     #[inline(never)]
-    fn make_inner(dev: &driver::AsahiDevice,
+    fn make_inner(
+        dev: &driver::AsahiDevice,
         bst: bindings::bus_space_tag_t,
-        node: i32) -> Result<Arc<UatInner>> {
-            let handoff_rgn = Self::map_region(dev, c_str!("handoff"), HANDOFF_SIZE, false, bst, node)?;
-            let ttbs_rgn = Self::map_region(dev, c_str!("ttbs"), SLOTS_SIZE, false, bst, node)?;
-    
-            let handoff = unsafe { &(handoff_rgn.map.as_ptr() as *mut Handoff).as_ref().unwrap() };
-    
-            dev_info!(dev, "MMU: Initializing kernel page table\n");
-    
-            Arc::pin_init(try_pin_init!(UatInner {
-                handoff_flush <- init::pin_init_array_from_fn(|i| {
-                    Mutex::new_named(HandoffFlush(&handoff.flush[i]), c_str!("handoff_flush"))
-                }),
-                shared <- Mutex::new_named(
-                    UatShared {
-                        kernel_ttb1: 0,
-                        map_kernel_to_user: false,
-                        handoff_rgn,
-                        ttbs_rgn,
-                    },
-                    c_str!("uat_shared")
-                ),
-            }))
+        node: i32,
+    ) -> Result<Arc<UatInner>> {
+        let handoff_rgn = Self::map_region(dev, c_str!("handoff"), HANDOFF_SIZE, false, bst, node)?;
+        let ttbs_rgn = Self::map_region(dev, c_str!("ttbs"), SLOTS_SIZE, false, bst, node)?;
+
+        let handoff = unsafe { &(handoff_rgn.map.as_ptr() as *mut Handoff).as_ref().unwrap() };
+
+        dev_info!(dev, "MMU: Initializing kernel page table\n");
+
+        Arc::pin_init(try_pin_init!(UatInner {
+            handoff_flush <- init::pin_init_array_from_fn(|i| {
+                Mutex::new_named(HandoffFlush(&handoff.flush[i]), c_str!("handoff_flush"))
+            }),
+            shared <- Mutex::new_named(
+                UatShared {
+                    kernel_ttb1: 0,
+                    map_kernel_to_user: false,
+                    handoff_rgn,
+                    ttbs_rgn,
+                },
+                c_str!("uat_shared")
+            ),
+        }))
     }
 
     /// Creates a new `Uat` instance given the relevant hardware config.

@@ -478,9 +478,7 @@ impl Buffer::ver {
         // Allocate the new blocks first, so if it fails they will be dropped
         let mut ualloc = inner.ualloc.lock();
         for _i in 0..add_blocks {
-            new_blocks
-    .push(ualloc.array_gpuonly(BLOCK_SIZE)?)
-;
+            new_blocks.push(ualloc.array_gpuonly(BLOCK_SIZE)?);
         }
         core::mem::drop(ualloc);
 
@@ -731,9 +729,7 @@ impl BufferManager::ver {
     pub(crate) fn new() -> Result<BufferManager::ver> {
         let mut owners = Vec::new();
         for _i in 0..(NUM_BUFFERS as usize) {
-            owners
-    .push(None)
-;
+            owners.push(None);
         }
         Ok(BufferManager::ver(slotalloc::SlotAllocator::new(
             NUM_BUFFERS,
