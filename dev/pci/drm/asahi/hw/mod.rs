@@ -9,8 +9,8 @@ use crate::fw::types::*;
 use alloc::vec::Vec;
 use kernel::c_str;
 use kernel::device::RawDevice;
-use kernel::prelude::*;
 use kernel::of;
+use kernel::prelude::*;
 
 const MAX_POWERZONES: usize = 5;
 

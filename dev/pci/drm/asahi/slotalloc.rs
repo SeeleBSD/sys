@@ -138,12 +138,11 @@ impl<T: SlotItem> SlotAllocator<T> {
         let mut slots = Vec::try_with_capacity(num_slots as usize)?;
 
         for i in 0..num_slots {
-            slots
-                .push(constructor(&mut data, i).map(|item| Entry {
-                    item,
-                    get_time: 0,
-                    drop_time: 0,
-                }));
+            slots.push(constructor(&mut data, i).map(|item| Entry {
+                item,
+                get_time: 0,
+                drop_time: 0,
+            }));
         }
 
         let inner = SlotAllocatorInner {

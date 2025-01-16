@@ -1049,8 +1049,7 @@ impl Allocator for HeapAllocator {
             if let Some(g) = inner.garbage.as_mut() {
                 for node in g.drain(0..count) {
                     inner.total_garbage -= node.size() as usize;
-                    garbage
-                        .push(node);
+                    garbage.push(node);
                 }
             }
         });

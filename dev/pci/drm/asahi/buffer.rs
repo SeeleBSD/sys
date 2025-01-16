@@ -497,9 +497,7 @@ impl Buffer::ver {
         for (i, block) in new_blocks.into_iter().enumerate() {
             let page_num = (block.gpu_va().get() >> PAGE_SHIFT) as u32;
 
-            inner
-                .blocks
-                .push(block);
+            inner.blocks.push(block);
             inner.info.block_list[2 * (cur_count + i)] = page_num;
             for j in 0..PAGES_PER_BLOCK {
                 inner.info.page_list[(cur_count + i) * PAGES_PER_BLOCK + j] = page_num + j as u32;

@@ -21,6 +21,7 @@ use kernel::{
     device::RawDevice,
     error::code::*,
     macros::versions,
+    of, platform,
     prelude::*,
     soc::apple::rtkit,
     sync::{
@@ -1385,8 +1386,7 @@ impl GpuManager for GpuManager::ver {
         }
 
         for i in work {
-            garbage
-                .push(i);
+            garbage.push(i);
         }
     }
 

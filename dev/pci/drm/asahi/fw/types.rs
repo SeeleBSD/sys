@@ -10,10 +10,10 @@ pub(crate) use crate::event::EventValue;
 pub(crate) use crate::object::{GpuPointer, GpuStruct, GpuWeakPointer};
 pub(crate) use crate::{f32, float::F32};
 
-pub(crate) use kernel::alloc::boxed::Box;
 pub(crate) use core::fmt::Debug;
 pub(crate) use core::marker::PhantomData;
 pub(crate) use core::sync::atomic::{AtomicI32, AtomicU32, AtomicU64};
+pub(crate) use kernel::alloc::boxed::Box;
 pub(crate) use kernel::init::Zeroable;
 pub(crate) use kernel::macros::versions;
 

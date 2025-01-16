@@ -423,9 +423,7 @@ impl Job::ver {
             wptr = next_wptr;
 
             // Cannot fail, since we did a try_reserve(1) above
-            inner
-                .pending
-                .push(command);
+            inner.pending.push(command);
         }
 
         self.submitted = true;
@@ -787,7 +785,7 @@ impl WorkQueue for WorkQueue::ver {
         let pipe_type = inner.pipe_type;
 
         for cmd in inner.pending.drain(..completed_commands) {
-            if completed.push(cmd);
+            completed.push(cmd);
         }
 
         mod_pr_debug!(
