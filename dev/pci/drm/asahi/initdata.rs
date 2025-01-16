@@ -48,16 +48,18 @@ impl<'a> InitDataBuilder::ver<'a> {
 
     /// Create the HwDataShared1 structure, which is used in two places in InitData.
     fn hw_shared1(cfg: &'static hw::HwConfig) -> impl Init<raw::HwDataShared1> {
+        init::chain(
             init!(raw::HwDataShared1 {
                 unk_a4: cfg.shared1_a4,
                 ..Zeroable::zeroed()
-            }).chain(
+            }),
             |ret| {
                 for (i, val) in cfg.shared1_tab.iter().enumerate() {
                     ret.table[i] = *val;
                 }
                 Ok(())
-            })
+            },
+        )
     }
 
     fn init_curve(
@@ -88,12 +90,13 @@ impl<'a> InitDataBuilder::ver<'a> {
         cfg: &'static hw::HwConfig,
         dyncfg: &'a hw::DynConfig,
     ) -> impl Init<raw::HwDataShared2, Error> + 'a {
+        init::chain(
             try_init!(raw::HwDataShared2 {
                 unk_28: Array::new([0xff; 16]),
                 g14: Default::default(),
                 unk_508: cfg.shared2_unk_508,
                 ..Zeroable::zeroed()
-            }).chain(
+            }),
             |ret| {
                 for (i, val) in cfg.shared2_tab.iter().enumerate() {
                     ret.table[i] = *val;
@@ -108,15 +111,15 @@ impl<'a> InitDataBuilder::ver<'a> {
                 let mut t3 = Vec::new();
 
                 for _ in 0..curve_cfg.t3_scales.len() {
-                    t3.push(Vec::new());
+                    t3.try_push(Vec::new())?;
                 }
 
                 for (i, ps) in dyncfg.pwr.perf_states.iter().enumerate() {
                     let t3_coef = curve_cfg.t3_coefs[i];
                     if t3_coef == 0 {
-                        t1.push(0xffff);
+                        t1.try_push(0xffff)?;
                         for j in t3.iter_mut() {
-                            j.push(0x3ffffff);
+                            j.try_push(0x3ffffff)?;
                         }
                         continue;
                     }
@@ -124,18 +127,18 @@ impl<'a> InitDataBuilder::ver<'a> {
                     let f_khz = (ps.freq_hz / 1000) as u64;
                     let v_max = ps.max_volt_mv() as u64;
 
-                    t1.push(
+                    t1.try_push(
                         (1000000000 * (curve_cfg.t1_coef as u64) / (f_khz * v_max))
                             .try_into()
                             .unwrap(),
-                    );
+                    )?;
 
                     for (j, scale) in curve_cfg.t3_scales.iter().enumerate() {
-                        t3[j].push(
+                        t3[j].try_push(
                             (t3_coef as u64 * 1000000100 * *scale as u64 / (f_khz * v_max * 6))
                                 .try_into()
                                 .unwrap(),
-                        );
+                        )?;
                     }
                 }
 
@@ -157,7 +160,7 @@ impl<'a> InitDataBuilder::ver<'a> {
 
     /// Create the HwDataShared3 structure, which is used in two places in InitData.
     fn hw_shared3(cfg: &'static hw::HwConfig) -> impl Init<raw::HwDataShared3> {
-        init::zeroed::<raw::HwDataShared3>().chain(|ret| {
+        init::chain(init::zeroed::<raw::HwDataShared3>(), |ret| {
             if !cfg.shared3_tab.is_empty() {
                 ret.unk_0 = 1;
                 ret.unk_4 = 500;
@@ -176,7 +179,7 @@ impl<'a> InitDataBuilder::ver<'a> {
     ) -> impl Init<raw::T81xxData> {
         let _perf_max_pstate = dyncfg.pwr.perf_max_pstate;
 
-        init::zeroed::<raw::T81xxData>().chain(move |_ret| {
+        init::chain(init::zeroed::<raw::T81xxData>(), move |_ret| {
             match cfg.chip_id {
                 0x8103 | 0x8112 => {
                     #[ver(V < V13_3)]
@@ -231,6 +234,7 @@ impl<'a> InitDataBuilder::ver<'a> {
         self.alloc.private.new_init(init::zeroed(), |_inner, _ptr| {
             let cfg = &self.cfg;
             let dyncfg = &self.dyncfg;
+            init::chain(
                 try_init!(raw::HwDataA::ver {
                     clocks_per_period: clocks_per_period,
                     #[ver(V >= V13_0B4)]
@@ -412,7 +416,8 @@ impl<'a> InitDataBuilder::ver<'a> {
                     hws3 <- Self::hw_shared3(cfg),
                     unk_3ce8: 1,
                     ..Zeroable::zeroed()
-                }).chain(|raw| {
+                }),
+                |raw| {
                     for i in 0..self.dyncfg.pwr.perf_states.len() {
                         raw.sram_k[i] = self.cfg.sram_k;
                     }
@@ -477,6 +482,7 @@ impl<'a> InitDataBuilder::ver<'a> {
         self.alloc.private.new_init(init::zeroed(), |_inner, _ptr| {
             let cfg = &self.cfg;
             let dyncfg = &self.dyncfg;
+            init::chain(
                 try_init!(raw::HwDataB::ver {
                     // Userspace VA map related
                     #[ver(V < V13_0B4)]
@@ -551,7 +557,8 @@ impl<'a> InitDataBuilder::ver<'a> {
                     #[ver(V >= V13_3)]
                     unk_c3c: 0x1a,
                     ..Zeroable::zeroed()
-                }).chain(|raw| {
+                }),
+                |raw| {
                     #[ver(V >= V13_3)]
                     for i in 0..16 {
                         raw.unk_arr_0[i] = i as u32;
@@ -633,6 +640,7 @@ impl<'a> InitDataBuilder::ver<'a> {
             let max_ps = pwr.perf_max_pstate;
             let max_ps_scaled = 100 * max_ps;
 
+            init::chain(
                 try_init!(raw::Globals::ver {
                     //ktrace_enable: 0xffffffff,
                     ktrace_enable: 0,
@@ -698,7 +706,7 @@ impl<'a> InitDataBuilder::ver<'a> {
                     unk_903c: 1,
                     #[ver(V < V13_0B4)]
                     unk_903c: 0,
-                    fault_control: 0,
+                    fault_control: *crate::fault_control.read(),
                     do_init: 1,
                     unk_11020: 40,
                     unk_11024: 10,
@@ -722,7 +730,8 @@ impl<'a> InitDataBuilder::ver<'a> {
                     #[ver(V >= V13_0B4)]
                     unk_11efc: 0,
                     ..Zeroable::zeroed()
-                }).chain(|raw| {
+                }),
+                |raw| {
                     for (i, pz) in self.dyncfg.pwr.power_zones.iter().enumerate() {
                         raw.power_zones[i].target = pz.target;
                         raw.power_zones[i].target_off = pz.target - pz.target_offset;
@@ -905,6 +914,6 @@ impl<'a> InitDataBuilder::ver<'a> {
                 })
             },
         )?;
-        Ok(Box::new(obj))
+        Ok(Box::try_new(obj)?)
     }
 }

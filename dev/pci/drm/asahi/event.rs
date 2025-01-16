@@ -142,7 +142,7 @@ impl EventManager {
     pub(crate) fn new(alloc: &mut gpu::KernelAllocators) -> Result<EventManager> {
         let mut owners = Vec::new();
         for _i in 0..(NUM_EVENTS as usize) {
-            owners.push(None);
+            owners.try_push(None)?;
         }
         let inner = EventManagerInner {
             stamps: alloc.shared.array_empty(NUM_EVENTS as usize)?,
@@ -222,7 +222,9 @@ impl EventManager {
 
         self.alloc.with_inner(|inner| {
             for wq in inner.owners.iter().filter_map(|o| o.as_ref()).cloned() {
-                owners.push(wq);
+                if owners.try_push(wq).is_err() {
+                    pr_err!("Failed to signal failure to WorkQueue\n");
+                }
             }
         });
 

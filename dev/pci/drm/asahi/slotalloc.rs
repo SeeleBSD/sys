@@ -138,11 +138,13 @@ impl<T: SlotItem> SlotAllocator<T> {
         let mut slots = Vec::try_with_capacity(num_slots as usize)?;
 
         for i in 0..num_slots {
-            slots.push(constructor(&mut data, i).map(|item| Entry {
-                item,
-                get_time: 0,
-                drop_time: 0,
-            }));
+            slots
+                .try_push(constructor(&mut data, i).map(|item| Entry {
+                    item,
+                    get_time: 0,
+                    drop_time: 0,
+                }))
+                .expect("try_push() failed after reservation");
         }
 
         let inner = SlotAllocatorInner {
@@ -157,7 +159,7 @@ impl<T: SlotItem> SlotAllocator<T> {
             inner <- Mutex::new_with_key(inner, name, lock_key1),
             // SAFETY: `condvar_init!` is called below.
             cond <- CondVar::new(name, lock_key2),
-        }));
+        }))?;
 
         Ok(SlotAllocator(alloc))
     }

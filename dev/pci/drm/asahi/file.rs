@@ -131,7 +131,7 @@ impl SyncItem {
             // SAFETY: All bit patterns in the struct are valid
             let sync = unsafe { sync.assume_init() };
 
-            vec.push(SyncItem::parse_one(file, sync, out))?;
+            vec.try_push(SyncItem::parse_one(file, sync, out)?)?;
         }
 
         Ok(vec)
@@ -179,11 +179,11 @@ impl drm::file::DriverFile for File {
         let id = gpu.ids().file.next();
 
         mod_dev_dbg!(device, "[File {}]: DRM device opened\n", id);
-        Ok(Box::into_pin(Box::new(Self {
+        Ok(Box::into_pin(Box::try_new(Self {
             id,
             vms: xarray::XArray::new(xarray::flags::ALLOC1),
             queues: xarray::XArray::new(xarray::flags::ALLOC1),
-        })))
+        })?))
     }
 }
 
@@ -344,12 +344,12 @@ impl File {
         dummy_obj.map_at(&vm, VM_UNK_PAGE, mmu::PROT_GPU_SHARED_RW, true)?;
 
         mod_dev_dbg!(device, "[File {} VM {}]: VM created\n", file_id, id);
-        resv.store(Box::new(Vm {
+        resv.store(Box::try_new(Vm {
             ualloc,
             ualloc_priv,
             vm,
             dummy_obj,
-        }))?;
+        })?)?;
 
         data.vm_id = id;
 
@@ -803,7 +803,7 @@ impl File {
             unsafe { reader.read_raw(cmd.as_mut_ptr() as *mut u8, STRIDE)? };
 
             // SAFETY: All bit patterns in the struct are valid
-            commands.push(unsafe { cmd.assume_init() });
+            commands.try_push(unsafe { cmd.assume_init() })?;
         }
 
         let ret = queue

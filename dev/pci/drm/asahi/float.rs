@@ -285,10 +285,10 @@ impl F32U {
     }
 }
 
-impl<'a> TryFrom<of::Property> for F32 {
+impl<'a> TryFrom<of::Property<'a>> for F32 {
     type Error = Error;
 
-    fn try_from(p: of::Property) -> core::result::Result<F32, Self::Error> {
+    fn try_from(p: of::Property<'_>) -> core::result::Result<F32, Self::Error> {
         let bits: u32 = p.try_into()?;
         Ok(F32::from_bits(bits))
     }
