@@ -1045,11 +1045,11 @@ impl Uat {
             return Err(ENOMEM);
         }
 
-        // let flags = if cached {
-        // bindings::MEMREMAP_WB
-        // } else {
-        // bindings::MEMREMAP_WC
-        // };
+        let flags = if cached {
+            0x1
+        } else {
+            0x0
+        };
         // let map = unsafe { bindings::memremap(res.start, rgn_size, flags.into()) };
         // let map = NonNull::new(map);
         let mut bsh: bindings::bus_space_handle_t = 0;
@@ -1058,7 +1058,7 @@ impl Uat {
                 bst,
                 res.start as bindings::bus_addr_t,
                 rgn_size as bindings::bus_size_t,
-                bindings::BUS_SPACE_MAP_LINEAR as i32,
+                flags,
                 &mut bsh,
             )
         } != 0
