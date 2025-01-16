@@ -10,6 +10,7 @@ use alloc::vec::Vec;
 use kernel::c_str;
 use kernel::device::RawDevice;
 use kernel::prelude::*;
+use kernel::of;
 
 const MAX_POWERZONES: usize = 5;
 

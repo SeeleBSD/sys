@@ -29,6 +29,8 @@ use kernel::{
     },
     time::{clock, Now},
     types::ForeignOwnable,
+    platform,
+    of,
 };
 
 use crate::alloc::Allocator;
