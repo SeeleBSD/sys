@@ -628,13 +628,7 @@ impl Drop for HeapAllocation {
 
         alloc.with(|a| {
             if let Some(garbage) = a.garbage.as_mut() {
-                if garbage.try_push(node).is_err() {
-                    dev_err!(
-                        &a.dev,
-                        "HeapAllocation[{}]::drop: Failed to keep garbage\n",
-                        &*a.name,
-                    );
-                }
+                garbage.push(node);
                 a.total_garbage += size as usize;
                 None
             } else {
@@ -853,7 +847,7 @@ impl HeapAllocator {
                 }
             };
 
-            self.guard_nodes.try_push(node)?;
+            self.guard_nodes.push(node);
 
             new_top += guard as u64;
         }
@@ -865,7 +859,7 @@ impl HeapAllocator {
         );
 
         self.mm
-            .with_inner(|inner| inner.backing_objects.try_push((obj, gpu_ptr)))?;
+            .with_inner(|inner| inner.backing_objects.push((obj, gpu_ptr)));
 
         self.top = new_top;
 
@@ -1056,8 +1050,7 @@ impl Allocator for HeapAllocator {
                 for node in g.drain(0..count) {
                     inner.total_garbage -= node.size() as usize;
                     garbage
-                        .try_push(node)
-                        .expect("try_push() failed after reserve()");
+                        .push(node);
                 }
             }
         });

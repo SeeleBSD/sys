@@ -493,11 +493,11 @@ impl GpuManager::ver {
             .zip(&mgr.pipes.frag)
             .zip(&mgr.pipes.comp)
         {
-            p_pipes.try_push(fw::initdata::raw::PipeChannels::ver {
+            p_pipes.push(fw::initdata::raw::PipeChannels::ver {
                 vtx: v.lock().to_raw(),
                 frag: f.lock().to_raw(),
                 comp: c.lock().to_raw(),
-            })?;
+            });
         }
 
         mgr.as_mut()
@@ -535,7 +535,7 @@ impl GpuManager::ver {
                     raw.sgx_sram_ptr = U64(mapping.iova() as u64);
                 });
 
-            mgr.as_mut().io_mappings_mut().try_push(mapping)?;
+            mgr.as_mut().io_mappings_mut().push(mapping);
         }
 
         let mgr = Arc::from(mgr);
@@ -617,7 +617,7 @@ impl GpuManager::ver {
         #[ver(G < G14X)]
         let map_kernel_to_user = false;
 
-        Ok(Box::try_new(mmu::Uat::new(dev, cfg, map_kernel_to_user)?)?)
+        Ok(Box::new(mmu::Uat::new(dev, cfg, map_kernel_to_user)?))
     }
 
     /// Actually create the final GpuManager instance, as a UniqueArc.
@@ -640,18 +640,18 @@ impl GpuManager::ver {
         };
 
         for _i in 0..=NUM_PIPES - 1 {
-            pipes.vtx.try_push(Box::pin_init(Mutex::new_named(
+            pipes.vtx.push(Box::pin_init(Mutex::new_named(
                 channel::PipeChannel::ver::new(dev, &mut alloc)?,
                 c_str!("pipe_vtx"),
-            ))?)?;
-            pipes.frag.try_push(Box::pin_init(Mutex::new_named(
+            ))?);
+            pipes.frag.push(Box::pin_init(Mutex::new_named(
                 channel::PipeChannel::ver::new(dev, &mut alloc)?,
                 c_str!("pipe_frag"),
-            ))?)?;
-            pipes.comp.try_push(Box::pin_init(Mutex::new_named(
+            ))?);
+            pipes.comp.push(Box::pin_init(Mutex::new_named(
                 channel::PipeChannel::ver::new(dev, &mut alloc)?,
                 c_str!("pipe_comp"),
-            ))?)?;
+            ))?);
         }
 
         let fwctl_channel = channel::FwCtlChannel::new(dev, &mut alloc)?;
@@ -800,12 +800,12 @@ impl GpuManager::ver {
 
         let node = of::Node::from_handle(node).ok_or(EIO)?;
 
-        Ok(Box::try_new(hw::DynConfig {
+        Ok(Box::new(hw::DynConfig {
             pwr: pwr_cfg,
             uat_ttb_base: uat.ttb_base(),
             id: gpu_id,
             firmware_version: node.get_property(c_str!("apple,firmware-version"))?,
-        })?)
+        }))
     }
 
     /// Create the global GPU event manager, and return an `Arc<>` to it.
@@ -854,7 +854,7 @@ impl GpuManager::ver {
                     },
                 )?;
 
-                this.as_mut().io_mappings_mut().try_push(mapping)?;
+                this.as_mut().io_mappings_mut().push(mapping);
                 cur_iova += map_size as u64;
             }
         }
@@ -1201,7 +1201,7 @@ impl GpuManager for GpuManager::ver {
     ) -> Result<Box<dyn queue::Queue>> {
         let mut kalloc = self.alloc();
         let id = self.ids.queue.next();
-        Ok(Box::try_new(queue::Queue::ver::new(
+        Ok(Box::new(queue::Queue::ver::new(
             &self.dev,
             vm,
             &mut kalloc,
@@ -1212,7 +1212,7 @@ impl GpuManager for GpuManager::ver {
             id,
             priority,
             caps,
-        )?)?)
+        )?))
     }
 
     fn kick_firmware(&self) -> Result {
@@ -1386,20 +1386,14 @@ impl GpuManager for GpuManager::ver {
 
         for i in work {
             garbage
-                .try_push(i)
-                .expect("try_push() failed after try_reserve()");
+                .push(i);
         }
     }
 
     fn free_context(&self, ctx: Box<fw::types::GpuObject<fw::workqueue::GpuContextData>>) {
         let mut garbage = self.garbage_contexts.lock();
 
-        if garbage.try_push(ctx).is_err() {
-            dev_err!(
-                self.dev,
-                "Failed to reserve space for freed context, deadlock possible.\n"
-            );
-        }
+        garbage.push(ctx);
     }
 
     fn is_crashed(&self) -> bool {

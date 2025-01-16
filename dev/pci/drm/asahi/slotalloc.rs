@@ -139,12 +139,11 @@ impl<T: SlotItem> SlotAllocator<T> {
 
         for i in 0..num_slots {
             slots
-                .try_push(constructor(&mut data, i).map(|item| Entry {
+                .push(constructor(&mut data, i).map(|item| Entry {
                     item,
                     get_time: 0,
                     drop_time: 0,
-                }))
-                .expect("try_push() failed after reservation");
+                }));
         }
 
         let inner = SlotAllocatorInner {
