@@ -779,6 +779,7 @@ impl Vm {
                 oas: cfg.uat_oas,
                 coherent_walk: true,
                 quirks: 0,
+                dmat: unsafe { crate::DMAT.expect("Uninitialized") },
             },
             (),
         )?;

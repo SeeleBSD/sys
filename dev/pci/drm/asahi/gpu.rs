@@ -618,7 +618,13 @@ impl GpuManager::ver {
         #[ver(G < G14X)]
         let map_kernel_to_user = false;
 
-        Ok(Box::new(mmu::Uat::new(dev, cfg, map_kernel_to_user)?))
+        Ok(Box::new(mmu::Uat::new(
+            dev,
+            cfg,
+            map_kernel_to_user,
+            bst,
+            node,
+        )?))
     }
 
     /// Actually create the final GpuManager instance, as a UniqueArc.
@@ -921,7 +927,7 @@ impl GpuManager::ver {
     fn get_fault_info(&self) -> Option<regs::FaultInfo> {
         let data = self.dev.data();
 
-        let res = match data.resources() {
+        let res = match data.res() {
             Some(res) => res,
             None => {
                 dev_err!(self.dev, "  Failed to acquire resources\n");
