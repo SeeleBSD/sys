@@ -130,16 +130,16 @@ impl<T: SlotItem> SlotAllocator<T> {
     pub(crate) fn new(
         num_slots: u32,
         mut data: T::Data,
-        mut constructor: impl FnMut(&mut T::Data, u32) -> T,
+        mut constructor: impl FnMut(&mut T::Data, u32) -> Option<T>,
         name: &'static CStr,
         lock_key1: LockClassKey,
         lock_key2: LockClassKey,
     ) -> Result<SlotAllocator<T>> {
-        let mut slots = Vec::with_capacity(num_slots as usize);
+        let mut slots = Vec::try_with_capacity(num_slots as usize)?;
 
         for i in 0..num_slots {
-            slots.push(Some(Entry {
-                item: constructor(&mut data, i),
+            slots.push(constructor(&mut data, i).map(|item| Entry {
+                item,
                 get_time: 0,
                 drop_time: 0,
             }));
@@ -157,7 +157,7 @@ impl<T: SlotItem> SlotAllocator<T> {
             inner <- Mutex::new_with_key(inner, name, lock_key1),
             // SAFETY: `condvar_init!` is called below.
             cond <- CondVar::new(name, lock_key2),
-        }))?;
+        }));
 
         Ok(SlotAllocator(alloc))
     }

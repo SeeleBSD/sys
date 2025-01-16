@@ -163,22 +163,22 @@ impl Resources {
     }
 
     fn sgx_read32(&self, off: usize) -> u32 {
-        self.sgx.readl(off)
+        self.sgx.readl_relaxed(off)
     }
 
     /* Not yet used
     fn sgx_write32(&self, off: usize, val: u32) {
-        self.sgx.writel(val, off)
+        self.sgx.writel_relaxed(val, off)
     }
     */
 
     fn sgx_read64(&self, off: usize) -> u64 {
-        self.sgx.readq(off)
+        self.sgx.readq_relaxed(off)
     }
 
     /* Not yet used
     fn sgx_write64(&self, off: usize, val: u64) {
-        self.sgx.writeq(val, off)
+        self.sgx.writeq_relaxed(val, off)
     }
     */
 
@@ -191,9 +191,9 @@ impl Resources {
 
     /// Start the ASC coprocessor CPU.
     pub(crate) fn start_cpu(&self) -> Result {
-        let val = self.asc.readl(CPU_CONTROL);
+        let val = self.asc.readl_relaxed(CPU_CONTROL);
 
-        self.asc.writel(val | CPU_RUN, CPU_CONTROL);
+        self.asc.writel_relaxed(val | CPU_RUN, CPU_CONTROL);
 
         Ok(())
     }
@@ -236,7 +236,8 @@ impl Resources {
                 core_mask_regs.push(self.sgx_read32(CORE_MASKS_G14X));
                 core_mask_regs.push(self.sgx_read32(CORE_MASKS_G14X + 4));
                 core_mask_regs.push(self.sgx_read32(CORE_MASKS_G14X + 8));
-                (id_counts_1 >> 8) & 0xff
+                // Clusters per die * num dies
+                ((id_counts_1 >> 8) & 0xff) * ((id_counts_1 >> 16) & 0xf)
             }
             a => {
                 dev_err!(self.dev, "Unknown GPU generation {}\n", a);
@@ -245,7 +246,7 @@ impl Resources {
         };
 
         let mut core_masks_packed = Vec::new();
-        core_masks_packed.extend_from_slice(&core_mask_regs);
+        core_masks_packed.try_extend_from_slice(&core_mask_regs)?;
 
         dev_info!(self.dev, "Core masks: {:#x?}\n", core_masks_packed);
 

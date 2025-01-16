@@ -10,7 +10,7 @@ const INFO: drv::DriverInfo = drv::DriverInfo {
     patchlevel: 0,
     name: c_str!("asahi"),
     desc: c_str!("Apple AGX Graphics"),
-    date: c_str!("20230802"),
+    date: c_str!("20231005"),
 };
 
 pub(crate) struct AsahiData {

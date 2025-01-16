@@ -16,7 +16,7 @@
 extern "C" {
 #endif
 
-#define DRM_ASAHI_UNSTABLE_UABI_VERSION		10008
+#define DRM_ASAHI_UNSTABLE_UABI_VERSION		10009
 
 #define DRM_ASAHI_GET_PARAMS			0x00
 #define DRM_ASAHI_VM_CREATE			0x01
@@ -70,6 +70,8 @@ struct drm_asahi_params_global {
 
 	__u32 result_render_size;
 	__u32 result_compute_size;
+
+	__u32 firmware_version[4];
 };
 
 /*
@@ -332,6 +334,8 @@ struct drm_asahi_attachment {
 #define ASAHI_RENDER_PROCESS_EMPTY_TILES (1UL << 3)
 #define ASAHI_RENDER_NO_VERTEX_CLUSTERING (1UL << 4)
 #define ASAHI_RENDER_MSAA_ZS (1UL << 5)
+/* XXX check */
+#define ASAHI_RENDER_NO_PREEMPTION (1UL << 6)
 
 struct drm_asahi_cmd_render {
 	/** @extensions: Pointer to the first extension struct, if any */
@@ -346,23 +350,48 @@ struct drm_asahi_cmd_render {
 	__u32 vertex_attachment_count;
 	__u32 fragment_attachment_count;
 
+	__u32 vertex_helper_program;
+	__u32 fragment_helper_program;
+	__u64 vertex_helper_arg;
+	__u64 fragment_helper_arg;
+
 	__u64 depth_buffer_load;
+	__u64 depth_buffer_load_stride;
 	__u64 depth_buffer_store;
+	__u64 depth_buffer_store_stride;
 	__u64 depth_buffer_partial;
+	__u64 depth_buffer_partial_stride;
 	__u64 depth_meta_buffer_load;
+	__u64 depth_meta_buffer_load_stride;
 	__u64 depth_meta_buffer_store;
+	__u64 depth_meta_buffer_store_stride;
 	__u64 depth_meta_buffer_partial;
+	__u64 depth_meta_buffer_partial_stride;
 
 	__u64 stencil_buffer_load;
+	__u64 stencil_buffer_load_stride;
 	__u64 stencil_buffer_store;
+	__u64 stencil_buffer_store_stride;
 	__u64 stencil_buffer_partial;
+	__u64 stencil_buffer_partial_stride;
 	__u64 stencil_meta_buffer_load;
+	__u64 stencil_meta_buffer_load_stride;
 	__u64 stencil_meta_buffer_store;
+	__u64 stencil_meta_buffer_store_stride;
 	__u64 stencil_meta_buffer_partial;
+	__u64 stencil_meta_buffer_partial_stride;
 
 	__u64 scissor_array;
 	__u64 depth_bias_array;
 	__u64 visibility_result_buffer;
+
+	__u64 vertex_sampler_array;
+	__u32 vertex_sampler_count;
+	__u32 vertex_sampler_max;
+
+	__u64 fragment_sampler_array;
+	__u32 fragment_sampler_count;
+	__u32 fragment_sampler_max;
 
 	__u64 zls_ctrl;
 	__u64 ppp_multisamplectl;
@@ -469,6 +498,9 @@ struct drm_asahi_cmd_render_unknowns {
 	__u64 vtx_unk_mask;
 };
 
+/* XXX check */
+#define ASAHI_COMPUTE_NO_PREEMPTION (1UL << 0)
+
 struct drm_asahi_cmd_compute {
 	__u64 flags;
 
@@ -479,13 +511,16 @@ struct drm_asahi_cmd_compute {
 	__u32 attachment_count;
 	__u32 pad;
 
-	__u64 helper_arg;
-
-	__u32 buffer_descriptor_size; /* ? */
 	__u32 helper_program;
+	__u32 helper_unk; /* ? */
+	__u64 helper_arg;
 
 	__u32 encoder_id;
 	__u32 cmd_id;
+
+	__u64 sampler_array;
+	__u32 sampler_count;
+	__u32 sampler_max;
 
 	__u32 iogpu_unk_40;
 	__u32 unk_mask;

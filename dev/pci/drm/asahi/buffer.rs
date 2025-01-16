@@ -91,6 +91,8 @@ pub(crate) struct TileInfo {
     pub(crate) tpc_size: usize,
     /// Number of blocks in the clustering meta buffer (for clustering).
     pub(crate) meta1_blocks: u32,
+    /// Layering metadata size.
+    pub(crate) layermeta_size: usize,
     /// Minimum number of TVB blocks for this render.
     pub(crate) min_tvb_blocks: usize,
     /// Tiling parameter structure passed to firmware.
@@ -161,6 +163,11 @@ impl Scene::ver {
     /// Returns the GPU pointer to the TVB heap metadata buffer.
     pub(crate) fn tvb_heapmeta_pointer(&self) -> GpuPointer<'_, &'_ [u8]> {
         self.object.tvb_heapmeta.gpu_pointer()
+    }
+
+    /// Returns the GPU pointer to the layer metadata buffer.
+    pub(crate) fn tvb_layermeta_pointer(&self) -> GpuPointer<'_, &'_ [u8]> {
+        self.object.tvb_heapmeta.gpu_offset_pointer(0x200)
     }
 
     /// Returns the GPU pointer to the top-level TVB tilemap buffer.
@@ -336,8 +343,10 @@ impl Buffer::ver {
                 try_init!(buffer::Info::ver {
                     block_ctl: shared.new_default::<buffer::BlockControl>()?,
                     counter: shared.new_default::<buffer::Counter>()?,
-                    page_list: ualloc_priv.lock().array_empty(max_pages)?,
-                    block_list: ualloc_priv.lock().array_empty(max_blocks * 2)?,
+                    page_list: ualloc_priv.lock().array_empty_tagged(max_pages, b"PLST")?,
+                    block_list: ualloc_priv
+                        .lock()
+                        .array_empty_tagged(max_blocks * 2, b"BLST")?,
                 })
             },
             |inner, _p| {
@@ -380,7 +389,7 @@ impl Buffer::ver {
         )?;
 
         // Technically similar to Scene below, let's play it safe.
-        let kernel_buffer = alloc.shared.array_empty(0x40)?;
+        let kernel_buffer = alloc.shared.array_empty_tagged(0x40, b"KBUF")?;
         let stats = alloc
             .shared
             .new_object(Default::default(), |_inner| buffer::raw::Stats {
@@ -478,7 +487,7 @@ impl Buffer::ver {
         // Allocate the new blocks first, so if it fails they will be dropped
         let mut ualloc = inner.ualloc.lock();
         for _i in 0..add_blocks {
-            new_blocks.push(ualloc.array_gpuonly(BLOCK_SIZE)?);
+            new_blocks.push(ualloc.array_gpuonly(BLOCK_SIZE))?;
         }
         core::mem::drop(ualloc);
 
@@ -532,20 +541,29 @@ impl Buffer::ver {
         // On M1 Ultra, it can grow and usually doesn't exceed 64 entries.
         // macOS allocates a whole 64K * 0x80 for this, so let's go with
         // that to be safe...
-        let user_buffer = inner.ualloc.lock().array_empty(if inner.num_clusters > 1 {
-            0x10080
-        } else {
-            0x80
-        })?;
+        let user_buffer = inner.ualloc.lock().array_empty_tagged(
+            if inner.num_clusters > 1 {
+                0x10080
+            } else {
+                0x80
+            },
+            b"UBUF",
+        );
 
-        let tvb_heapmeta = inner.ualloc.lock().array_empty(0x200)?;
-        let tvb_tilemap = inner.ualloc.lock().array_empty(tilemap_size)?;
-
-        mod_pr_debug!("Buffer: Allocating misc buffers\n");
-        let preempt_buf = inner
+        let tvb_heapmeta = inner
             .ualloc
             .lock()
-            .array_empty(inner.preempt1_size + inner.preempt2_size + inner.preempt3_size)?;
+            .array_empty_tagged(0x200 + tile_info.layermeta_size, b"HMTA")?;
+        let tvb_tilemap = inner
+            .ualloc
+            .lock()
+            .array_empty_tagged(tilemap_size, b"TMAP")?;
+
+        mod_pr_debug!("Buffer: Allocating misc buffers\n");
+        let preempt_buf = inner.ualloc.lock().array_empty_tagged(
+            inner.preempt1_size + inner.preempt2_size + inner.preempt3_size,
+            b"PRMT",
+        )?;
 
         let tpc = match inner.tpc.as_ref() {
             Some(buf) if buf.len() >= tpc_size => buf.clone(),
@@ -554,12 +572,11 @@ impl Buffer::ver {
                 // priv seems to work and might be faster?
                 // Needs to be FW-writable anyway, so ualloc
                 // won't work.
-                let buf = Arc::try_new(
-                    inner
-                        .ualloc_priv
-                        .lock()
-                        .array_empty((tpc_size + mmu::UAT_PGMSK) & !mmu::UAT_PGMSK)?,
-                )?;
+                let buf =
+                    Arc::try_new(inner.ualloc_priv.lock().array_empty_tagged(
+                        (tpc_size + mmu::UAT_PGMSK) & !mmu::UAT_PGMSK,
+                        b"TPC ",
+                    )?)?;
                 inner.tpc = Some(buf.clone());
                 buf
             }
@@ -585,8 +602,8 @@ impl Buffer::ver {
             let tilemaps = inner
                 .ualloc
                 .lock()
-                .array_empty(cfg.max_splits * tilemap_size)?;
-            let meta = inner.ualloc.lock().array_empty(meta_size)?;
+                .array_empty_tagged(cfg.max_splits * tilemap_size, b"CTMP")?;
+            let meta = inner.ualloc.lock().array_empty_tagged(meta_size, b"CMTA")?;
             Some(buffer::ClusterBuffers { tilemaps, meta })
         } else {
             None
@@ -614,7 +631,7 @@ impl Buffer::ver {
                 clustering: clustering,
                 preempt_buf: preempt_buf,
                 #[ver(G >= G14X)]
-                control_word: _gpu.array_empty(1)?,
+                control_word: _gpu.array_empty_tagged(1, b"CWRD")?,
             }),
             |inner, _p| {
                 try_init!(buffer::raw::Scene::ver {
@@ -731,7 +748,7 @@ impl BufferManager::ver {
         Ok(BufferManager::ver(slotalloc::SlotAllocator::new(
             NUM_BUFFERS,
             BufferManagerInner::ver { owners },
-            |_inner, _slot| BufferSlotInner::ver(),
+            |_inner, _slot| Some(BufferSlotInner::ver()),
             c_str!("BufferManager::SlotAllocator"),
             static_lock_class!(),
             static_lock_class!(),
@@ -745,8 +762,8 @@ impl BufferManager::ver {
             .with_inner(|inner| inner.owners[slot as usize].as_ref().cloned())
         {
             Some(owner) => {
-                pr_info!(
-                    "BufferManager: Received synchronous grow request for slot {}, this is not generally expected\n",
+                pr_err!(
+                    "BufferManager: Unexpected grow request for slot {}. This might deadlock. Please report this bug.\n",
                     slot
                 );
                 owner.sync_grow();
