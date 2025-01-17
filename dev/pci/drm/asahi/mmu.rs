@@ -1047,7 +1047,7 @@ impl Uat {
         let flags = if cached {
             0x1
         } else {
-            0x0
+            0x2
         };
         // let map = unsafe { bindings::memremap(res.start, rgn_size, flags.into()) };
         // let map = NonNull::new(map);

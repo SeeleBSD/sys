@@ -317,6 +317,10 @@ __arm_lpae_alloc_pages(size_t size, int flags,
     bus_dma_tag_t dmat = cfg->dmat;
     int error;
 
+	int bus_flags = BUS_DMA_NOWAIT;
+	if (!cfg->coherent_walk)
+		bus_flags |= BUS_DMA_COHERENT;
+
     pgtable = malloc(sizeof(*pgtable), M_DEVBUF, M_NOWAIT | M_ZERO);
     if (!pgtable)
         return NULL;
@@ -325,26 +329,31 @@ __arm_lpae_alloc_pages(size_t size, int flags,
     pgtable->dmat = dmat;
 
     error = bus_dmamem_alloc(dmat, size, cfg->pgsize_bitmap, 0, pgtable->segs, 1,
-                             &pgtable->nsegs, BUS_DMA_NOWAIT | BUS_DMA_COHERENT);
+                             &pgtable->nsegs, bus_flags);
     if (error)
         goto out_free_pgtable;
 
     error = bus_dmamem_map(dmat, pgtable->segs, pgtable->nsegs, size,
-                           (caddr_t*)&pgtable->cpu_addr, BUS_DMA_NOWAIT | BUS_DMA_COHERENT);
+                           (caddr_t*)&pgtable->cpu_addr, bus_flags);
     if (error)
         goto out_free_dmamem;
 
-    error = bus_dmamap_create(dmat, size, 1, size, 0, BUS_DMA_NOWAIT | BUS_DMA_COHERENT,
+    error = bus_dmamap_create(dmat, size, 1, size, 0, bus_flags,
                               &pgtable->dmamap);
     if (error)
         goto out_unmap;
 
     error = bus_dmamap_load_raw(dmat, pgtable->dmamap, pgtable->segs, 1, size,
-            										BUS_DMA_NOWAIT | BUS_DMA_COHERENT);
+            										bus_flags);
     if (error)
         goto out_destroy_dmamap;
 
     memset(pgtable->cpu_addr, 0, pgtable->size);
+
+	if (!cfg->coherent_walk) {
+        bus_dmamap_sync(dmat, pgtable->dmamap, 0,
+                        pgtable->size, BUS_DMASYNC_PREWRITE);
+    }
 
     return pgtable;
 
