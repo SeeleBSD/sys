@@ -146,7 +146,7 @@ impl Node {
     pub fn property_match_string(&self, propname: &CStr, name: &CStr) -> i32 {
         unsafe {
             let idx = bindings::OF_getindex(self.handle(), name.as_char_ptr() as *mut _, propname.as_char_ptr() as *mut _);
-            Ok(idx)
+            idx
         }
     }
 }
