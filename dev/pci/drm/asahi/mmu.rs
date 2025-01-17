@@ -30,6 +30,7 @@ use kernel::{
     },
     time::{clock, Now},
     types::ForeignOwnable,
+    of,
 };
 
 use crate::debug::*;
@@ -997,25 +998,22 @@ impl Uat {
         size: usize,
         cached: bool,
         bst: bindings::bus_space_tag_t,
-        node: i32,
+        handle: i32,
     ) -> Result<UatRegion> {
-        let rdev = dev.raw_device();
-
         let mut res = core::mem::MaybeUninit::<bindings::resource>::uninit();
+        let node = of::Node::from_handle(handle)?;
 
         let res = unsafe {
-            let idx = bindings::__of_property_match_string(
-                node as usize as *mut _,
-                c_str!("memory-region-names").as_char_ptr(),
-                name.as_char_ptr(),
-            );
+            let idx = node.property_match_string(
+                c_str!("memory-region-names"),
+                name,
+            )?;
             to_result(idx)?;
 
-            let np = bindings::__of_parse_phandle(
-                node as usize as *mut _,
-                c_str!("memory-region").as_char_ptr(),
+            let np = node.parse_phandle(
+                c_str!("memory-region"),
                 idx,
-            );
+            )?;
             if np.is_null() {
                 dev_err!(dev, "Missing {} region\n", name);
                 return Err(EINVAL);

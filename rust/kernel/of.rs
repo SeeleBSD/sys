@@ -142,6 +142,13 @@ impl Node {
         self.find_property(name)
             .map_or(Ok(None), |prop| Ok(Some(prop.try_into()?)))
     }
+
+    pub fn property_match_string(&self, propname: &CStr, name: &CStr) -> Result<i32> {
+        unsafe {
+            let idx = bindings::OF_getindex(self.handle(), name.as_char_ptr() as *mut _, propname.as_char_ptr() as *mut _);
+            Ok(idx)
+        }
+    }
 }
 
 pub struct Property {
