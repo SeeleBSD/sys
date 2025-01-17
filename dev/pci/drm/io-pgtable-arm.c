@@ -424,6 +424,10 @@ __arm_lpae_sync_pte(arm_lpae_iopte *ptep, int num_entries,
 	cpu_dcache_wb_range(va_start, sync_size);
 
 	__asm__ volatile ("dsb ish" : : : "memory");
+
+	off_t offset = (char *)ptep - (char *)pgtable->cpu_addr;
+    bus_dmamap_sync(pgtable->dmat, pgtable->dmamap,
+                    offset, size, BUS_DMASYNC_PREWRITE);
 }
 #endif
 
