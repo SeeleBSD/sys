@@ -126,7 +126,7 @@ pub extern "C" fn asahidrm_attachhook(_self: *mut bindings::device) {
 
     let dev = unsafe { Device::new(_self) };
     let reg =
-        drm::drv::Registration::<AsahiDriver>::new(&dev, unsafe { &mut (*sc).sc_ddev as *mut _ })
+        drm::drv::Registration::<AsahiDriver>::new(&dev)
             .expect("Failed to create reg");
 
     let mut pdev =
