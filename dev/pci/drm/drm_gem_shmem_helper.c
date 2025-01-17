@@ -732,10 +732,10 @@ int drm_gem_shmem_vmap(struct drm_gem_shmem_object *shmem,
 
 		dma_resv_assert_held(shmem->base.resv);
 
-		/*if (shmem->vmap_use_count++ > 0) {
+		if (shmem->vmap_use_count++ > 0) {
 			iosys_map_set_vaddr(map, shmem->vaddr);
 			return 0;
-		}*/
+		}
 
 		ret = drm_gem_shmem_get_pages(shmem);
 		if (ret)
@@ -781,7 +781,6 @@ EXPORT_SYMBOL(drm_gem_shmem_vmap);
 void drm_gem_shmem_vunmap(struct drm_gem_shmem_object *shmem,
 			  struct iosys_map *map)
 {
-	/*
 	struct drm_gem_object *obj = &shmem->base;
 
 	dma_resv_assert_held(obj->resv);
@@ -800,7 +799,6 @@ void drm_gem_shmem_vunmap(struct drm_gem_shmem_object *shmem,
 		vunmap(shmem->vaddr);
 		drm_gem_shmem_put_pages(shmem);
 	}
-	*/
 
 	shmem->vaddr = NULL;
 }
