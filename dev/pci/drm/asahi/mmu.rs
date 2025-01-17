@@ -1007,13 +1007,13 @@ impl Uat {
             let idx = node.property_match_string(
                 c_str!("memory-region-names"),
                 name,
-            )?;
+            ).unwrap();
             to_result(idx)?;
 
             let np = node.parse_phandle(
                 c_str!("memory-region"),
                 idx,
-            )?;
+            ).unwrap();
             if np.is_null() {
                 dev_err!(dev, "Missing {} region\n", name);
                 return Err(EINVAL);
