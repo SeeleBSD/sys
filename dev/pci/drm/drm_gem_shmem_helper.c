@@ -796,7 +796,7 @@ void drm_gem_shmem_vunmap(struct drm_gem_shmem_object *shmem,
 		if (--shmem->vmap_use_count > 0)
 			return;
 
-		vunmap(shmem->vaddr);
+		vunmap(shmem->vaddr, obj->size >> PAGE_SHIFT);
 		drm_gem_shmem_put_pages(shmem);
 	}
 
