@@ -1007,18 +1007,19 @@ impl Uat {
             let idx = node.property_match_string(
                 c_str!("memory-region-names"),
                 name,
-            ).unwrap();
+            );
             to_result(idx)?;
 
             let np = node.parse_phandle(
                 c_str!("memory-region"),
                 idx,
-            ).unwrap();
-            if np.is_null() {
+            );
+            if np.is_none() {
                 dev_err!(dev, "Missing {} region\n", name);
                 return Err(EINVAL);
             }
-            let ret = bindings::of_address_to_resource(np, 0, res.as_mut_ptr());
+            let np = np.unwrap();
+            let ret = bindings::of_address_to_resource(np.raw_node, 0, res.as_mut_ptr());
             // #[cfg(CONFIG_OF_DYNAMIC)]
             // bindings::of_node_put(np);
 

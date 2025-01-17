@@ -38,7 +38,7 @@ impl Iterator for NodeIter {
 
 #[derive(Clone, Copy)]
 pub struct Node {
-    raw_node: *mut bindings::device_node,
+    pub raw_node: *mut bindings::device_node,
 }
 
 impl Node {
@@ -143,7 +143,7 @@ impl Node {
             .map_or(Ok(None), |prop| Ok(Some(prop.try_into()?)))
     }
 
-    pub fn property_match_string(&self, propname: &CStr, name: &CStr) -> Result<i32> {
+    pub fn property_match_string(&self, propname: &CStr, name: &CStr) -> i32 {
         unsafe {
             let idx = bindings::OF_getindex(self.handle(), name.as_char_ptr() as *mut _, propname.as_char_ptr() as *mut _);
             Ok(idx)
