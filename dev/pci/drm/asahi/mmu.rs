@@ -1001,7 +1001,7 @@ impl Uat {
         handle: i32,
     ) -> Result<UatRegion> {
         let mut res = core::mem::MaybeUninit::<bindings::resource>::uninit();
-        let node = of::Node::from_handle(handle)?;
+        let node = of::Node::from_handle(handle).unwrap();
 
         let res = unsafe {
             let idx = node.property_match_string(
@@ -1012,7 +1012,7 @@ impl Uat {
 
             let np = node.parse_phandle(
                 c_str!("memory-region"),
-                idx,
+                idx as usize,
             );
             if np.is_none() {
                 dev_err!(dev, "Missing {} region\n", name);
