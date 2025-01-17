@@ -34,12 +34,9 @@ impl<T: drm::drv::Driver> Device<T> {
 
     /// Returns a borrowed reference to the user data associated with this Device.
     pub fn data(&self) -> <T::Data as ForeignOwnable>::Borrowed<'_> {
+        // SAFETY: dev_private is guaranteed to be initialized for all
         // Device objects exposed to users.
-        unsafe {
-            T::Data::borrow(bindings::dev_get_drvdata(
-                self.drm.get() as *mut _ as *mut bindings::device
-            ))
-        }
+        unsafe { T::Data::borrow((*self.drm.get()).dev_private) }
     }
 }
 
