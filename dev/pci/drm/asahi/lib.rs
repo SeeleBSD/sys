@@ -44,7 +44,6 @@ use kernel::{
 use crate::driver::{AsahiData, AsahiDriver, DeviceData};
 use crate::hw::HwConfig;
 
-const INITIAL_TVB_SIZE: usize = 0x8;
 const __LOG_PREFIX: &'static str = "asahidrm";
 static mut INFO: Option<&'static HwConfig> = None;
 static mut PMAP: bindings::pmap_t = core::ptr::null_mut();
