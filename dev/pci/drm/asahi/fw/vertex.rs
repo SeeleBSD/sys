@@ -148,7 +148,7 @@ pub(crate) mod raw {
         pub(crate) unk_buf_8: U64,
         pub(crate) unk_buf_10: U64,
         pub(crate) cur_ts: U64,
-        pub(crate) timestamp_pointers: GpuWeakPointer<job::raw::TimestampPointers<'a>>,
+        pub(crate) timestamp_pointers: job::raw::TimestampPointers<'a>,
         pub(crate) unk_5c4: u32,
         pub(crate) unk_5c8: u32,
         pub(crate) unk_5cc: u32,

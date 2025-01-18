@@ -74,7 +74,7 @@ pub(crate) mod raw {
         pub(crate) encoder_params: job::raw::EncoderParams,
         pub(crate) meta: job::raw::JobMeta,
         pub(crate) cur_ts: U64,
-        pub(crate) timestamp_pointers: GpuWeakPointer<job::raw::TimestampPointers<'a>>,
+        pub(crate) timestamp_pointers: job::raw::TimestampPointers<'a>,
         pub(crate) unk_2c0: u32,
         pub(crate) unk_2c4: u32,
         pub(crate) unk_2c8: u32,
