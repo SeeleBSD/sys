@@ -697,7 +697,7 @@ impl<'a> InitDataBuilder::ver<'a> {
                 unk_903c: 1,
                 #[ver(V < V13_0B4)]
                 unk_903c: 0,
-                fault_control: 0,
+                fault_control: 0xb,
                 do_init: 1,
                 unk_11020: 40,
                 unk_11024: 10,
