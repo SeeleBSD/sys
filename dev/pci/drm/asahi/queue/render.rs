@@ -760,7 +760,7 @@ impl super::Queue::ver {
                     unk3: U64(unks.aux_fb_unk),
                 };
 
-                try_init!(fw::fragment::raw::RunFragment::ver {
+                let asd = try_init!(fw::fragment::raw::RunFragment::ver {
                     tag: fw::workqueue::CommandType::RunFragment,
                     #[ver(V >= V13_0B4)]
                     counter: U64(count_frag),
@@ -1075,7 +1075,9 @@ impl super::Queue::ver {
                     unk_ts: U64(0),
                     #[ver(V >= V13_0B4)]
                     unk_92d_8: Default::default(),
-                })
+                });
+                mod_dev_dbg!(self.dev, "[Submission {}] RunFragment::ver {:?}", id, asd);
+                asd
             },
         )?;
 

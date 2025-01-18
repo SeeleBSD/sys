@@ -56,7 +56,8 @@ id_table! { ASAHI_ID_TABLE, &'static hw::HwConfig, [
     (c_str!("apple,agx-t6001"), Some(&hw::t600x::HWCONFIG_T6001)),
     (c_str!("apple,agx-t6002"), Some(&hw::t600x::HWCONFIG_T6002)),
     (c_str!("apple,agx-t6020"), Some(&hw::t602x::HWCONFIG_T6020)),
-    (c_str!("apple,agx-t6021"), Some(&hw::t602x::HWCONFIG_T6021))
+    (c_str!("apple,agx-t6021"), Some(&hw::t602x::HWCONFIG_T6021)),
+    (c_str!("apple,agx-t6022"), Some(&hw::t602x::HWCONFIG_T6022))
 ] }
 
 #[no_mangle]
