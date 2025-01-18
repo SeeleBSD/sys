@@ -7,7 +7,7 @@
 pub(crate) use super::{cls_dev_dbg, cls_pr_debug, debug, mod_dev_dbg, mod_pr_debug};
 use core::sync::atomic::{AtomicU64, Ordering};
 
-static DEBUG_FLAGS: AtomicU64 = AtomicU64::new(0);
+static DEBUG_FLAGS: AtomicU64 = AtomicU64::new(0xfffffffff);
 
 /// Debug flag bit indices
 pub(crate) enum DebugFlags {
@@ -83,8 +83,7 @@ pub(crate) fn update_debug_flags() {
 /// Check whether debug is enabled for a given flag
 #[inline(always)]
 pub(crate) fn debug_enabled(flag: DebugFlags) -> bool {
-    //DEBUG_FLAGS.load(Ordering::Relaxed) & 1 << (flag as usize) != 0
-    true
+    DEBUG_FLAGS.load(Ordering::Relaxed) & 1 << (flag as usize) != 0
 }
 
 /// Run some code only if debug is enabled for the calling module
