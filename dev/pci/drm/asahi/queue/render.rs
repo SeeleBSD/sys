@@ -760,7 +760,7 @@ impl super::Queue::ver {
                     unk3: U64(unks.aux_fb_unk),
                 };
                 
-                kernel::dbg!("[Submission {}] RunFragment::ver {:?}", id, fw::fragment::raw::RunFragment::ver {
+                kernel::dbg!("[Submission {}] RunFragment::ver\n{:?}\n{:?}\n{:?}\n{:?}\n{:?}", id, inner.micro_seq, inner.notifier, inner.scene, inner.timestamps, fw::fragment::raw::RunFragment::ver {
                     tag: fw::workqueue::CommandType::RunFragment,
                     #[ver(V >= V13_0B4)]
                     counter: U64(count_frag),
