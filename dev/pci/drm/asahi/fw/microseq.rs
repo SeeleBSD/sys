@@ -144,7 +144,7 @@ pub(crate) struct Timestamp<'a> {
     pub(crate) ts_pointers: GpuWeakPointer<job::raw::TimestampPointers<'a>>,
     pub(crate) update_ts: GpuWeakPointer<Option<GpuPointer<'a, AtomicU64>>>,
     pub(crate) work_queue: GpuWeakPointer<workqueue::QueueInfo::ver>,
-    pub(crate) unk_24: U64,
+    pub(crate) user_ts_pointers: GpuWeakPointer<job::raw::TimestampPointers<'a>>,
 
     #[ver(V >= V13_0B4)]
     pub(crate) unk_ts: GpuWeakPointer<U64>,

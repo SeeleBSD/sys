@@ -177,7 +177,7 @@ impl super::Queue::ver {
                                 ts_pointers: inner_weak_ptr!(ptr, timestamp_pointers),
                                 update_ts: inner_weak_ptr!(ptr, timestamp_pointers.start_addr),
                                 work_queue: ev_comp.info_ptr,
-                                unk_24: U64(0),
+                                user_ts_pointers: inner_weak_ptr!(ptr, user_timestamp_pointers),
                                 #[ver(V >= V13_0B4)]
                                 unk_ts: inner_weak_ptr!(ptr, unk_ts),
                                 uuid,
@@ -201,7 +201,7 @@ impl super::Queue::ver {
                                 ts_pointers: inner_weak_ptr!(ptr, timestamp_pointers),
                                 update_ts: inner_weak_ptr!(ptr, timestamp_pointers.end_addr),
                                 work_queue: ev_comp.info_ptr,
-                                unk_24: U64(0),
+                                user_ts_pointers: inner_weak_ptr!(ptr, user_timestamp_pointers),
                                 #[ver(V >= V13_0B4)]
                                 unk_ts: inner_weak_ptr!(ptr, unk_ts),
                                 uuid,
@@ -359,10 +359,10 @@ impl super::Queue::ver {
                         start_addr: Some(inner_ptr!(inner.timestamps.gpu_pointer(), start)),
                         end_addr: Some(inner_ptr!(inner.timestamps.gpu_pointer(), end)),
                     }),
-                    unk_2c0: 0,
-                    unk_2c4: 0,
-                    unk_2c8: 0,
-                    unk_2cc: 0,
+                    user_timestamp_pointers <- try_init!(fw::job::raw::TimestampPointers {
+                        start_addr: None,
+                        end_addr: None,
+                    }),
                     client_sequence: slot_client_seq,
                     pad_2d1: Default::default(),
                     unk_2d4: 0,
