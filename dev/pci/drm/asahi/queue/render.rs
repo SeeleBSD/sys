@@ -667,8 +667,8 @@ impl super::Queue::ver {
                             builder.add(microseq::Timestamp::ver {
                                 header: microseq::op::Timestamp::new(true),
                                 cur_ts: inner_weak_ptr!(ptr, cur_ts),
-                                start_ts: inner_weak_ptr!(ptr, start_ts),
-                                update_ts: inner_weak_ptr!(ptr, start_ts),
+                                ts_pointers: inner_weak_ptr!(ptr, timestamp_pointers),
+                                update_ts: inner_weak_ptr!(ptr, timestamp_pointers.start_addr),
                                 work_queue: ev_frag.info_ptr,
                                 unk_24: U64(0),
                                 #[ver(V >= V13_0B4)]
@@ -691,8 +691,8 @@ impl super::Queue::ver {
                             builder.add(microseq::Timestamp::ver {
                                 header: microseq::op::Timestamp::new(false),
                                 cur_ts: inner_weak_ptr!(ptr, cur_ts),
-                                start_ts: inner_weak_ptr!(ptr, start_ts),
-                                update_ts: inner_weak_ptr!(ptr, end_ts),
+                                ts_pointers: inner_weak_ptr!(ptr, timestamp_pointers),
+                                update_ts: inner_weak_ptr!(ptr, timestamp_pointers.end_addr),
                                 work_queue: ev_frag.info_ptr,
                                 unk_24: U64(0),
                                 #[ver(V >= V13_0B4)]
@@ -1062,8 +1062,10 @@ impl super::Queue::ver {
                     #[ver(G >= G14X)]
                     unk_buf_10: U64(0),
                     cur_ts: U64(0),
-                    start_ts: Some(inner_ptr!(inner.timestamps.gpu_pointer(), frag.start)),
-                    end_ts: Some(inner_ptr!(inner.timestamps.gpu_pointer(), frag.end)),
+                    timestamp_pointers: fw::job::raw::TimestampPointers {
+                        start_addr: Some(inner_ptr!(inner.timestamps.gpu_pointer(), frag.start)),
+                        end_addr: Some(inner_ptr!(inner.timestamps.gpu_pointer(), frag.end)),
+                    },
                     unk_914: 0,
                     unk_918: U64(0),
                     unk_920: 0,
@@ -1379,8 +1381,10 @@ impl super::Queue::ver {
                     #[ver(G >= G14X)]
                     unk_buf_10: U64(0),
                     cur_ts: U64(0),
-                    start_ts: Some(inner_ptr!(inner.timestamps.gpu_pointer(), frag.start)),
-                    end_ts: Some(inner_ptr!(inner.timestamps.gpu_pointer(), frag.end)),
+                    timestamp_pointers <- try_init!(fw::job::raw::TimestampPointers {
+                        start_addr: Some(inner_ptr!(inner.timestamps.gpu_pointer(), frag.start)),
+                        end_addr: Some(inner_ptr!(inner.timestamps.gpu_pointer(), frag.end)),
+                    }),
                     unk_914: 0,
                     unk_918: U64(0),
                     unk_920: 0,
@@ -1511,8 +1515,8 @@ impl super::Queue::ver {
                             builder.add(microseq::Timestamp::ver {
                                 header: microseq::op::Timestamp::new(true),
                                 cur_ts: inner_weak_ptr!(ptr, cur_ts),
-                                start_ts: inner_weak_ptr!(ptr, start_ts),
-                                update_ts: inner_weak_ptr!(ptr, start_ts),
+                                ts_pointers: inner_weak_ptr!(ptr, timestamp_pointers),
+                                update_ts: inner_weak_ptr!(ptr, timestamp_pointers.start_addr),
                                 work_queue: ev_vtx.info_ptr,
                                 unk_24: U64(0),
                                 #[ver(V >= V13_0B4)]
@@ -1535,8 +1539,8 @@ impl super::Queue::ver {
                             builder.add(microseq::Timestamp::ver {
                                 header: microseq::op::Timestamp::new(false),
                                 cur_ts: inner_weak_ptr!(ptr, cur_ts),
-                                start_ts: inner_weak_ptr!(ptr, start_ts),
-                                update_ts: inner_weak_ptr!(ptr, end_ts),
+                                ts_pointers: inner_weak_ptr!(ptr, timestamp_pointers),
+                                update_ts: inner_weak_ptr!(ptr, timestamp_pointers.end_addr),
                                 work_queue: ev_vtx.info_ptr,
                                 unk_24: U64(0),
                                 #[ver(V >= V13_0B4)]
@@ -1829,8 +1833,10 @@ impl super::Queue::ver {
                     unk_buf_8: U64(0),
                     unk_buf_10: U64(0),
                     cur_ts: U64(0),
-                    start_ts: Some(inner_ptr!(inner.timestamps.gpu_pointer(), vtx.start)),
-                    end_ts: Some(inner_ptr!(inner.timestamps.gpu_pointer(), vtx.end)),
+                    timestamp_pointers <- try_init!(fw::job::raw::TimestampPointers {
+                        start_addr: Some(inner_ptr!(inner.timestamps.gpu_pointer(), vtx.start)),
+                        end_addr: Some(inner_ptr!(inner.timestamps.gpu_pointer(), vtx.end)),
+                    }),
                     unk_5c4: 0,
                     unk_5c8: 0,
                     unk_5cc: 0,
