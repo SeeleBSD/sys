@@ -784,7 +784,7 @@ impl super::Queue::ver {
                     unk_68: U64(0),
                     tile_count: U64(tile_info.tiles as u64),
                     #[ver(G < G14X)]
-                    job_params1 <- try_init!(fw::fragment::raw::JobParameters1::ver {
+                    job_params1: fw::fragment::raw::JobParameters1::ver {
                         utile_config,
                         unk_4: 0,
                         clear_pipeline: fw::fragment::raw::ClearPipelineBinding {
@@ -837,9 +837,9 @@ impl super::Queue::ver {
                         __pad: Default::default(),
                         #[ver(V < V13_0B4)]
                         __pad1: Default::default(),
-                    }),
+                    },
                     #[ver(G < G14X)]
-                    job_params2 <- try_init!(fw::fragment::raw::JobParameters2 {
+                    job_params2: fw::fragment::raw::JobParameters2 {
                         store_pipeline_bind: cmdbuf.store_pipeline_bind,
                         store_pipeline_addr: cmdbuf.store_pipeline,
                         unk_8: 0x0,
@@ -859,7 +859,7 @@ impl super::Queue::ver {
                         unk_3c: unks.frg_unk_3c as u32,
                         unk_40: unks.frg_unk_40 as u32,
                         __pad: Default::default(),
-                    }),
+                    },
                     #[ver(G >= G14X)]
                     registers: fw::job::raw::RegisterArray::new(
                         inner_weak_ptr!(_ptr, registers.registers),
@@ -949,7 +949,7 @@ impl super::Queue::ver {
                             */
                         }
                     ),
-                    job_params3 <- try_init!(fw::fragment::raw::JobParameters3::ver {
+                    job_params3: fw::fragment::raw::JobParameters3::ver {
                         depth_bias_array: fw::fragment::raw::ArrayAddr {
                             ptr: U64(cmdbuf.depth_bias_array),
                             unk_padding: U64(0),
@@ -1010,14 +1010,14 @@ impl super::Queue::ver {
                         #[ver(V >= V13_0B4)]
                         unk_390_0: U64(0x0),
                         depth_dimensions: U64(cmdbuf.depth_dimensions as u64),
-                    }),
+                    },
                     unk_758_flag: 0,
                     unk_75c_flag: 0,
                     unk_buf: Default::default(),
                     busy_flag: 0,
                     tvb_overflow_count: 0,
                     unk_878: 0,
-                    encoder_params <- try_init!(fw::job::raw::EncoderParams {
+                    encoder_params: fw::job::raw::EncoderParams {
                         unk_8: (cmdbuf.flags & uapi::ASAHI_RENDER_SET_WHEN_RELOADING_Z_OR_S as u64
                             != 0) as u32,
                         sync_grow: 0,
@@ -1028,7 +1028,7 @@ impl super::Queue::ver {
                         sampler_array: U64(cmdbuf.fragment_sampler_array),
                         sampler_count: cmdbuf.fragment_sampler_count,
                         sampler_max: cmdbuf.fragment_sampler_max,
-                    }),
+                    },
                     process_empty_tiles: (cmdbuf.flags
                         & uapi::ASAHI_RENDER_PROCESS_EMPTY_TILES as u64
                         != 0) as u32,
@@ -1039,7 +1039,7 @@ impl super::Queue::ver {
                     unk_pointee: 0,
                     #[ver(V >= V13_3)]
                     unk_v13_3: 0,
-                    meta <- try_init!(fw::job::raw::JobMeta {
+                    meta: fw::job::raw::JobMeta {
                         unk_0: 0,
                         unk_2: 0,
                         no_preemption: (cmdbuf.flags
@@ -1053,7 +1053,7 @@ impl super::Queue::ver {
                         flush_stamps: flush_stamps as u32,
                         uuid: uuid_3d,
                         event_seq: ev_frag.event_seq as u32,
-                    }),
+                    },
                     unk_after_meta: unk1.into(),
                     unk_buf_0: U64(0),
                     unk_buf_8: U64(0),
