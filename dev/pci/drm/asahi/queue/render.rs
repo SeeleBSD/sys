@@ -1277,7 +1277,7 @@ impl super::Queue::ver {
                 #[ver(G < G14)]
                 let core_masks = gpu.core_masks_packed();
 
-                kernel::dbg!("[Submission {}] RunVertex::ver\n{:?}\n{:?}\n{:?}\n{:?}", id, inner.notifier, inner.scene, inner.timestamps, fw::vertex::raw::RunVertex::ver {
+                /*kernel::dbg!("[Submission {}] RunVertex::ver\n{:?}\n{:?}\n{:?}\n{:?}", id, inner.notifier, inner.scene, inner.timestamps, fw::vertex::raw::RunVertex::ver {
                     tag: fw::workqueue::CommandType::RunVertex,
                     #[ver(V >= V13_0B4)]
                     counter: U64(count_vtx),
@@ -1531,7 +1531,7 @@ impl super::Queue::ver {
                     unk_ts: U64(0),
                     #[ver(V >= V13_0B4)]
                     unk_5dd_8: Default::default(),
-                });
+                });*/
 
                 try_init!(fw::vertex::raw::RunVertex::ver {
                     tag: fw::workqueue::CommandType::RunVertex,

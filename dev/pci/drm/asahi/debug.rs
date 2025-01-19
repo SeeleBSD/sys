@@ -7,7 +7,7 @@
 pub(crate) use super::{cls_dev_dbg, cls_pr_debug, debug, mod_dev_dbg, mod_pr_debug};
 use core::sync::atomic::{AtomicU64, Ordering};
 
-static DEBUG_FLAGS: AtomicU64 = AtomicU64::new((1 << 39) | (1 << 16));
+static DEBUG_FLAGS: AtomicU64 = AtomicU64::new((1 << 39) | (1 << 16) | (1 << 17) | (1 << 18) | (1 << 19) | (1 << 20) | (1 << 21) | (1 << 22));
 
 /// Debug flag bit indices
 pub(crate) enum DebugFlags {
