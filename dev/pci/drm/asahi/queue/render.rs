@@ -759,326 +759,6 @@ impl super::Queue::ver {
                     #[ver(V >= V13_0B4)]
                     unk3: U64(unks.aux_fb_unk),
                 };
-                
-                kernel::dbg!("[Submission {}] RunFragment::ver\n{:?}\n{:?}\n{:?}\n{:?}", id, inner.notifier, inner.scene, inner.timestamps, fw::fragment::raw::RunFragment::ver {
-                    tag: fw::workqueue::CommandType::RunFragment,
-                    #[ver(V >= V13_0B4)]
-                    counter: U64(count_frag),
-                    vm_slot,
-                    unk_8: 0,
-                    microsequence: inner.micro_seq.gpu_pointer(),
-                    microsequence_size: inner.micro_seq.len() as u32,
-                    notifier: inner.notifier.gpu_pointer(),
-                    buffer: inner.scene.buffer_pointer(),
-                    scene: inner.scene.gpu_pointer(),
-                    unk_buffer_buf: inner.scene.kernel_buffer_pointer(),
-                    tvb_tilemap: inner.scene.tvb_tilemap_pointer(),
-                    ppp_multisamplectl: U64(cmdbuf.ppp_multisamplectl),
-                    samples: cmdbuf.samples,
-                    tiles_per_mtile_y: tile_info.tiles_per_mtile_y as u16,
-                    tiles_per_mtile_x: tile_info.tiles_per_mtile_x as u16,
-                    unk_50: U64(0),
-                    unk_58: U64(0),
-                    merge_upper_x: F32::from_bits(cmdbuf.merge_upper_x),
-                    merge_upper_y: F32::from_bits(cmdbuf.merge_upper_y),
-                    unk_68: U64(0),
-                    tile_count: U64(tile_info.tiles as u64),
-                    #[ver(G < G14X)]
-                    job_params1: fw::fragment::raw::JobParameters1::ver {
-                        utile_config,
-                        unk_4: 0,
-                        clear_pipeline: fw::fragment::raw::ClearPipelineBinding {
-                            pipeline_bind: U64(cmdbuf.load_pipeline_bind as u64),
-                            address: U64(cmdbuf.load_pipeline as u64),
-                        },
-                        ppp_multisamplectl: U64(cmdbuf.ppp_multisamplectl),
-                        scissor_array: U64(cmdbuf.scissor_array),
-                        depth_bias_array: U64(cmdbuf.depth_bias_array),
-                        aux_fb_info,
-                        depth_dimensions: U64(cmdbuf.depth_dimensions as u64),
-                        visibility_result_buffer: U64(cmdbuf.visibility_result_buffer),
-                        zls_ctrl: U64(cmdbuf.zls_ctrl),
-                        #[ver(G >= G14)]
-                        unk_58_g14_0: U64(unks.g14_unk),
-                        #[ver(G >= G14)]
-                        unk_58_g14_8: U64(0),
-                        depth_buffer_ptr1: U64(cmdbuf.depth_buffer_load),
-                        depth_buffer_ptr2: U64(cmdbuf.depth_buffer_store),
-                        stencil_buffer_ptr1: U64(cmdbuf.stencil_buffer_load),
-                        stencil_buffer_ptr2: U64(cmdbuf.stencil_buffer_store),
-                        #[ver(G >= G14)]
-                        unk_68_g14_0: Default::default(),
-                        depth_buffer_stride1: U64(cmdbuf.depth_buffer_load_stride),
-                        depth_buffer_stride2: U64(cmdbuf.depth_buffer_store_stride),
-                        stencil_buffer_stride1: U64(cmdbuf.stencil_buffer_load_stride),
-                        stencil_buffer_stride2: U64(cmdbuf.stencil_buffer_store_stride),
-                        depth_meta_buffer_ptr1: U64(cmdbuf.depth_meta_buffer_load),
-                        depth_meta_buffer_stride1: U64(cmdbuf.depth_meta_buffer_load_stride),
-                        depth_meta_buffer_ptr2: U64(cmdbuf.depth_meta_buffer_store),
-                        depth_meta_buffer_stride2: U64(cmdbuf.depth_meta_buffer_store_stride),
-                        stencil_meta_buffer_ptr1: U64(cmdbuf.stencil_meta_buffer_load),
-                        stencil_meta_buffer_stride1: U64(cmdbuf.stencil_meta_buffer_load_stride),
-                        stencil_meta_buffer_ptr2: U64(cmdbuf.stencil_meta_buffer_store),
-                        stencil_meta_buffer_stride2: U64(cmdbuf.stencil_meta_buffer_store_stride),
-                        tvb_tilemap: inner.scene.tvb_tilemap_pointer(),
-                        tvb_layermeta: inner.scene.tvb_layermeta_pointer(),
-                        mtile_stride_dwords: U64((4 * tile_info.params.rgn_size as u64) << 24),
-                        tvb_heapmeta: inner.scene.tvb_heapmeta_pointer(),
-                        tile_config: U64(tile_config),
-                        aux_fb: inner.aux_fb.gpu_pointer(),
-                        unk_108: Default::default(),
-                        pipeline_base: U64(0x11_00000000),
-                        unk_140: U64(unks.frg_unk_140),
-                        helper_program: cmdbuf.fragment_helper_program,
-                        unk_14c: 0,
-                        helper_arg: U64(cmdbuf.fragment_helper_arg),
-                        unk_158: U64(unks.frg_unk_158),
-                        unk_160: U64(0),
-                        __pad: Default::default(),
-                        #[ver(V < V13_0B4)]
-                        __pad1: Default::default(),
-                    },
-                    #[ver(G < G14X)]
-                    job_params2: fw::fragment::raw::JobParameters2 {
-                        store_pipeline_bind: cmdbuf.store_pipeline_bind,
-                        store_pipeline_addr: cmdbuf.store_pipeline,
-                        unk_8: 0x0,
-                        unk_c: 0x0,
-                        merge_upper_x: F32::from_bits(cmdbuf.merge_upper_x),
-                        merge_upper_y: F32::from_bits(cmdbuf.merge_upper_y),
-                        unk_18: U64(0x0),
-                        utiles_per_mtile_y: tile_info.utiles_per_mtile_y as u16,
-                        utiles_per_mtile_x: tile_info.utiles_per_mtile_x as u16,
-                        unk_24: 0x0,
-                        tile_counts: ((tile_info.tiles_y - 1) << 12) | (tile_info.tiles_x - 1),
-                        tib_blocks: cmdbuf.tib_blocks,
-                        isp_bgobjdepth: cmdbuf.isp_bgobjdepth,
-                        // TODO: does this flag need to be exposed to userspace?
-                        isp_bgobjvals: unks.load_bgobjvals as u32,
-                        unk_38: unks.frg_unk_38 as u32,
-                        unk_3c: unks.frg_unk_3c as u32,
-                        unk_40: unks.frg_unk_40 as u32,
-                        __pad: Default::default(),
-                    },
-                    #[ver(G >= G14X)]
-                    registers: fw::job::raw::RegisterArray::new(
-                        inner_weak_ptr!(_ptr, registers.registers),
-                        |r| {
-                            r.add(0x1739, 1);
-                            r.add(0x10009, utile_config.into());
-                            r.add(0x15379, cmdbuf.store_pipeline_bind.into());
-                            r.add(0x15381, cmdbuf.store_pipeline.into());
-                            r.add(0x15369, cmdbuf.load_pipeline_bind.into());
-                            r.add(0x15371, cmdbuf.load_pipeline.into());
-                            r.add(0x15131, cmdbuf.merge_upper_x.into());
-                            r.add(0x15139, cmdbuf.merge_upper_y.into());
-                            r.add(0x100a1, 0);
-                            r.add(0x15069, 0);
-                            r.add(0x15071, 0); // pointer
-                            r.add(0x16058, 0);
-                            r.add(0x10019, cmdbuf.ppp_multisamplectl);
-                            let isp_mtile_size = (tile_info.utiles_per_mtile_y
-                                | (tile_info.utiles_per_mtile_x << 16))
-                                .into();
-                            r.add(0x100b1, isp_mtile_size); // ISP_MTILE_SIZE
-                            r.add(0x16030, isp_mtile_size); // ISP_MTILE_SIZE
-                            r.add(
-                                0x100d9,
-                                (((tile_info.tiles_y - 1) << 12) | (tile_info.tiles_x - 1)).into(),
-                            ); // TE_SCREEN
-                            r.add(0x16098, inner.scene.tvb_heapmeta_pointer().into());
-                            r.add(0x15109, cmdbuf.scissor_array); // ISP_SCISSOR_BASE
-                            r.add(0x15101, cmdbuf.depth_bias_array); // ISP_DBIAS_BASE
-                            r.add(0x15021, cmdbuf.iogpu_unk_214.into()); // aux_fb_info.unk_1
-                            r.add(
-                                0x15211,
-                                ((cmdbuf.fb_height as u64) << 32) | cmdbuf.fb_width as u64,
-                            ); // aux_fb_info.{width, heigh
-                            r.add(0x15049, unks.aux_fb_unk); // s2.aux_fb_info.unk3
-                            r.add(0x10051, cmdbuf.tib_blocks.into()); // s1.unk_2c
-                            r.add(0x15321, cmdbuf.depth_dimensions.into()); // ISP_ZLS_PIXELS
-                            r.add(0x15301, cmdbuf.isp_bgobjdepth.into()); // ISP_BGOBJDEPTH
-                            r.add(0x15309, unks.load_bgobjvals); // ISP_BGOBJVALS
-                            r.add(0x15311, cmdbuf.visibility_result_buffer); // ISP_OCLQRY_BASE
-                            r.add(0x15319, cmdbuf.zls_ctrl); // ISP_ZLSCTL
-                            r.add(0x15349, unks.g14_unk); // s2.unk_58_g14_0
-                            r.add(0x15351, 0); // s2.unk_58_g14_8
-                            r.add(0x15329, cmdbuf.depth_buffer_load); // ISP_ZLOAD_BASE
-                            r.add(0x15331, cmdbuf.depth_buffer_store); // ISP_ZSTORE_BASE
-                            r.add(0x15339, cmdbuf.stencil_buffer_load); // ISP_STENCIL_LOAD_BASE
-                            r.add(0x15341, cmdbuf.stencil_buffer_store); // ISP_STENCIL_STORE_BASE
-                            r.add(0x15231, 0);
-                            r.add(0x15221, 0);
-                            r.add(0x15239, 0);
-                            r.add(0x15229, 0);
-                            r.add(0x15401, cmdbuf.depth_buffer_load_stride);
-                            r.add(0x15421, cmdbuf.depth_buffer_store_stride);
-                            r.add(0x15409, cmdbuf.stencil_buffer_load_stride);
-                            r.add(0x15429, cmdbuf.stencil_buffer_store_stride);
-                            r.add(0x153c1, cmdbuf.depth_meta_buffer_load);
-                            r.add(0x15411, cmdbuf.depth_meta_buffer_load_stride);
-                            r.add(0x153c9, cmdbuf.depth_meta_buffer_store);
-                            r.add(0x15431, cmdbuf.depth_meta_buffer_store_stride);
-                            r.add(0x153d1, cmdbuf.stencil_meta_buffer_load);
-                            r.add(0x15419, cmdbuf.stencil_meta_buffer_load_stride);
-                            r.add(0x153d9, cmdbuf.stencil_meta_buffer_store);
-                            r.add(0x15439, cmdbuf.stencil_meta_buffer_store_stride);
-                            r.add(0x16429, inner.scene.tvb_tilemap_pointer().into());
-                            r.add(0x16060, inner.scene.tvb_layermeta_pointer().into());
-                            r.add(0x16431, (4 * tile_info.params.rgn_size as u64) << 24); // ISP_RGN?
-                            r.add(0x10039, tile_config); // tile_config ISP_CTL?
-                            r.add(0x16451, 0x0); // ISP_RENDER_ORIGIN
-                            r.add(0x11821, cmdbuf.fragment_helper_program.into());
-                            r.add(0x11829, cmdbuf.fragment_helper_arg);
-                            r.add(0x11f79, 0);
-                            r.add(0x15359, 0);
-                            r.add(0x10069, 0x11_00000000); // USC_EXEC_BASE_ISP
-                            r.add(0x16020, 0);
-                            r.add(0x16461, inner.aux_fb.gpu_pointer().into());
-                            r.add(0x16090, inner.aux_fb.gpu_pointer().into());
-                            r.add(0x120a1, unks.frg_unk_158);
-                            r.add(0x160a8, 0);
-                            r.add(0x16068, frg_tilecfg);
-                            r.add(0x160b8, 0x0);
-                            /*
-                            r.add(0x10201, 0x100); // Some kind of counter?? Does this matter?
-                            r.add(0x10428, 0x100); // Some kind of counter?? Does this matter?
-                            r.add(0x1c838, 1);  // ?
-                            r.add(0x1ca28, 0x1502960f00); // ??
-                            r.add(0x1731, 0x1); // ??
-                            */
-                        }
-                    ),
-                    job_params3: fw::fragment::raw::JobParameters3::ver {
-                        depth_bias_array: fw::fragment::raw::ArrayAddr {
-                            ptr: U64(cmdbuf.depth_bias_array),
-                            unk_padding: U64(0),
-                        },
-                        scissor_array: fw::fragment::raw::ArrayAddr {
-                            ptr: U64(cmdbuf.scissor_array),
-                            unk_padding: U64(0),
-                        },
-                        visibility_result_buffer: U64(cmdbuf.visibility_result_buffer),
-                        unk_118: U64(0x0),
-                        unk_120: Default::default(),
-                        unk_reload_pipeline: fw::fragment::raw::ClearPipelineBinding {
-                            pipeline_bind: U64(cmdbuf.partial_reload_pipeline_bind as u64),
-                            address: U64(cmdbuf.partial_reload_pipeline as u64),
-                        },
-                        unk_258: U64(0),
-                        unk_260: U64(0),
-                        unk_268: U64(0),
-                        unk_270: U64(0),
-                        reload_pipeline: fw::fragment::raw::ClearPipelineBinding {
-                            pipeline_bind: U64(cmdbuf.partial_reload_pipeline_bind as u64),
-                            address: U64(cmdbuf.partial_reload_pipeline as u64),
-                        },
-                        zls_ctrl: U64(unks.reload_zlsctrl),
-                        unk_290: U64(unks.g14_unk),
-                        depth_buffer_ptr1: U64(cmdbuf.depth_buffer_load),
-                        depth_buffer_stride3: U64(cmdbuf.depth_buffer_partial_stride),
-                        depth_meta_buffer_stride3: U64(cmdbuf.depth_meta_buffer_partial_stride),
-                        depth_buffer_ptr2: U64(cmdbuf.depth_buffer_store),
-                        depth_buffer_ptr3: U64(cmdbuf.depth_buffer_partial),
-                        depth_meta_buffer_ptr3: U64(cmdbuf.depth_meta_buffer_partial),
-                        stencil_buffer_ptr1: U64(cmdbuf.stencil_buffer_load),
-                        stencil_buffer_stride3: U64(cmdbuf.stencil_buffer_partial_stride),
-                        stencil_meta_buffer_stride3: U64(cmdbuf.stencil_meta_buffer_partial_stride),
-                        stencil_buffer_ptr2: U64(cmdbuf.stencil_buffer_store),
-                        stencil_buffer_ptr3: U64(cmdbuf.stencil_buffer_partial),
-                        stencil_meta_buffer_ptr3: U64(cmdbuf.stencil_meta_buffer_partial),
-                        unk_2f8: Default::default(),
-                        tib_blocks: cmdbuf.tib_blocks,
-                        unk_30c: 0x0,
-                        aux_fb_info,
-                        tile_config: U64(tile_config),
-                        unk_328_padding: Default::default(),
-                        unk_partial_store_pipeline: fw::fragment::raw::StorePipelineBinding::new(
-                            cmdbuf.partial_store_pipeline_bind,
-                            cmdbuf.partial_store_pipeline
-                        ),
-                        partial_store_pipeline: fw::fragment::raw::StorePipelineBinding::new(
-                            cmdbuf.partial_store_pipeline_bind,
-                            cmdbuf.partial_store_pipeline
-                        ),
-                        isp_bgobjdepth: cmdbuf.isp_bgobjdepth,
-                        isp_bgobjvals: cmdbuf.isp_bgobjvals,
-                        sample_size: cmdbuf.sample_size,
-                        unk_37c: 0x0,
-                        unk_380: U64(0x0),
-                        unk_388: U64(0x0),
-                        #[ver(V >= V13_0B4)]
-                        unk_390_0: U64(0x0),
-                        depth_dimensions: U64(cmdbuf.depth_dimensions as u64),
-                    },
-                    unk_758_flag: 0,
-                    unk_75c_flag: 0,
-                    unk_buf: Default::default(),
-                    busy_flag: 0,
-                    tvb_overflow_count: 0,
-                    unk_878: 0,
-                    encoder_params: fw::job::raw::EncoderParams {
-                        unk_8: (cmdbuf.flags & uapi::ASAHI_RENDER_SET_WHEN_RELOADING_Z_OR_S as u64
-                            != 0) as u32,
-                        sync_grow: 0,
-                        unk_10: 0x0, // fixed
-                        encoder_id: cmdbuf.encoder_id,
-                        unk_18: 0x0, // fixed
-                        unk_mask: unks.frg_unk_mask as u32,
-                        sampler_array: U64(cmdbuf.fragment_sampler_array),
-                        sampler_count: cmdbuf.fragment_sampler_count,
-                        sampler_max: cmdbuf.fragment_sampler_max,
-                    },
-                    process_empty_tiles: (cmdbuf.flags
-                        & uapi::ASAHI_RENDER_PROCESS_EMPTY_TILES as u64
-                        != 0) as u32,
-                    no_clear_pipeline_textures: (cmdbuf.flags
-                        & uapi::ASAHI_RENDER_NO_CLEAR_PIPELINE_TEXTURES as u64
-                        != 0) as u32,
-                    msaa_zs: (cmdbuf.flags & uapi::ASAHI_RENDER_MSAA_ZS as u64 != 0) as u32,
-                    unk_pointee: 0,
-                    #[ver(V >= V13_3)]
-                    unk_v13_3: 0,
-                    meta: fw::job::raw::JobMeta {
-                        unk_0: 0,
-                        unk_2: 0,
-                        no_preemption: (cmdbuf.flags
-                        & uapi::ASAHI_RENDER_NO_PREEMPTION as u64
-                        != 0) as u8,
-                        stamp: ev_frag.stamp_pointer,
-                        fw_stamp: ev_frag.fw_stamp_pointer,
-                        stamp_value: ev_frag.value.next(),
-                        stamp_slot: ev_frag.slot,
-                        evctl_index: 0, // fixed
-                        flush_stamps: flush_stamps as u32,
-                        uuid: uuid_3d,
-                        event_seq: ev_frag.event_seq as u32,
-                    },
-                    unk_after_meta: unk1.into(),
-                    unk_buf_0: U64(0),
-                    unk_buf_8: U64(0),
-                    #[ver(G < G14X)]
-                    unk_buf_10: U64(1),
-                    #[ver(G >= G14X)]
-                    unk_buf_10: U64(0),
-                    cur_ts: U64(0),
-                    timestamp_pointers: fw::job::raw::TimestampPointers {
-                        start_addr: Some(inner_ptr!(inner.timestamps.gpu_pointer(), frag.start)),
-                        end_addr: Some(inner_ptr!(inner.timestamps.gpu_pointer(), frag.end)),
-                    },
-                    user_timestamp_pointers: fw::job::raw::TimestampPointers {
-                        start_addr: None,
-                        end_addr: None,
-                    },
-                    client_sequence: slot_client_seq,
-                    pad_925: Default::default(),
-                    unk_928: 0,
-                    unk_92c: 0,
-                    #[ver(V >= V13_0B4)]
-                    unk_ts: U64(0),
-                    #[ver(V >= V13_0B4)]
-                    unk_92d_8: Default::default(),
-                });
 
                 try_init!(fw::fragment::raw::RunFragment::ver {
                     tag: fw::workqueue::CommandType::RunFragment,
@@ -1596,6 +1276,262 @@ impl super::Queue::ver {
                 let vm_slot = vm_bind.slot();
                 #[ver(G < G14)]
                 let core_masks = gpu.core_masks_packed();
+
+                kernel::dbg!("[Submission {}] RunVertex::ver\n{:?}\n{:?}\n{:?}\n{:?}", id, inner.notifier, inner.scene, inner.timestamps, fw::vertex::raw::RunVertex::ver {
+                    tag: fw::workqueue::CommandType::RunVertex,
+                    #[ver(V >= V13_0B4)]
+                    counter: U64(count_vtx),
+                    vm_slot,
+                    unk_8: 0,
+                    notifier: inner.notifier.gpu_pointer(),
+                    buffer_slot: inner.scene.slot(),
+                    unk_1c: 0,
+                    buffer: inner.scene.buffer_pointer(),
+                    scene: inner.scene.gpu_pointer(),
+                    unk_buffer_buf: inner.scene.kernel_buffer_pointer(),
+                    unk_34: 0,
+                    #[ver(G < G14X)]
+                    job_params1: fw::vertex::raw::JobParameters1::ver {
+                        unk_0: U64(if unk1 { 0 } else { 0x200 }), // sometimes 0
+                        unk_8: f32!(1e-20),                       // fixed
+                        unk_c: f32!(1e-20),                       // fixed
+                        tvb_tilemap: inner.scene.tvb_tilemap_pointer(),
+                        #[ver(G < G14)]
+                        tvb_cluster_tilemaps: inner.scene.cluster_tilemaps_pointer(),
+                        tpc: inner.scene.tpc_pointer(),
+                        tvb_heapmeta: inner.scene.tvb_heapmeta_pointer().or(0x8000_0000_0000_0000),
+                        iogpu_unk_54: U64(unks.iogpu_unk54), // fixed
+                        iogpu_unk_56: U64(unks.iogpu_unk56), // fixed
+                        #[ver(G < G14)]
+                        tvb_cluster_meta1: inner
+                            .scene
+                            .meta_1_pointer()
+                            .map(|x| x.or((tile_info.meta1_blocks as u64) << 50)),
+                        utile_config,
+                        unk_4c: 0,
+                        ppp_multisamplectl: U64(cmdbuf.ppp_multisamplectl), // fixed
+                        tvb_layermeta: inner.scene.tvb_layermeta_pointer(),
+                        #[ver(G < G14)]
+                        unk_60: U64(0x0), // fixed
+                        #[ver(G < G14)]
+                        core_mask: Array::new([
+                            *core_masks.first().unwrap_or(&0),
+                            *core_masks.get(1).unwrap_or(&0),
+                        ]),
+                        preempt_buf1: inner.scene.preempt_buf_1_pointer(),
+                        preempt_buf2: inner.scene.preempt_buf_2_pointer(),
+                        unk_80: U64(0x1), // fixed
+                        preempt_buf3: inner.scene.preempt_buf_3_pointer().or(0x4_0000_0000_0000), // check
+                        encoder_addr: U64(cmdbuf.encoder_ptr),
+                        #[ver(G < G14)]
+                        tvb_cluster_meta2: inner.scene.meta_2_pointer(),
+                        #[ver(G < G14)]
+                        tvb_cluster_meta3: inner.scene.meta_3_pointer(),
+                        #[ver(G < G14)]
+                        tiling_control,
+                        #[ver(G < G14)]
+                        unk_ac: unks.tiling_control_2 as u32, // fixed
+                        unk_b0: Default::default(), // fixed
+                        pipeline_base: U64(0x11_00000000),
+                        #[ver(G < G14)]
+                        tvb_cluster_meta4: inner
+                            .scene
+                            .meta_4_pointer()
+                            .map(|x| x.or(0x3000_0000_0000_0000)),
+                        #[ver(G < G14)]
+                        unk_f0: U64(unks.vtx_unk_f0),
+                        unk_f8: U64(unks.vtx_unk_f8),     // fixed
+                        helper_program: cmdbuf.vertex_helper_program,
+                        unk_104: 0,
+                        helper_arg: U64(cmdbuf.vertex_helper_arg),
+                        unk_110: Default::default(),      // fixed
+                        unk_118: unks.vtx_unk_118 as u32, // fixed
+                        __pad: Default::default(),
+                    },
+                    #[ver(G < G14X)]
+                    tiling_params: tile_info.params,
+                    #[ver(G >= G14X)]
+                    registers: fw::job::raw::RegisterArray::new(
+                        inner_weak_ptr!(_ptr, registers.registers),
+                        |r| {
+                            r.add(0x10141, if unk1 { 0 } else { 0x200 }); // s2.unk_0
+                            r.add(0x1c039, inner.scene.tvb_tilemap_pointer().into());
+                            r.add(0x1c9c8, inner.scene.tvb_tilemap_pointer().into());
+
+                            let cl_tilemaps_ptr = inner
+                                .scene
+                                .cluster_tilemaps_pointer()
+                                .map_or(0, |a| a.into());
+                            r.add(0x1c041, cl_tilemaps_ptr);
+                            r.add(0x1c9d0, cl_tilemaps_ptr);
+                            r.add(0x1c0a1, inner.scene.tpc_pointer().into()); // TE_TPC_ADDR
+
+                            let tvb_heapmeta_ptr = inner
+                                .scene
+                                .tvb_heapmeta_pointer()
+                                .or(0x8000_0000_0000_0000)
+                                .into();
+                            r.add(0x1c031, tvb_heapmeta_ptr);
+                            r.add(0x1c9c0, tvb_heapmeta_ptr);
+                            r.add(0x1c051, unks.iogpu_unk54); // iogpu_unk_54/55
+                            r.add(0x1c061, unks.iogpu_unk56); // iogpu_unk_56
+                            r.add(0x10149, utile_config.into()); // s2.unk_48 utile_config
+                            r.add(0x10139, cmdbuf.ppp_multisamplectl); // PPP_MULTISAMPLECTL
+                            r.add(0x10111, inner.scene.preempt_buf_1_pointer().into());
+                            r.add(0x1c9b0, inner.scene.preempt_buf_1_pointer().into());
+                            r.add(0x10119, inner.scene.preempt_buf_2_pointer().into());
+                            r.add(0x1c9b8, inner.scene.preempt_buf_2_pointer().into());
+                            r.add(0x1c958, 1); // s2.unk_80
+                            r.add(
+                                0x1c950,
+                                inner
+                                    .scene
+                                    .preempt_buf_3_pointer()
+                                    .or(0x4_0000_0000_0000)
+                                    .into(),
+                            );
+                            r.add(0x1c930, 0); // VCE related addr, lsb to enable
+                            r.add(0x1c880, cmdbuf.encoder_ptr); // VDM_CTRL_STREAM_BASE
+                            r.add(0x1c898, 0x0); // if lsb set, faults in UL1C0, possibly missing addr.
+                            r.add(
+                                0x1c948,
+                                inner.scene.meta_2_pointer().map_or(0, |a| a.into()),
+                            ); // tvb_cluster_meta2
+                            r.add(
+                                0x1c888,
+                                inner.scene.meta_3_pointer().map_or(0, |a| a.into()),
+                            ); // tvb_cluster_meta3
+                            r.add(0x1c890, tiling_control.into()); // tvb_tiling_control
+                            r.add(0x1c918, unks.tiling_control_2);
+                            r.add(0x1c079, inner.scene.tvb_layermeta_pointer().into());
+                            r.add(0x1c9d8, inner.scene.tvb_layermeta_pointer().into());
+                            r.add(0x1c089, 0);
+                            r.add(0x1c9e0, 0);
+                            let cl_meta_4_pointer =
+                                inner.scene.meta_4_pointer().map_or(0, |a| a.into());
+                            r.add(0x16c41, cl_meta_4_pointer); // tvb_cluster_meta4
+                            r.add(0x1ca40, cl_meta_4_pointer); // tvb_cluster_meta4
+                            r.add(0x1c9a8, unks.vtx_unk_f0); // + meta1_blocks? min_free_tvb_pages?
+                            r.add(
+                                0x1c920,
+                                inner.scene.meta_1_pointer().map_or(0, |a| a.into()),
+                            ); // ??? | meta1_blocks?
+                            r.add(0x10151, 0);
+                            r.add(0x1c199, 0);
+                            r.add(0x1c1a1, 0);
+                            r.add(0x1c1a9, 0); // 0x10151 bit 1 enables
+                            r.add(0x1c1b1, 0);
+                            r.add(0x1c1b9, 0);
+                            r.add(0x10061, 0x11_00000000); // USC_EXEC_BASE_TA
+                            r.add(0x11801, cmdbuf.vertex_helper_program.into());
+                            r.add(0x11809, cmdbuf.vertex_helper_arg);
+                            r.add(0x11f71, 0);
+                            r.add(0x1c0b1, tile_info.params.rgn_size.into()); // TE_PSG
+                            r.add(0x1c850, tile_info.params.rgn_size.into());
+                            r.add(0x10131, tile_info.params.unk_4.into());
+                            r.add(0x10121, tile_info.params.ppp_ctrl.into()); // PPP_CTRL
+                            r.add(
+                                0x10129,
+                                tile_info.params.x_max as u64
+                                    | ((tile_info.params.y_max as u64) << 16),
+                            ); // PPP_SCREEN
+                            r.add(0x101b9, tile_info.params.te_screen.into()); // TE_SCREEN
+                            r.add(0x1c069, tile_info.params.te_mtile1.into()); // TE_MTILE1
+                            r.add(0x1c071, tile_info.params.te_mtile2.into()); // TE_MTILE2
+                            r.add(0x1c081, tile_info.params.tiles_per_mtile.into()); // TE_MTILE
+                            r.add(0x1c0a9, tile_info.params.tpc_stride.into()); // TE_TPC
+                            r.add(0x10171, tile_info.params.unk_24.into());
+                            r.add(0x10169, tile_info.params.unk_28.into()); // TA_RENDER_TARGET_MAX
+                            r.add(0x12099, unks.vtx_unk_118);
+                            r.add(0x1c9e8, 0);
+                            /*
+                            r.add(0x10209, 0x100); // Some kind of counter?? Does this matter?
+                            r.add(0x1c9f0, 0x100); // Some kind of counter?? Does this matter?
+                            r.add(0x1c830, 1); // ?
+                            r.add(0x1ca30, 0x1502960e60); // ?
+                            r.add(0x16c39, 0x1502960e60); // ?
+                            r.add(0x1c910, 0xa0000b011d); // ?
+                            r.add(0x1c8e0, 0xff); // cluster mask
+                            r.add(0x1c8e8, 0); // ?
+                            */
+                        }
+                    ),
+                    tpc: inner.scene.tpc_pointer(),
+                    tpc_size: U64(tile_info.tpc_size as u64),
+                    microsequence: inner.micro_seq.gpu_pointer(),
+                    microsequence_size: inner.micro_seq.len() as u32,
+                    fragment_stamp_slot: ev_frag.slot,
+                    fragment_stamp_value: ev_frag.value.next(),
+                    unk_pointee: 0,
+                    unk_pad: 0,
+                    job_params2: fw::vertex::raw::JobParameters2 {
+                        unk_480: Default::default(), // fixed
+                        unk_498: U64(0x0),           // fixed
+                        unk_4a0: 0x0,                // fixed
+                        preempt_buf1: inner.scene.preempt_buf_1_pointer(),
+                        unk_4ac: 0x0,      // fixed
+                        unk_4b0: U64(0x0), // fixed
+                        unk_4b8: 0x0,      // fixed
+                        unk_4bc: U64(0x0), // fixed
+                        unk_4c4_padding: Default::default(),
+                        unk_50c: 0x0,      // fixed
+                        unk_510: U64(0x0), // fixed
+                        unk_518: U64(0x0), // fixed
+                        unk_520: U64(0x0), // fixed
+                    },
+                    encoder_params: fw::job::raw::EncoderParams {
+                        unk_8: 0x0,     // fixed
+                        sync_grow: 0x0, // fixed
+                        unk_10: 0x0,    // fixed
+                        encoder_id: cmdbuf.encoder_id,
+                        unk_18: 0x0, // fixed
+                        unk_mask: unks.vtx_unk_mask as u32,
+                        sampler_array: U64(cmdbuf.vertex_sampler_array),
+                        sampler_count: cmdbuf.vertex_sampler_count,
+                        sampler_max: cmdbuf.vertex_sampler_max,
+                    },
+                    unk_55c: 0,
+                    unk_560: 0,
+                    sync_grow: 0,
+                    unk_568: 0,
+                    unk_56c: 0,
+                    meta: fw::job::raw::JobMeta {
+                        unk_0: 0,
+                        unk_2: 0,
+                        no_preemption: (cmdbuf.flags
+                        & uapi::ASAHI_RENDER_NO_PREEMPTION as u64
+                        != 0) as u8,
+                        stamp: ev_vtx.stamp_pointer,
+                        fw_stamp: ev_vtx.fw_stamp_pointer,
+                        stamp_value: ev_vtx.value.next(),
+                        stamp_slot: ev_vtx.slot,
+                        evctl_index: 0, // fixed
+                        flush_stamps: flush_stamps as u32,
+                        uuid: uuid_ta,
+                        event_seq: ev_vtx.event_seq as u32,
+                    },
+                    unk_after_meta: unk1.into(),
+                    unk_buf_0: U64(0),
+                    unk_buf_8: U64(0),
+                    unk_buf_10: U64(0),
+                    cur_ts: U64(0),
+                    timestamp_pointers: fw::job::raw::TimestampPointers {
+                        start_addr: Some(inner_ptr!(inner.timestamps.gpu_pointer(), vtx.start)),
+                        end_addr: Some(inner_ptr!(inner.timestamps.gpu_pointer(), vtx.end)),
+                    },
+                    user_timestamp_pointers: fw::job::raw::TimestampPointers {
+                        start_addr: None,
+                        end_addr: None,
+                    },
+                    client_sequence: slot_client_seq,
+                    pad_5d5: Default::default(),
+                    unk_5d8: 0,
+                    unk_5dc: 0,
+                    #[ver(V >= V13_0B4)]
+                    unk_ts: U64(0),
+                    #[ver(V >= V13_0B4)]
+                    unk_5dd_8: Default::default(),
+                });
 
                 try_init!(fw::vertex::raw::RunVertex::ver {
                     tag: fw::workqueue::CommandType::RunVertex,
