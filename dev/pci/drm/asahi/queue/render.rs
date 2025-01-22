@@ -1513,6 +1513,9 @@ impl super::Queue::ver {
                     unk_after_meta: unk1.into(),
                     unk_buf_0: U64(0),
                     unk_buf_8: U64(0),
+                    #[ver(G < G14X)]
+                    unk_buf_10: U64(1),
+                    #[ver(G >= G14X)]
                     unk_buf_10: U64(0),
                     cur_ts: U64(0),
                     timestamp_pointers <- try_init!(fw::job::raw::TimestampPointers {
