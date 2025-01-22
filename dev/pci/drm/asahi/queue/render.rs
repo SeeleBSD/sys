@@ -1322,7 +1322,7 @@ impl super::Queue::ver {
                         preempt_buf2: inner.scene.preempt_buf_2_pointer(),
                         unk_80: U64(0x1), // fixed
                         preempt_buf3: inner.scene.preempt_buf_3_pointer().or(0x4_0000_0000_0000), // check
-                        encoder_addr: U64(inner.scene.buffer_pointer() as u64),
+                        encoder_addr: U64(u64::from(inner.scene.buffer_pointer())),
                         #[ver(G < G14)]
                         tvb_cluster_meta2: inner.scene.meta_2_pointer(),
                         #[ver(G < G14)]
